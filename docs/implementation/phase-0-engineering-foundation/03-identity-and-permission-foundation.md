@@ -3,7 +3,7 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Identity and Permission Foundation"
 owning_service: "Identity and Access"
 modules: [Authentication Contracts, Tenant Context, Roles, Permissions, Policy Enforcement]
-status: Approved
+status: In progress
 requirements: [IAM-001, IAM-003, IAM-004, IAM-005, IAM-006, IAM-007, IAM-010, IAM-011, SEC-009, SEC-010]
 stories: [US-005, US-006, US-007]
 dependencies: [Repository and Build Foundation, Local Infrastructure]
@@ -14,6 +14,18 @@ last_updated: 2026-10-16
 # Epic: Identity and Permission Foundation
 
 Approved 2026-10-16 on the instruction of the repository owner, after ADR-0008 and ADR-0009 were accepted. Ready to implement.
+
+Implementation evidence, 2026-10-16:
+
+- Contracts live in `src/BuildingBlocks/CoreBanking.BuildingBlocks.Application/Security`: `PermissionIdentifier`, `AuthenticatedActor` with `ActorType` and `AuthenticationStrength`, `ResourceScope`, `GrantScope`, `PermissionRequirement`, `AuthorisationDecision` with `DenialReason`, `Entitlements` (`EntitlementSnapshot`, `IEffectivePermissionSource`, `IEntitlementVersionSource`) and `AuthorisationCodes`. The value object is named `PermissionIdentifier` rather than `Permission` because CA1711 reserves that suffix and ADR-0003 forbids blanket suppressions.
+- `AuthorisationPolicy` denies by default and evaluates in a fixed order: missing authentication, actor type, institution, entitlement version, snapshot freshness, step-up, permission, contextual scope, segregation of duties. Permissions are read from the entitlement snapshot only; no claim from the request participates in a decision.
+- The foundation catalogue is `identity.permission.assign`, `identity.access.review`, `identity.role.create`, `audit.event.view`, `institution.tenant.create` and `platform.foundation.execute`. No permission grants a wildcard, and no role name appears in code.
+- `AuthorisationService` writes one audit entry per decision, including denials, through `IAuthorisationAuditWriter`. `AuthorisationProblem` projects a refusal to problem details: 401 only for missing authentication, 403 with a unique stable `auth.*` code for every other reason.
+- The reference protected flow is `POST /api/v1/identity/foundation-executions`, which declares `platform.foundation.execute` through `ProtectedOperationFilter`. The filter reads the requested institution and branch from the request and the policy refuses a mismatch, so client-supplied context cannot widen access.
+- Replaceable development stand-ins live in Identity and Access Infrastructure: `InMemoryEntitlementStore` (incrementing the version invalidates issued entitlements), `InMemoryAuthorisationAuditWriter` and `DevelopmentActorContextResolver`, which is registered only when the environment is Development and ignores permission, role and super-user claims in the payload.
+- Verification: `dotnet build CoreBanking.sln -c Release` reports 0 warnings and 0 errors; `dotnet test` reports 40 passed, 0 failed (12 architecture tests, 28 Identity and Access tests); `dotnet format --verify-no-changes` passes.
+- HTTP evidence from the running reference API: no material returns 401 `auth.missing_authentication`; the seeded operator without grants returns 403 `auth.missing_permission`; the operator smuggling permission, role and super-user claims still returns 403 `auth.missing_permission`; the administrator targeting another institution returns 403 `auth.wrong_institution`; the administrator with entitlement version 99 returns 403 `auth.stale_entitlement`; the administrator presented as a service identity returns 403 `auth.service_identity_not_permitted`; malformed material returns 401; the correct administrator, institution and entitlement version returns 200 with the declared permission echoed.
+- Outstanding: slice 4 (EF Core mappings and migrations for the 15 tables of the persistence foundation below) is not implemented, so effective permissions are served by the in-memory store; slice 7 telemetry is deferred to epic 05, which owns collector configuration, redaction and audit retention. Status is `In progress`, not `Implemented`.
 
 ## Objective
 
@@ -146,14 +158,14 @@ Authenticated synthetic administrator
 
 ## Acceptance criteria
 
-- [ ] Authentication and tenant context are distinct from authorisation.
-- [ ] Every reference operation declares a permission.
-- [ ] Roles remain configurable bundles rather than code branches.
-- [ ] Contextual scopes are enforced server-side.
-- [ ] Cross-tenant and missing-permission tests pass.
-- [ ] Service and human identities remain separate.
-- [ ] Entitlement changes have a defined invalidation path.
-- [ ] Sensitive decisions are auditable.
+- [x] Authentication and tenant context are distinct from authorisation. The resolver produces an `AuthenticatedActor`; the policy alone decides.
+- [x] Every reference operation declares a permission. `ProtectedOperationFilter` refuses an endpoint that declares none.
+- [x] Roles remain configurable bundles rather than code branches. Grants are awarded per permission, and the code names no role.
+- [x] Contextual scopes are enforced server-side. `GrantScope.Covers` is evaluated against the requested scope, never against client-supplied grants.
+- [x] Cross-tenant and missing-permission tests pass. `AuthorisationPolicyTests` covers the epic test matrix; HTTP evidence confirms 403 for both cases.
+- [x] Service and human identities remain separate. `PermissionRequirement.AllowedActorTypes` refuses a service identity for a human permission.
+- [x] Entitlement changes have a defined invalidation path. Incrementing the version makes previously issued entitlements fail with `auth.stale_entitlement`, and a snapshot older than 60 seconds is refused.
+- [x] Sensitive decisions are auditable. Every decision, including a refusal, is written with the correlation id and the stable reason.
 
 ## Open decisions
 
