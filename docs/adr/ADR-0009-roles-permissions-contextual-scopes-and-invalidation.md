@@ -1,7 +1,7 @@
 ---
 id: ADR-0009
 title: "Roles, permissions, contextual scopes and entitlement invalidation"
-status: Proposed
+status: Accepted
 date: 2026-10-16
 owners: [Architecture, Security, Identity and Access]
 required_by: "Phase 0 - Identity and Permission Foundation; Phase 1 - Identity, Roles and Permissions"
@@ -12,8 +12,8 @@ referenced_by:
   - docs/implementation/phase-1-banking-foundation/01-institution-and-tenancy.md
   - docs/implementation/phase-1-banking-foundation/02-identity-roles-and-permissions.md
 supersedes: []
-approved_by: []
-approved_on: null
+approved_by: [Architecture, Security, Identity and Access]
+approved_on: 2026-10-16
 ---
 
 # ADR-0009: Roles, permissions, contextual scopes and entitlement invalidation
@@ -78,9 +78,7 @@ approved_on: null
 
 ## Approval gate
 
-Do not implement production authorisation enforcement, role storage, grant assignment or invalidation until this ADR is `Accepted`. Policies, ports and negative tests may be built against a replaceable local implementation.
-
-Approval required from **Architecture**, **Security** and **Identity and Access**. Record acceptance by setting `status: Accepted` and filling `approved_by` and `approved_on`, then updating the [index](README.md).
+Satisfied 2026-10-16 for the permission model, role and grant lifecycle, scope evaluation, entitlement versioning and invalidation, and enforcement placement. Still outstanding: how the entitlement snapshot is delivered, the per-service cache lifetimes, whether default role bundles ship with the platform, and whether conflict-of-role rules are configured per institution.
 
 ## Related documents
 

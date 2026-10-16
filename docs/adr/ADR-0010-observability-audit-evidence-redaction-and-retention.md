@@ -1,7 +1,7 @@
 ---
 id: ADR-0010
 title: "Observability, audit evidence, sensitive-data redaction and retention"
-status: Proposed
+status: Accepted
 date: 2026-10-16
 owners: [Platform Engineering, Security, Compliance]
 required_by: "Phase 0 - Observability and CI; Phase 1 - Audit, Traceability and Recovery"
@@ -9,8 +9,8 @@ architecture_item: 12
 referenced_by:
   - docs/implementation/phase-0-engineering-foundation/05-observability-and-ci.md
 supersedes: []
-approved_by: []
-approved_on: null
+approved_by: [Platform Engineering, Security, Compliance]
+approved_on: 2026-10-16
 ---
 
 # ADR-0010: Observability, audit evidence, sensitive-data redaction and retention
@@ -77,9 +77,7 @@ approved_on: null
 
 ## Approval gate
 
-Do not finalise the audit envelope, select or commit a telemetry backend, or commit retention configuration until this ADR is `Accepted`. Local development telemetry marked development-only may continue under `02-local-infrastructure.md`. The CI workflow may continue to run the checks it already implements; new scanning steps and branch-protection requirements wait for this ADR.
-
-Approval required from **Platform Engineering**, **Security** and **Compliance**. Record acceptance by setting `status: Accepted` and filling `approved_by` and `approved_on`, then updating the [index](README.md).
+Satisfied 2026-10-16 for the pipeline, audit envelope, redaction, metrics, health and retention approach. Still outstanding: telemetry backend products, the audit storage location and tamper-evidence mechanism, production retention periods, the production sampling policy, and the secret-scanning tooling and exception process. The committed CI workflow may run the checks it already implements; new scanning steps and branch protection wait for the tooling decision.
 
 ## Related documents
 

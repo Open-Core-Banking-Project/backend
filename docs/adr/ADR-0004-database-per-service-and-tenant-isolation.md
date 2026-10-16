@@ -1,7 +1,7 @@
 ---
 id: ADR-0004
 title: "Database-per-service and tenant-isolation model"
-status: Proposed
+status: Accepted
 date: 2026-10-16
 owners: [Architecture, Database, Security]
 required_by: "Phase 0 - Local Infrastructure; Phase 1 - Institution and Tenancy"
@@ -10,8 +10,8 @@ referenced_by:
   - docs/implementation/phase-0-engineering-foundation/02-local-infrastructure.md
   - docs/implementation/phase-1-banking-foundation/01-institution-and-tenancy.md
 supersedes: []
-approved_by: []
-approved_on: null
+approved_by: [Architecture, Database, Security]
+approved_on: 2026-10-16
 ---
 
 # ADR-0004: Database-per-service and tenant-isolation model
@@ -75,9 +75,7 @@ approved_on: null
 
 ## Approval gate
 
-Do not commit production connection topology, database principals, migration execution policy or a tenant-isolation mechanism until this ADR is `Accepted`. Local, clearly marked development-only infrastructure may continue under `02-local-infrastructure.md`.
-
-Approval required from **Architecture**, **Database** and **Security**. Record acceptance by setting `status: Accepted` and filling `approved_by` and `approved_on`, then updating the [index](README.md).
+Satisfied 2026-10-16 for the topology, principals, tenant model, enforcement approach and migration ownership. Still outstanding before production: the row-level security evaluation and adoption decision, retention and partitioning periods, the production hosting topology in [ADR-0013](ADR-0013-deployment-migration-backup-restore-rto-and-rpo.md), and a production provisioning plan confirming the database and principal inventory.
 
 ## Related documents
 

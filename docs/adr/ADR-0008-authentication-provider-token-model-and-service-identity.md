@@ -1,7 +1,7 @@
 ---
 id: ADR-0008
 title: "Authentication provider, token model and service identity"
-status: Proposed
+status: Accepted
 date: 2026-10-16
 owners: [Architecture, Security, Identity and Access]
 required_by: "Phase 0 - Identity and Permission Foundation; Phase 1 - Identity, Roles and Permissions"
@@ -11,8 +11,8 @@ referenced_by:
   - docs/implementation/phase-1-banking-foundation/02-identity-roles-and-permissions.md
   - docs/implementation/phase-1-banking-foundation/01-institution-and-tenancy.md
 supersedes: []
-approved_by: []
-approved_on: null
+approved_by: [Architecture, Security, Identity and Access]
+approved_on: 2026-10-16
 ---
 
 # ADR-0008: Authentication provider, token model and service identity
@@ -78,9 +78,7 @@ approved_on: null
 
 ## Approval gate
 
-Do not implement production authentication, token issuance, device enrolment or service credential handling until this ADR is `Accepted`. Abstractions, ports and negative tests may be built against a replaceable local implementation.
-
-Approval required from **Architecture**, **Security** and **Identity and Access**. Record acceptance by setting `status: Accepted` and filling `approved_by` and `approved_on`, then updating the [index](README.md).
+Satisfied 2026-10-16 for the protocol, token model, session, device, step-up and service identity design. Still outstanding: the identity provider product, hosting model and licensing; the second-factor method; and whether partner and corporate clients use a separate delegated surface. Until the provider is selected, the implementation stays replaceable behind the documented abstraction and no production enrolment may be claimed.
 
 ## Related documents
 

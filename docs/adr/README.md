@@ -31,9 +31,9 @@ Several epics state that an ADR "must be approved before production implementati
 
 Current gates:
 
-- Satisfied 2026-10-16: `ADR-0001`, `ADR-0002`, `ADR-0003` (Phase 0 repository and build scaffolding) and `ADR-0007` (publishing integration events, and committing outbox, inbox, idempotency and dead-letter tables).
-- Outstanding, decision drafted and awaiting approval: `ADR-0004` (production database provisioning and cross-service data access), `ADR-0008` and `ADR-0009` (production authentication, authorisation and entitlement invalidation), `ADR-0010` (finalising audit, telemetry and retention), `ADR-0011` (production secret, key and certificate mechanisms).
-- Outstanding, scope only: `ADR-0005` (any production financial posting in Phase 1).
+- Satisfied 2026-10-16: `ADR-0001`, `ADR-0002`, `ADR-0003` (Phase 0 repository and build), `ADR-0004` (database topology, principals and tenant isolation), `ADR-0007` (messaging, outbox, inbox and replay), `ADR-0008` and `ADR-0009` (authentication, authorisation and entitlement invalidation), `ADR-0010` (observability, audit and retention approach) and `ADR-0011` (secrets, keys and certificates).
+- Outstanding, decision drafted and awaiting approval: `ADR-0013` (deployment, migration execution, backup, restore, RTO and RPO) - required by Phase 1 operations and release readiness.
+- Outstanding, scope only: `ADR-0005` (any production financial posting in Phase 1), `ADR-0006` (API versioning and problem details), `ADR-0012` (channel security boundaries) and `ADR-0014` (reporting read models and regulatory lineage).
 
 ## File naming
 
@@ -43,11 +43,13 @@ ADR-NNNN-kebab-case-title.md
 
 ## Index
 
-**Accepted 2026-10-16:** ADR-0001, ADR-0002, ADR-0003 (Phase 0 repository and build) and ADR-0007 (messaging, outbox, inbox and replay).
+**Accepted 2026-10-16:** ADR-0001, ADR-0002, ADR-0003 (Phase 0 repository and build), ADR-0004 (database topology, principals and tenant isolation), ADR-0007 (messaging), ADR-0008 and ADR-0009 (authentication, authorisation and entitlement invalidation), ADR-0010 (observability, audit and retention approach) and ADR-0011 (secrets, keys and certificates).
 
-**Decision-complete, awaiting owner approval:** ADR-0004, ADR-0008, ADR-0009, ADR-0010, ADR-0011 and ADR-0013. Together these cover every remaining Phase 0 dependency for epics 02, 03 and 05, and the deployment and recovery model.
+**Decision-complete, awaiting owner approval:** ADR-0013 (deployment, migration execution, backup, restore, RTO and RPO).
 
 **Scope only, awaiting an owner decision:** ADR-0005, ADR-0006, ADR-0012, ADR-0014.
+
+Each accepted record states the narrow items that remain open, such as the production broker product, identity provider licensing, telemetry backends, retention periods, row-level security adoption and the production secret store. Those are tracked in the record's Approval gate section and must be closed before the corresponding production claim.
 
 | ID | Title | Architecture item | Referenced by |
 | --- | --- | --- | --- |

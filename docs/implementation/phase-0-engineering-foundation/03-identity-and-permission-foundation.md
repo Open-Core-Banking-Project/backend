@@ -3,15 +3,17 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Identity and Permission Foundation"
 owning_service: "Identity and Access"
 modules: [Authentication Contracts, Tenant Context, Roles, Permissions, Policy Enforcement]
-status: Draft
+status: Approved
 requirements: [IAM-001, IAM-003, IAM-004, IAM-005, IAM-006, IAM-007, IAM-010, IAM-011, SEC-009, SEC-010]
 stories: [US-005, US-006, US-007]
 dependencies: [Repository and Build Foundation, Local Infrastructure]
 adrs: [ADR-0008, ADR-0009]
-last_updated: 2026-10-15
+last_updated: 2026-10-16
 ---
 
 # Epic: Identity and Permission Foundation
+
+Approved 2026-10-16 on the instruction of the repository owner, after ADR-0008 and ADR-0009 were accepted. Ready to implement.
 
 ## Objective
 

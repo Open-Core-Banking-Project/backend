@@ -1,7 +1,7 @@
 ---
 id: ADR-0011
 title: "Secret, key and certificate management and cryptographic boundaries"
-status: Proposed
+status: Accepted
 date: 2026-10-16
 owners: [Security, Platform Engineering]
 required_by: "Phase 0 - Local Infrastructure; Phase 0 - Observability and CI; Phase 1 - Integration Hub and Providers"
@@ -10,8 +10,8 @@ referenced_by:
   - docs/implementation/phase-0-engineering-foundation/02-local-infrastructure.md
   - docs/implementation/phase-0-engineering-foundation/05-observability-and-ci.md
 supersedes: []
-approved_by: []
-approved_on: null
+approved_by: [Security, Platform Engineering]
+approved_on: 2026-10-16
 ---
 
 # ADR-0011: Secret, key and certificate management and cryptographic boundaries
@@ -76,9 +76,7 @@ approved_on: null
 
 ## Approval gate
 
-Do not commit production secret paths, key material, certificate handling, cryptographic algorithm choices or CI secret wiring until this ADR is `Accepted`. Clearly marked development-only substitutes may continue under `02-local-infrastructure.md`.
-
-Approval required from **Security** and **Platform Engineering**. Record acceptance by setting `status: Accepted` and filling `approved_by` and `approved_on`, then updating the [index](README.md).
+Satisfied 2026-10-16 for the secret access path, cryptography, key versioning, certificate lifecycle and provider credential handling. Still outstanding: the production secret store product, any hardware module requirement, per-institution key separation, the subset of personal data that requires field-level encryption, and the secret-scanning tool choice shared with [ADR-0010](ADR-0010-observability-audit-evidence-redaction-and-retention.md).
 
 ## Related documents
 

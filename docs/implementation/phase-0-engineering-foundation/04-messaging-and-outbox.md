@@ -3,15 +3,17 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Messaging, Outbox, Inbox and Idempotency"
 owning_service: "Platform-wide"
 modules: [Event Contracts, Transactional Outbox, Inbox, Idempotency, Replay]
-status: Draft
+status: Approved
 requirements: [ARC-002, ARC-003, LED-004, LED-005, NFR-RES-002, API-007]
 stories: [US-020, US-068, US-071]
 dependencies: [Repository and Build Foundation, Local Infrastructure, Identity and Permission Foundation]
 adrs: [ADR-0007]
-last_updated: 2026-10-15
+last_updated: 2026-10-16
 ---
 
 # Epic: Messaging, Outbox, Inbox and Idempotency
+
+Approved 2026-10-16 on the instruction of the repository owner, after ADR-0007 was accepted. Ready to implement.
 
 ## Objective
 

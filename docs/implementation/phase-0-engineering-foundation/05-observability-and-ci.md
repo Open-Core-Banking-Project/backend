@@ -3,15 +3,17 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Observability, Audit and Continuous Integration"
 owning_service: "Platform-wide"
 modules: [OpenTelemetry, Audit Foundation, Health, CI, Security Checks]
-status: Draft
+status: Approved
 requirements: [NFR-OBS-001, NFR-OBS-002, NFR-MNT-001, SEC-016, SEC-017, AUD-001, AUD-002, AUD-003, AUD-004]
 stories: [US-070, US-071, US-079, US-080]
 dependencies: [Repository and Build Foundation, Local Infrastructure, Identity and Permission Foundation, Messaging and Outbox]
 adrs: [ADR-0010, ADR-0011]
-last_updated: 2026-10-15
+last_updated: 2026-10-16
 ---
 
 # Epic: Observability, Audit and Continuous Integration
+
+Approved 2026-10-16 on the instruction of the repository owner, after ADR-0010 and ADR-0011 were accepted. The CI provider, additional scanning tools and branch protection remain governed by ADR-0010 and must be confirmed before they are treated as required checks.
 
 ## Objective
 
