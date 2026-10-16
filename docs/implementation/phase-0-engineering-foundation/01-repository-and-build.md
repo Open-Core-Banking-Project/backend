@@ -3,15 +3,17 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Repository and Build Foundation"
 owning_service: "Platform-wide"
 modules: [Build, Repository Structure, Architecture Tests]
-status: Draft
+status: Approved
 requirements: [ARC-001, ARC-004, ARC-009, NFR-MNT-001]
 stories: [US-079]
 dependencies: []
 adrs: [ADR-0001, ADR-0002, ADR-0003]
-last_updated: 2026-10-15
+last_updated: 2026-10-16
 ---
 
 # Epic: Repository and Build Foundation
+
+Approved 2026-10-16 on the instruction of the repository owner, after ADR-0001, ADR-0002 and ADR-0003 were accepted. Ready to implement.
 
 ## Objective
 

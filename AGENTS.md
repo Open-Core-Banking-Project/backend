@@ -18,7 +18,7 @@ Read the following before making architectural or domain changes:
    - `../Core_Banking_Software_Requirements_Specification.pdf`
    - `../Core_Banking_User_Stories.pdf`
    - `../Core_Banking_Blueprint.pdf`
-6. Relevant ADRs, API contracts, event contracts, accounting rules, migrations, and tests once those directories exist.
+6. Relevant ADRs (index and status in `docs/adr/README.md`), API contracts, event contracts, accounting rules, migrations, and tests once those directories exist.
 
 When sources conflict, use this precedence:
 

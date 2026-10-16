@@ -1071,3 +1071,5 @@ The following must be resolved rather than guessed during implementation:
 - Data migration and go-live cutover strategy.
 
 Until approved, represent these as explicit open decisions in ADRs, work items, and tests. Do not hide assumptions inside code.
+
+ADR identifiers, statuses, and the mapping of the required decisions above to `ADR-0001` to `ADR-0014` are maintained in [`docs/adr/README.md`](../adr/README.md). Epic documents reference ADRs by identifier or by topic name until an identifier is assigned.
