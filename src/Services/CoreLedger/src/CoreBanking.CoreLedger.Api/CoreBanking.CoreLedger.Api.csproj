@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CoreBanking.CoreLedger.Application\CoreBanking.CoreLedger.Application.csproj" />
+    <ProjectReference Include="..\CoreBanking.CoreLedger.Contracts\CoreBanking.CoreLedger.Contracts.csproj" />
+    <ProjectReference Include="..\CoreBanking.CoreLedger.Infrastructure\CoreBanking.CoreLedger.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+</Project>

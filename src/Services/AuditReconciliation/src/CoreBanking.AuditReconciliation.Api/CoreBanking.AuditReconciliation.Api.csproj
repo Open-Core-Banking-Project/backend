@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CoreBanking.AuditReconciliation.Application\CoreBanking.AuditReconciliation.Application.csproj" />
+    <ProjectReference Include="..\CoreBanking.AuditReconciliation.Contracts\CoreBanking.AuditReconciliation.Contracts.csproj" />
+    <ProjectReference Include="..\CoreBanking.AuditReconciliation.Infrastructure\CoreBanking.AuditReconciliation.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+</Project>

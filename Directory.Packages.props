@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    Central package management. Project files must not declare package versions.
+    See docs/adr/ADR-0003-monorepo-solution-and-project-organisation.md.
+
+    Add one PackageVersion entry here for each package a project requires, with an
+    exact version. Floating versions are not permitted.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+</Project>

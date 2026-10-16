@@ -3,7 +3,7 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Repository and Build Foundation"
 owning_service: "Platform-wide"
 modules: [Build, Repository Structure, Architecture Tests]
-status: Approved
+status: In progress
 requirements: [ARC-001, ARC-004, ARC-009, NFR-MNT-001]
 stories: [US-079]
 dependencies: []
@@ -14,6 +14,8 @@ last_updated: 2026-10-16
 # Epic: Repository and Build Foundation
 
 Approved 2026-10-16 on the instruction of the repository owner, after ADR-0001, ADR-0002 and ADR-0003 were accepted. Ready to implement.
+
+Implementation progress: slices 2 to 4 are complete on `devops/phase-0-repository-and-build` - root build and configuration files, the solution, the nine services with their standard projects, the building-block projects and the approved project references. Slices 5 to 7 remain: test projects with the architecture tests, the build and test scripts, and CI-ready deterministic verification.
 
 ## Objective
 
