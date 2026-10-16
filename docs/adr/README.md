@@ -31,8 +31,9 @@ Several epics state that an ADR "must be approved before production implementati
 
 Current gates:
 
-- Satisfied 2026-10-16: `ADR-0001`, `ADR-0002`, `ADR-0003` (Phase 0 repository and build scaffolding).
-- Outstanding: `ADR-0004` (production database provisioning and cross-service data access), `ADR-0005` (any production financial posting in Phase 1), `ADR-0007` (publishing any integration event), `ADR-0008` and `ADR-0009` (production authentication and authorisation enforcement).
+- Satisfied 2026-10-16: `ADR-0001`, `ADR-0002`, `ADR-0003` (Phase 0 repository and build scaffolding) and `ADR-0007` (publishing integration events, and committing outbox, inbox, idempotency and dead-letter tables).
+- Outstanding, decision drafted and awaiting approval: `ADR-0004` (production database provisioning and cross-service data access), `ADR-0008` and `ADR-0009` (production authentication, authorisation and entitlement invalidation), `ADR-0010` (finalising audit, telemetry and retention), `ADR-0011` (production secret, key and certificate mechanisms).
+- Outstanding, scope only: `ADR-0005` (any production financial posting in Phase 1).
 
 ## File naming
 
@@ -42,11 +43,11 @@ ADR-NNNN-kebab-case-title.md
 
 ## Index
 
-**Accepted 2026-10-16:** ADR-0001, ADR-0002, ADR-0003 (the Phase 0 repository and build unblockers).
+**Accepted 2026-10-16:** ADR-0001, ADR-0002, ADR-0003 (Phase 0 repository and build) and ADR-0007 (messaging, outbox, inbox and replay).
 
-**Decision-complete, awaiting owner approval:** ADR-0007, ADR-0013.
+**Decision-complete, awaiting owner approval:** ADR-0004, ADR-0008, ADR-0009, ADR-0010, ADR-0011 and ADR-0013. Together these cover every remaining Phase 0 dependency for epics 02, 03 and 05, and the deployment and recovery model.
 
-**Scope only, awaiting an owner decision:** ADR-0004, ADR-0005, ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0014.
+**Scope only, awaiting an owner decision:** ADR-0005, ADR-0006, ADR-0012, ADR-0014.
 
 | ID | Title | Architecture item | Referenced by |
 | --- | --- | --- | --- |

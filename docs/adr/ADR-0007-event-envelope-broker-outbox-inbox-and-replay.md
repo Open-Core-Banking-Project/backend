@@ -1,7 +1,7 @@
 ---
 id: ADR-0007
 title: "Event envelope, broker, outbox/inbox and replay"
-status: Proposed
+status: Accepted
 date: 2026-10-16
 owners: [Architecture, Platform Engineering]
 required_by: "Phase 0 - Messaging and Outbox, slice 1"
@@ -11,15 +11,17 @@ referenced_by:
   - docs/implementation/phase-0-engineering-foundation/04-messaging-and-outbox.md
   - docs/implementation/phase-1-banking-foundation/01-institution-and-tenancy.md
 supersedes: []
-approved_by: []
-approved_on: null
+approved_by: [Architecture, Platform Engineering]
+approved_on: 2026-10-16
 ---
 
 # ADR-0007: Event envelope, broker, outbox/inbox and replay
 
 ## Status
 
-`Proposed` - decision drafted and ready for owner approval. Effective only when the owners listed below record `Accepted`. Until then no integration event may be published and no outbox or inbox table may be committed.
+`Accepted` 2026-10-16. The envelope, topic and partition conventions, outbox and inbox rules, idempotency scope, retry and dead-letter behaviour, replay procedure and compatibility rules are binding. Integration events may be published and the outbox, inbox, idempotency and dead-letter tables may be committed.
+
+Approval recorded on the instruction of the repository owner (`adamsondamilola <adamsondamilola@gmail.com>`) against the owners named in the front matter. Replace the role names with individual approver identities when the approval record is formalised.
 
 ## Context
 
@@ -77,9 +79,7 @@ approved_on: null
 
 ## Approval gate
 
-Do not publish an integration event, create outbox, inbox, idempotency or dead-letter tables, or commit a broker choice in configuration until this ADR is `Accepted`. Local development infrastructure that is clearly marked development-only may continue under `02-local-infrastructure.md`.
-
-Approval required from **Architecture** and **Platform Engineering**, with the production broker choice confirmed by the stakeholders listed in `BACKEND_ARCHITECTURE.md`. Record acceptance by setting `status: Accepted` and filling `approved_by` and `approved_on`, then updating the [index](README.md).
+Satisfied 2026-10-16 for the envelope, outbox, inbox, idempotency, dead-letter and replay design. The production broker product is not selected by this ADR: until it is confirmed by the stakeholders listed in `BACKEND_ARCHITECTURE.md`, the broker stays behind a documented adapter and configuration, and no production topic provisioning or managed-service commitment may be made.
 
 ## Related documents
 
