@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to the Core Banking Platform.
 
-This is a volunteer, collaborative learning project focused on designing and building a secure, modern and reusable banking platform. Contributors may participate in backend development, frontend development, mobile development, UI/UX design, quality assurance, cybersecurity, DevOps, documentation, business analysis and other project areas.
+This repository is the backend of a volunteer, collaborative project focused on designing and building a secure, modern and reusable banking platform. All production backend services, APIs, workers, integrations and business logic in this repository use C# and .NET.
 
 By contributing, you agree to follow the project standards, communicate respectfully and submit work that supports the goals of the project.
 
@@ -21,12 +21,12 @@ Before starting work, contributors should:
 1. Join the approved project communication channel.
 2. Provide their GitHub username.
 3. Select or receive an assigned project role.
-4. Read the project documentation.
-5. Review the architecture and technology guidelines.
-6. Set up the required development environment.
-7. Confirm that the relevant project can run locally.
+4. Read `AGENTS.md`, `README.md` and the documentation relevant to the intended change.
+5. Review the applicable requirement IDs, user stories, architecture decisions and contracts.
+6. Install the repository-pinned .NET SDK and required local infrastructure.
+7. Confirm that the affected projects build and their tests run locally.
 8. Receive or select an approved task.
-9. Understand the task requirements and acceptance criteria.
+9. Understand the task requirements, acceptance criteria, dependencies and affected financial or security invariants.
 10. Inform the team lead before beginning significant implementation.
 
 Do not begin work on an unassigned major feature without discussing it with the relevant team lead.
@@ -35,26 +35,19 @@ Do not begin work on an unassigned major feature without discussing it with the 
 
 Contributions may include:
 
-* C# and ASP.NET Core backend services
-* Java and Spring Boot backend services
-* TypeScript and NestJS backend services
-* Python and FastAPI services
-* React and Next.js web applications
-* Flutter mobile applications
-* UI/UX and Figma designs
-* PostgreSQL database development
-* Kafka and Redis integration
-* API integration
-* Automated testing
-* Cybersecurity reviews
-* DevOps and infrastructure
-* Documentation
-* Business analysis
-* Product research
-* Banking-domain research
-* Bug fixes
-* Code reviews
-* Usability testing
+* C# and ASP.NET Core services, APIs and hosted workers
+* Domain modelling and financial business rules
+* Entity Framework Core and PostgreSQL persistence
+* Kafka-compatible messaging and Redis integration
+* External-provider and partner integrations
+* OpenAPI and event-contract development
+* Automated unit, integration, architecture, contract and end-to-end testing
+* Cybersecurity, privacy and threat-modelling reviews
+* Observability, DevOps and infrastructure
+* Documentation, runbooks and architecture decisions
+* Business analysis and requirement traceability
+* Banking-domain and regulatory research
+* Bug fixes, performance improvements and code reviews
 
 Contributors should work within their assigned area unless permission is given to work across multiple areas.
 
@@ -87,17 +80,9 @@ Do not duplicate another contributor’s work.
 
 ## 5. Repository Structure
 
-The project may contain multiple repositories or a monorepo covering areas such as:
+This repository contains a C#/.NET microservices backend, including bounded contexts, shared building blocks, contracts, tests, documentation and deployment assets. The initial topology has nine coarse-grained, independently deployable microservices, including a Channels and Engagement service for USSD, WhatsApp chatbot, CMS, notifications and conversational sessions. Additional microservices are created only through justified progressive decomposition. Frontend and mobile applications live in separate repositories and follow their own contribution instructions.
 
-* Backend services
-* Web applications
-* Mobile applications
-* Infrastructure
-* Documentation
-* UI/UX resources
-* Shared libraries
-
-Follow the existing repository structure. Do not create new top-level folders, services or applications without discussing the change with the project maintainers.
+Follow the existing repository structure and `AGENTS.md`. Do not create a new top-level folder, bounded context, microservice or shared library without an approved architectural reason.
 
 ## 6. Branching Rules
 
@@ -110,7 +95,6 @@ Recommended branch formats:
 ```text
 feature/TASK-0102-customer-onboarding
 fix/TASK-0210-payment-reversal
-design/TASK-0330-staff-dashboard
 test/TASK-0415-ledger-integration-tests
 docs/TASK-0450-api-documentation
 devops/TASK-0480-kubernetes-ingress
@@ -120,7 +104,6 @@ Use the following prefixes where appropriate:
 
 * `feature/` for new features
 * `fix/` for bug fixes
-* `design/` for UI/UX contributions
 * `test/` for testing work
 * `docs/` for documentation
 * `refactor/` for code improvements without behavioural changes
@@ -184,9 +167,9 @@ Before opening a pull request:
 
 1. Pull the latest changes from the target branch.
 2. Resolve merge conflicts.
-3. Run the application locally.
-4. Run relevant tests.
-5. Run code formatting and linting.
+3. Restore and build the affected .NET solution or projects.
+4. Run the relevant automated tests, starting with the narrowest affected suite.
+5. Run `dotnet format --verify-no-changes` and configured analyzers.
 6. Remove temporary files and debugging code.
 7. Review your own changes.
 8. Update documentation where necessary.
@@ -195,12 +178,14 @@ Before opening a pull request:
 A pull request should contain:
 
 * Related task or Issue ID
+* Related SRS requirement and user-story IDs
 * Summary of the change
 * Reason for the change
 * Main implementation decisions
-* Testing performed
+* Exact verification commands and results
 * Screenshots for visual changes
 * Database migration information
+* API or event compatibility information
 * Known limitations
 * Security considerations
 * Reviewer information
@@ -275,10 +260,13 @@ Contributors should:
 * Use meaningful names.
 * Keep functions and classes focused.
 * Avoid unnecessary duplication.
-* Follow existing architecture patterns.
+* Follow the bounded-context and dependency rules in `AGENTS.md`.
 * Validate external input.
 * Handle errors consistently.
-* Use dependency injection where appropriate.
+* Use ASP.NET Core dependency injection and configuration conventions.
+* Enable and respect nullable reference type analysis.
+* Use asynchronous APIs for I/O and propagate cancellation tokens.
+* Obtain current time through `TimeProvider` instead of calling the system clock in domain logic.
 * Add relevant logging.
 * Write tests for important business logic.
 * Document public APIs.
@@ -286,7 +274,7 @@ Contributors should:
 * Avoid premature optimisation.
 * Keep changes within the scope of the assigned task.
 
-Use the formatter, linter and static-analysis tools configured in each repository.
+Use the repository's .NET formatter, compiler warnings and configured analyzers. Use centrally managed package versions when that configuration is present.
 
 Do not reformat unrelated files as part of a small contribution.
 
@@ -300,17 +288,21 @@ This project handles banking and financial concepts. Contributions must respect 
 * Financial postings must follow double-entry accounting.
 * Debits and credits must remain balanced.
 * Financial operations must support auditability.
-* Important transaction requests should support idempotency.
+* Every financial command must use a scoped idempotency key and must not create a second accounting outcome when replayed.
 * Reversals must not erase the original transaction.
 * Financial history should not be silently modified or deleted.
 * Concurrency must be considered when changing balances or limits.
-* Important transaction states must be recorded.
-* External payment failures must be handled safely.
-* Ledger and payment services must remain the source of truth for financial records.
+* Financial transaction states must be explicit and traceable.
+* Provider timeouts or ambiguous responses must enter an uncertain state and be queried before retry, failover or reversal.
+* Core Banking and Ledger is the sole authoritative source for customer balances. Payment services orchestrate requests but do not directly mutate balances.
+* Business date, transaction timestamp, posting date and value date must remain distinct.
+* Fees, taxes, commissions, interest and penalties must be represented as explicit accounting components.
 
 Any change affecting the ledger, balances, interest, fees, settlements or transaction posting requires additional review.
 
 ## 12. Backend Requirements
+
+Backend contributions use C# and .NET. A typical bounded context separates Domain, Application, Infrastructure, API and Contracts responsibilities as described in `AGENTS.md`.
 
 Backend contributions should include, where applicable:
 
@@ -318,6 +310,7 @@ Backend contributions should include, where applicable:
 * Input validation
 * Authentication
 * Authorisation
+* Explicit role and permission requirements for every protected action
 * Business rules
 * Consistent error handling
 * Database migrations
@@ -326,10 +319,13 @@ Backend contributions should include, where applicable:
 * Logging
 * Unit tests
 * Integration tests
+* Architecture and contract tests
 * OpenAPI documentation
 * Example requests and responses
 * Event documentation
 * Health checks
+
+Domain projects must not depend on ASP.NET Core, Entity Framework Core, messaging clients or provider SDKs. API contracts must not expose EF Core entities or internal domain objects.
 
 Avoid exposing internal implementation details through public APIs.
 
@@ -339,14 +335,14 @@ Breaking API changes must be discussed and approved before implementation.
 
 Database changes must:
 
-* Use approved migration tools.
-* Include rollback considerations.
+* Use Entity Framework Core migrations owned by the bounded context that owns the schema.
+* Include rollback or forward-fix considerations.
 * Preserve existing financial records.
-* Use appropriate data types.
+* Configure appropriate PostgreSQL data types, including explicit precision and scale for money.
 * Include required indexes.
 * Consider query performance.
 * Consider concurrent operations.
-* Respect service database ownership.
+* Respect bounded-context database ownership.
 * Protect personal and sensitive data.
 * Avoid destructive changes without approval.
 * Include test data only when appropriate.
@@ -355,55 +351,19 @@ Do not manually change shared, staging or production databases without approval.
 
 Do not store passwords or secrets directly in database migration files.
 
-## 14. Frontend Guidelines
+Do not edit a released migration. Correct it with a new migration. Destructive or long-running migrations require an explicit rollout, data verification and recovery plan.
 
-Frontend contributions should:
+## 14. Frontend Contract Boundaries
 
-* Follow approved Figma designs.
-* Use the shared design system.
-* Use reusable components.
-* Support responsive layouts.
-* Include loading states.
-* Include empty states.
-* Include error states.
-* Include success states.
-* Include disabled states.
-* Apply role-based permissions.
-* Validate forms.
-* Protect sensitive information.
-* Meet accessibility requirements.
-* Include tests for critical user journeys.
-* Avoid direct database access.
+Frontend and mobile applications are maintained in separate repositories. Backend contributors must provide stable, versioned and documented HTTP or event contracts for those clients.
 
-Frontend applications must communicate through approved APIs.
+Backend code must never rely on a frontend to enforce authorisation, tenant isolation, ownership, limits, fee calculation, approval state or other security and financial rules. Do not place backend secrets in examples or expose them through client-facing configuration.
 
-Do not place sensitive credentials or secret business rules in frontend code.
+## 15. API and Design Coordination
 
-## 15. UI/UX and Figma Guidelines
+Changes affecting a user journey should be coordinated with the relevant frontend or design workstream. Backend pull requests must document new fields, validation rules, permissions, asynchronous states, error codes, compatibility considerations and example requests/responses.
 
-Design contributions should include:
-
-* Clear page names
-* User journeys
-* Information architecture
-* Responsive layouts
-* Components and variants
-* Auto Layout
-* Design tokens
-* Typography
-* Spacing
-* Form validation states
-* Loading states
-* Empty states
-* Error states
-* Success states
-* Permission-restricted states
-* Accessibility notes
-* Developer handoff information
-
-Designers should avoid creating isolated screens without considering the complete user flow.
-
-Significant design changes should be reviewed before frontend implementation begins.
+Do not silently change a published contract to match an unapproved screen. Breaking changes require an approved versioning and migration plan.
 
 ## 16. Testing Requirements
 
@@ -413,6 +373,7 @@ Testing may include:
 
 * Unit tests
 * Integration tests
+* Architecture tests
 * Contract tests
 * API tests
 * End-to-end tests
@@ -435,8 +396,22 @@ Features involving payments should test scenarios such as:
 * Unauthorised access
 * Partial failure
 * Concurrent requests
+* Cross-tenant access attempts
+* Currency mismatch and rounding boundaries
+* Outbox or event-publication failure after local persistence
 
-Tests should be repeatable and should not depend on real customer data.
+Tests must be deterministic and repeatable, must control time where relevant, and must not depend on real customer data or uncontrolled external networks. Financial state-change tests should assert ledger, idempotency, audit and emitted-event outcomes as applicable, not only an HTTP status code.
+
+When a solution exists, the normal verification sequence is:
+
+```powershell
+dotnet restore
+dotnet build --no-restore
+dotnet test --no-build
+dotnet format --verify-no-changes
+```
+
+Use the repository's actual solution paths and scripts. Do not report a command as successful unless it was run successfully.
 
 ## 17. Security Guidelines
 
@@ -525,12 +500,15 @@ A task is complete only when:
 
 * The approved requirement has been implemented.
 * Acceptance criteria have been satisfied.
-* Relevant tests have passed.
+* The affected .NET projects build and relevant tests have passed.
+* Formatting and configured analyzers pass.
 * The contribution has been reviewed.
 * Requested changes have been addressed.
 * Documentation has been updated.
 * Security concerns have been addressed.
 * Database migrations have been reviewed.
+* API and event compatibility has been reviewed.
+* Audit, idempotency, failure handling, observability and reconciliation paths have been addressed where applicable.
 * No critical blocker remains.
 * The task tracker has been updated.
 * The change has been merged into the approved branch.
@@ -628,12 +606,15 @@ Contributors may use approved AI tools to assist with research, coding, testing 
 However:
 
 * You remain responsible for everything you submit.
+* Give the tool the approved task, acceptance criteria and relevant repository context; do not ask it to invent missing banking policy.
+* Ensure coding agents read the applicable `AGENTS.md` files before changing code.
 * Review AI-generated code before committing it.
 * Do not submit code you do not understand.
 * Do not share secrets or confidential information with AI tools.
 * Check AI-generated code for security issues.
 * Check licences before using generated or suggested dependencies.
 * Test all AI-assisted changes.
+* Verify all claims about builds, tests, providers, migrations and external documentation.
 * Disclose significant AI-generated contributions where required by the maintainers.
 
 AI-generated output should not replace proper technical review.
@@ -718,16 +699,18 @@ Recognition depends on meaningful, traceable and reviewed contributions.
 Before submitting a pull request, confirm:
 
 * [ ] My work is linked to an approved task or Issue.
+* [ ] I read the applicable `AGENTS.md` and linked the relevant requirement and user-story IDs.
 * [ ] I used the correct branch naming format.
 * [ ] My code follows the project standards.
-* [ ] I tested the changes locally.
+* [ ] The affected .NET projects build locally.
 * [ ] Relevant automated tests pass.
 * [ ] I added or updated tests where required.
+* [ ] Formatting and configured analyzers pass.
 * [ ] I updated relevant documentation.
 * [ ] I did not commit secrets or sensitive data.
 * [ ] I reviewed my own changes.
-* [ ] I included screenshots for visual changes.
 * [ ] I documented migrations and configuration changes.
+* [ ] I documented API or event compatibility where applicable.
 * [ ] I described known limitations.
 * [ ] I am ready to respond to review feedback.
 

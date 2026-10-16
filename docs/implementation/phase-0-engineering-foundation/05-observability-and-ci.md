@@ -1,0 +1,131 @@
+---
+phase: "Phase 0 - Engineering Foundation"
+epic: "Observability, Audit and Continuous Integration"
+owning_service: "Platform-wide"
+modules: [OpenTelemetry, Audit Foundation, Health, CI, Security Checks]
+status: Draft
+requirements: [NFR-OBS-001, NFR-OBS-002, NFR-MNT-001, SEC-016, SEC-017, AUD-001, AUD-002, AUD-003, AUD-004]
+stories: [US-070, US-071, US-079, US-080]
+dependencies: [Repository and Build Foundation, Local Infrastructure, Identity and Permission Foundation, Messaging and Outbox]
+adrs: [ADR-0010, ADR-0011]
+last_updated: 2026-10-15
+---
+
+# Epic: Observability, Audit and Continuous Integration
+
+## Objective
+
+Make every foundation request traceable, every sensitive action auditable, every service operationally diagnosable, and every contribution automatically verified before merge.
+
+## Observability standard
+
+Each service emits:
+
+- Structured logs with stable event names.
+- Distributed traces for HTTP, database, messaging and background work.
+- Technical metrics for latency, failures, saturation, retries and queue depth.
+- Business/operational metrics for denied permissions, outbox backlog, inbox duplicates and audit failures.
+- Separate liveness and readiness checks.
+
+Telemetry carries service, version, environment, trace, correlation and causation context. Institution identifiers may be included only according to the approved data-classification policy.
+
+Never record secrets, credentials, tokens, private keys, PINs, OTPs, full identity/account/card numbers, prohibited PII or unredacted provider payloads.
+
+## Audit foundation
+
+Audit evidence is distinct from diagnostic logging. The initial audit contract includes:
+
+```text
+audit_event_id
+occurred_at
+institution_id
+actor_id
+actor_type
+role_or_service_context
+permission
+resource_type
+resource_id
+action
+decision
+reason
+source
+correlation_id
+before_and_after_reference
+policy_or_configuration_version
+```
+
+Audit records are append-only through normal application paths. Ordinary administrators cannot edit or delete them.
+
+## Health policy
+
+- Liveness answers whether the process should be restarted.
+- Readiness answers whether the service can safely accept assigned work.
+- A transient optional dependency does not automatically make all endpoints unavailable.
+- A required database or critical contract dependency affects readiness according to service policy.
+- Health output reveals no credentials, connection strings or internal topology beyond approved detail.
+
+## CI pipeline
+
+Required checks:
+
+1. Restore with locked/centrally managed dependencies.
+2. Build with warnings and configured analyzers treated as failures.
+3. Formatting verification.
+4. Unit tests.
+5. Architecture tests.
+6. Integration and contract tests using disposable dependencies.
+7. Dependency and secret scanning.
+8. Container/build-artifact scanning when artifacts are produced.
+9. Test and coverage evidence publication without arbitrary coverage-only approval.
+
+Performance, security and end-to-end suites may run in separate pipelines but must become required before their affected release gate.
+
+## Walking-skeleton evidence
+
+The reference flow must show:
+
+- One trace spanning API, database, outbox publisher and consumer.
+- Correlation and causation identifiers preserved.
+- Permission allow/deny decision recorded appropriately.
+- Audit evidence for the sensitive action.
+- Metrics for success, failure, duplicate and backlog states.
+- No prohibited values in collected telemetry.
+
+## Implementation slices
+
+1. Approve telemetry, audit and CI ADRs.
+2. Add shared OpenTelemetry configuration without domain coupling.
+3. Add consistent correlation/causation propagation.
+4. Add liveness/readiness conventions.
+5. Define and persist the foundation audit envelope.
+6. Instrument the Phase 0 walking skeleton.
+7. Create CI workflows and required checks.
+8. Add telemetry-redaction and pipeline-failure tests.
+9. Document dashboards, alerts and first-response runbooks.
+
+## Acceptance criteria
+
+- [ ] The walking skeleton is traceable end to end.
+- [ ] Sensitive actions generate immutable audit evidence.
+- [ ] Logs and traces contain no prohibited sensitive data.
+- [ ] Health endpoints distinguish liveness and readiness.
+- [ ] CI verifies build, formatting, analysis and required tests.
+- [ ] Security and secret checks run automatically.
+- [ ] Failed outbox, inbox and permission states are observable.
+- [ ] A clean pull request cannot merge when a required check fails.
+
+## Open decisions
+
+- CI provider and protected-branch settings.
+- Telemetry storage and dashboard products.
+- Audit retention and tamper-evidence mechanism.
+- Security scanning tools and exception process.
+- Coverage policy and performance baselines.
+
+## Agent instructions
+
+- Do not log payloads merely to improve diagnostics.
+- Do not make readiness permanently fail for optional local tooling.
+- Do not weaken analyzers or CI checks to obtain a green pipeline.
+- Include exact pipeline or local verification results in completion reports.
+

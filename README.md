@@ -1,6 +1,6 @@
 # Core Banking Platform — Backend Services
 
-The Core Banking Platform backend is a modular, service-oriented banking system designed to support commercial banks, microfinance banks, fintech companies, agency banking operations and digital financial services.
+The Core Banking Platform backend uses a microservices architecture designed to support commercial banks, microfinance banks, fintech companies, agency banking operations and digital financial services. It begins with coarse-grained services and uses progressive decomposition so that domain boundaries are preserved without creating unnecessary operational complexity.
 
 The platform covers customer onboarding, identity management, account management, ledger posting, payments, lending, cards, reconciliation, fraud monitoring, reporting, integrations and other banking operations.
 
@@ -41,6 +41,7 @@ The project follows these principles:
 
 * Domain-driven design
 * Clean Architecture
+* Microservices with coarse-grained initial service boundaries
 * Clear bounded contexts
 * Service-owned databases
 * Event-driven communication
@@ -49,6 +50,7 @@ The project follows these principles:
 * Immutable financial audit trails
 * Idempotent financial operations
 * Strong authentication and authorisation
+* Fine-grained role and permission enforcement in every service
 * Automated testing
 * Observability and operational readiness
 * Infrastructure as code
@@ -60,125 +62,25 @@ No service may directly alter balances outside the approved Core Banking and Led
 
 ## Technology strategy
 
-The platform uses multiple backend technologies based on service responsibilities.
+All production backend services, APIs, workers, integrations and business logic are implemented in C# on .NET. Using one backend language gives the platform consistent architecture, security controls, observability, testing, deployment and operational practices across every banking domain.
 
-### C# and ASP.NET Core
+The standard backend stack is:
 
-Recommended for high-integrity financial operations such as:
+* A repository-pinned, supported .NET SDK
+* C# with nullable reference types enabled
+* ASP.NET Core for HTTP APIs, authentication, authorisation and hosted services
+* Entity Framework Core with PostgreSQL for transactional persistence
+* OpenAPI for versioned API contracts
+* OpenTelemetry for logs, metrics and distributed traces
+* Kafka-compatible messaging for durable business events
+* Redis for approved caching, rate limiting and short-lived coordination
+* xUnit for automated tests
+* Testcontainers for integration and contract tests against real infrastructure dependencies
+* Built-in .NET configuration, dependency injection, health checks and resilience features
 
-* Core banking
-* General ledger
-* Account management
-* Deposit products
-* Payments
-* Cards
-* Lending
-* Treasury
-* Reconciliation
-* Settlement
-* Branch operations
-* Audit services
+The C# requirement applies to core banking, ledger, identity, onboarding, payments, cards, lending, treasury, workflows, notifications, integrations, fraud and AML processing, reporting, reconciliation, settlement, audit and operational tooling.
 
-Recommended stack:
-
-* .NET 8 or later
-* ASP.NET Core Web API
-* Entity Framework Core
-* PostgreSQL
-* FluentValidation
-* OpenAPI and Swagger
-* OpenTelemetry
-* Kafka client
-* Redis client
-* xUnit
-* Testcontainers
-
-### Java and Spring Boot
-
-Java may be used for selected enterprise banking services such as:
-
-* Payments
-* Cards
-* Lending
-* Treasury
-* Trade finance
-* Corporate banking
-* Reconciliation
-* Integration services
-* Identity services
-* Workflow services
-
-Recommended stack:
-
-* Java 21 or later
-* Spring Boot
-* Spring Security
-* Spring Data JPA
-* Hibernate
-* PostgreSQL
-* Flyway or Liquibase
-* Apache Kafka
-* Redis
-* OpenAPI
-* JUnit
-* Testcontainers
-
-A financial domain should not be split between Java and C# without a clear architectural reason.
-
-For example, if the Core Ledger is implemented in C#, all ledger posting responsibilities should remain within that service.
-
-### TypeScript and NestJS
-
-Recommended for:
-
-* Workflow services
-* API orchestration
-* Notifications
-* Conversational channels
-* Partner integrations
-* Developer platform capabilities
-* Document services
-* Operational tools
-
-Recommended stack:
-
-* Node.js
-* TypeScript
-* NestJS
-* Prisma or TypeORM
-* PostgreSQL
-* Kafka
-* Redis
-* OpenAPI
-* Jest
-* Supertest
-
-### Python and FastAPI
-
-Recommended for:
-
-* Fraud analytics
-* AML analytics
-* Credit-risk models
-* Behavioural analysis
-* Regulatory reporting
-* Data pipelines
-* Management analytics
-* Machine-learning services
-
-Recommended stack:
-
-* Python
-* FastAPI
-* Pydantic
-* SQLAlchemy
-* Alembic
-* PostgreSQL
-* Pandas
-* scikit-learn
-* LightGBM or XGBoost
-* Pytest
-* OpenTelemetry
+Bounded contexts must remain explicit even though they share a language and runtime. They must not bypass service contracts, access another context's database directly or move financial posting outside the protected Core Banking and Ledger boundary.
 
 ---
 
@@ -222,8 +124,7 @@ Responsibilities:
 
 Recommended framework:
 
-* NestJS with Keycloak, or
-* Spring Boot with Keycloak
+* ASP.NET Core with an approved OpenID Connect and OAuth 2.0 identity provider
 
 Responsibilities:
 
@@ -239,6 +140,7 @@ Responsibilities:
 * Token issuance
 * Session management
 * Roles and permissions
+* Role-permission assignments scoped by institution, branch, channel, account, mandate, action and transaction limit
 * Branch access
 * Institution access
 * Corporate maker-checker roles
@@ -258,7 +160,7 @@ Each business service must still enforce its own permissions.
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -292,7 +194,7 @@ Responsibilities:
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 This is the protected financial core of the platform.
 
@@ -343,7 +245,7 @@ All financial postings must be processed through this service.
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -375,7 +277,7 @@ Responsibilities:
 * Product versioning
 * Effective dates
 
-This service should use the same primary backend language as the Core Banking and Ledger service where practical.
+This service uses the same C#/.NET engineering standards as the Core Banking and Ledger service while preserving its own domain boundary.
 
 ---
 
@@ -383,7 +285,7 @@ This service should use the same primary backend language as the Core Banking an
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -429,7 +331,7 @@ This service requests financial postings from the Core Banking and Ledger servic
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -470,7 +372,7 @@ Responsibilities:
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -516,7 +418,7 @@ Loan disbursement and repayment posting must go through the Core Banking and Led
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -550,7 +452,7 @@ Responsibilities:
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -585,7 +487,7 @@ Responsibilities:
 
 Recommended framework:
 
-* Python and FastAPI
+* ASP.NET Core
 
 Responsibilities:
 
@@ -618,7 +520,7 @@ Final financial posting remains controlled by the Core Banking and Ledger servic
 
 Recommended framework:
 
-* NestJS or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -649,7 +551,7 @@ Responsibilities:
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -679,7 +581,7 @@ Responsibilities:
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -715,7 +617,7 @@ Responsibilities:
 
 Recommended framework:
 
-* ASP.NET Core or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -746,7 +648,7 @@ Responsibilities:
 
 Recommended framework:
 
-* NestJS
+* ASP.NET Core
 
 Responsibilities:
 
@@ -762,8 +664,12 @@ Responsibilities:
 * Customer segmentation
 * Consent-aware messaging
 * Secure in-app chat
+* USSD session orchestration
+* USSD menu and journey management
 * WhatsApp chatbot
 * Website chatbot
+* Content management for help, product, campaign, menu and knowledge-base content
+* Content versioning, localisation, approval and publication
 * FAQ search
 * Knowledge-base search
 * Human-agent handoff
@@ -778,7 +684,7 @@ Chatbots must use controlled APIs and must not have unrestricted access to banki
 
 Recommended framework:
 
-* NestJS
+* ASP.NET Core
 
 Responsibilities:
 
@@ -804,7 +710,7 @@ Responsibilities:
 
 Recommended framework:
 
-* Python and FastAPI
+* ASP.NET Core
 
 Responsibilities:
 
@@ -843,7 +749,7 @@ They must not become the source of truth for account balances.
 
 Recommended framework:
 
-* NestJS or Spring Boot
+* ASP.NET Core
 
 Responsibilities:
 
@@ -904,24 +810,25 @@ Responsibilities:
 
 ---
 
-## Initial deployable services
+## Initial microservices topology
 
-The project should not begin with 20 independently deployed services.
+The backend is a microservices system, but the project must not begin with 20 independently deployed services. Logical business domains may remain modules inside a coarse-grained microservice until there is a justified reason to extract them.
 
-The recommended initial deployment contains approximately eight services:
+The initial deployment target contains nine independently deployable microservices:
 
 1. Core Banking and Ledger
 2. Customer and Onboarding
 3. Identity and Access
 4. Payments and VTU
-5. Operations and Workflow
-6. Risk and Reporting
-7. Integration Hub
-8. Audit and Reconciliation
+5. Channels and Engagement
+6. Operations and Workflow
+7. Risk and Reporting
+8. Integration Hub
+9. Audit and Reconciliation
 
-The remaining domains may initially exist as internal modules with clear boundaries.
+The remaining domains initially exist as internal modules with explicit boundaries inside one of these microservices.
 
-A module should become an independent service when it requires:
+A module should become an independent microservice when it requires:
 
 * Independent scaling
 * Stronger security isolation
@@ -935,71 +842,40 @@ A module should become an independent service when it requires:
 
 ## Suggested repository structure
 
+The detailed project structure, microservice ownership, database topology, logical tables, contracts, infrastructure, testing model, and implementation order are defined in [`docs/architecture/BACKEND_ARCHITECTURE.md`](docs/architecture/BACKEND_ARCHITECTURE.md).
+
+Phase and epic implementation instructions are maintained in [`docs/implementation/README.md`](docs/implementation/README.md). Begin with the Phase 0 engineering foundation and use the epic template before implementing Phase 1 banking capabilities.
+
 ```text
 backend/
-├── services/
-│   ├── institution-service/
-│   ├── identity-service/
-│   ├── customer-service/
-│   ├── core-ledger-service/
-│   ├── deposit-service/
-│   ├── payment-service/
-│   ├── card-service/
-│   ├── lending-service/
-│   ├── treasury-service/
-│   ├── trade-finance-service/
-│   ├── risk-service/
-│   ├── workflow-service/
-│   ├── reconciliation-service/
-│   ├── branch-agent-service/
-│   ├── corporate-banking-service/
-│   ├── notification-service/
-│   ├── document-service/
-│   ├── reporting-service/
-│   ├── integration-service/
-│   └── audit-service/
-│
-├── shared/
-│   ├── contracts/
-│   ├── events/
-│   ├── security/
-│   ├── observability/
-│   ├── testing/
-│   └── documentation/
-│
-├── infrastructure/
-│   ├── docker/
-│   ├── kubernetes/
-│   ├── terraform/
-│   ├── kafka/
-│   ├── postgres/
-│   ├── redis/
-│   └── monitoring/
-│
+├── src/
+│   ├── BuildingBlocks/
+│   └── Services/
+│       ├── CoreLedger/
+│       ├── CustomerOnboarding/
+│       ├── IdentityAccess/
+│       ├── PaymentsVtu/
+│       ├── ChannelsEngagement/
+│       ├── OperationsWorkflow/
+│       ├── RiskReporting/
+│       ├── IntegrationHub/
+│       └── AuditReconciliation/
 ├── tests/
-│   ├── integration/
-│   ├── contract/
-│   ├── performance/
-│   └── security/
-│
 ├── docs/
-│   ├── architecture/
-│   ├── api/
-│   ├── events/
-│   ├── database/
-│   ├── security/
-│   └── runbooks/
-│
+├── deploy/
 ├── scripts/
 ├── .github/
+├── AGENTS.md
 ├── CONTRIBUTING.md
-├── CODE_OF_CONDUCT.md
-├── SECURITY.md
+├── Directory.Build.props
+├── Directory.Packages.props
+├── global.json
+├── CoreBanking.sln
 ├── LICENSE
 └── README.md
 ```
 
-The exact structure may change as the implementation strategy is finalised.
+Changes to this structure require an approved architectural reason and must preserve the nine-service topology and bounded-context rules.
 
 ---
 
@@ -1185,7 +1061,7 @@ Do not expose stack traces, database details or secrets in API responses.
 
 ## Authentication and authorisation
 
-The platform should support:
+The platform uses authentication plus fine-grained, server-side roles and permissions. It supports:
 
 * OAuth 2.0
 * OpenID Connect
@@ -1193,7 +1069,9 @@ The platform should support:
 * Refresh tokens
 * Multi-factor authentication
 * Device registration
-* Role-based access control
+* Fine-grained role-based access control
+* Explicit permission checks for every protected action
+* Role-permission assignments scoped by institution, branch, channel, account, mandate and transaction limit
 * Institution-level access
 * Branch-level access
 * Customer ownership checks
@@ -1204,7 +1082,7 @@ Authentication confirms identity.
 
 Authorisation determines whether that identity can perform a specific action.
 
-Every service must enforce authorisation independently.
+Every protected endpoint, command and workflow action must declare and enforce its required permission. Every service must enforce authorisation independently; authentication at a gateway or frontend is not sufficient.
 
 ---
 
@@ -1216,9 +1094,6 @@ Recommended tools:
 * Docker
 * Docker Compose
 * .NET SDK
-* Java Development Kit
-* Node.js
-* Python
 * PostgreSQL client
 * Redis client
 * Kafka tools
@@ -1228,10 +1103,7 @@ Recommended tools:
 Suggested versions:
 
 ```text
-.NET SDK: 8 or later
-Java: 21 or later
-Node.js: current supported LTS
-Python: 3.12 or later
+.NET SDK: repository-pinned supported version
 PostgreSQL: 16 or later
 Redis: 7 or later
 Kafka: current supported version
@@ -1309,15 +1181,7 @@ Provide a safe example file:
 
 ## Database migrations
 
-Every database change must use an approved migration tool.
-
-Examples:
-
-* Entity Framework Core migrations
-* Flyway
-* Liquibase
-* Alembic
-* Prisma migrations
+Every database change must use Entity Framework Core migrations owned by the bounded context that owns the affected schema.
 
 Do not make undocumented manual changes to shared databases.
 
