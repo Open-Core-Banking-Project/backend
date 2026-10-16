@@ -15,10 +15,11 @@ trim_trailing_whitespace = true
 [*.{json,yml,yaml,md}]
 indent_size = 2
 
-# The .NET toolchain writes CRLF on Windows and the working tree is configured with
-# autocrlf, so line endings are stated explicitly rather than left to the platform.
+# Line endings are normalised to LF so Windows and Linux produce identical working
+# trees and the `dotnet format` gate behaves the same on developer machines and CI.
+# .gitattributes takes precedence over core.autocrlf.
 [*.{cs,csproj,props,targets,json,sln}]
-end_of_line = crlf
+end_of_line = lf
 
 [*.cs]
 # Language and quality settings that belong to the editor experience only.

@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -144,6 +144,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreBanking.RiskReporting.Contracts", "src\Services\RiskReporting\src\CoreBanking.RiskReporting.Contracts\CoreBanking.RiskReporting.Contracts.csproj", "{60FF0CC9-0165-4F06-9AD8-F794E606D2A6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreBanking.RiskReporting.Infrastructure", "src\Services\RiskReporting\src\CoreBanking.RiskReporting.Infrastructure\CoreBanking.RiskReporting.Infrastructure.csproj", "{CA27B247-9E8F-4A22-ACB6-DF7A082ABA03}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreBanking.ArchitectureTests", "tests\CoreBanking.ArchitectureTests\CoreBanking.ArchitectureTests.csproj", "{C819A364-D9CC-46F7-96E4-5D886FD787B9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -755,6 +759,18 @@ Global
 		{CA27B247-9E8F-4A22-ACB6-DF7A082ABA03}.Release|x64.Build.0 = Release|Any CPU
 		{CA27B247-9E8F-4A22-ACB6-DF7A082ABA03}.Release|x86.ActiveCfg = Release|Any CPU
 		{CA27B247-9E8F-4A22-ACB6-DF7A082ABA03}.Release|x86.Build.0 = Release|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Debug|x64.Build.0 = Debug|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Debug|x86.Build.0 = Debug|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Release|x64.ActiveCfg = Release|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Release|x64.Build.0 = Release|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Release|x86.ActiveCfg = Release|Any CPU
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -830,5 +846,6 @@ Global
 		{41718F47-5627-4FE6-B96A-57BF87F887B4} = {3D4D8374-7C29-8497-4BC3-D544BA6A075C}
 		{60FF0CC9-0165-4F06-9AD8-F794E606D2A6} = {3D4D8374-7C29-8497-4BC3-D544BA6A075C}
 		{CA27B247-9E8F-4A22-ACB6-DF7A082ABA03} = {3D4D8374-7C29-8497-4BC3-D544BA6A075C}
+		{C819A364-D9CC-46F7-96E4-5D886FD787B9} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
