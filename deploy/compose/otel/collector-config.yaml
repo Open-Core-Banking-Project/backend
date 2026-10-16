@@ -1,0 +1,46 @@
+# Local OpenTelemetry collector for development.
+# Decision: docs/adr/ADR-0010-observability-audit-evidence-redaction-and-retention.md
+#
+# Receives OTLP over gRPC and HTTP and prints the telemetry, so a developer can see
+# what a service actually emitted without running a storage backend. Production
+# backends remain an open decision in ADR-0010 and are intentionally not configured here.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 2s
+    send_batch_size: 512
+
+exporters:
+  debug:
+    verbosity: normal
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
