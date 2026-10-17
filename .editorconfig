@@ -53,6 +53,14 @@ dotnet_naming_style.underscore_camel_case.required_prefix = _
 dotnet_naming_style.underscore_camel_case.capitalization = camel_case
 dotnet_naming_style.pascal_case.capitalization = pascal_case
 
+# Entity Framework generated migrations are not hand-edited. The generator emits block-scoped
+# namespaces and its own formatting, so code-style rules that fight the generator are relaxed
+# for this folder rather than by editing generated files.
+[**/Migrations/*.cs]
+generated_code = true
+csharp_style_namespace_declarations = block_scoped
+dotnet_diagnostic.IDE0161.severity = none
+
 # Tests may use a deliberate naming vocabulary for behaviour descriptions.
 # Architecture tests live in tests/; service test projects live in src/**/tests/.
 [tests/**/*.cs]

@@ -43,6 +43,9 @@ jobs:
       - name: Restore
         run: dotnet restore
 
+      - name: Restore pinned tools
+        run: dotnet tool restore
+
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
@@ -52,9 +55,12 @@ jobs:
       - name: Architecture tests
         run: dotnet test --no-build --configuration Release --filter Category=Architecture
 
+      # Database tests need the local infrastructure stack, so they are excluded here and run by
+      # scripts/db-verify.ps1 wherever a PostgreSQL instance is available.
       - name: Tests
         run: >-
           dotnet test --no-build --configuration Release
+          --filter "Category!=Database"
           --logger "trx;LogFileName=test-results.trx"
           --collect:"XPlat Code Coverage"
           --results-directory artifacts/test-results

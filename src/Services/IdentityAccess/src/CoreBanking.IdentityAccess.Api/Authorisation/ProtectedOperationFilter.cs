@@ -1,19 +1,23 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Security;
+using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.IdentityAccess.Application.Authorisation;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CoreBanking.IdentityAccess.Api.Authorisation;
 
 /// <summary>
 /// Declares a permission for one protected endpoint and enforces it before the handler runs.
-/// The requested institution and branch are read from the request as the target scope, and the
-/// policy refuses any request whose target does not match the authenticated context, so
-/// client-supplied context can never widen access.
-/// Decision: ADR-0009, epic 03 API requirements.
+/// It resolves the actor, establishes the trusted institution context from that actor, and only
+/// then evaluates the policy, so the persistence layer can rely on the context it reads. The
+/// requested institution and branch come from the request as the target scope and the policy
+/// refuses any mismatch, so client-supplied context can never widen access.
+/// Collaborators are resolved per request because the relational entitlement store is scoped to
+/// the request's database context.
+/// Decision: ADR-0004, ADR-0009, epic 03 API requirements.
 /// </summary>
 public sealed class ProtectedOperationFilter : IEndpointFilter
 {
@@ -26,20 +30,13 @@ public sealed class ProtectedOperationFilter : IEndpointFilter
     private const string InstitutionHeaderName = "X-Institution-Id";
     private const string BranchHeaderName = "X-Branch-Id";
 
-    private readonly AuthorisationService _authorisation;
-    private readonly IActorContextResolver _actorContextResolver;
     private readonly PermissionRequirement _requirement;
     private readonly string _operationName;
 
-    public ProtectedOperationFilter(
-        AuthorisationService authorisation,
-        IActorContextResolver actorContextResolver,
-        PermissionRequirement requirement,
-        string operationName)
+    public ProtectedOperationFilter(PermissionRequirement requirement, string operationName)
     {
-        _authorisation = authorisation ?? throw new ArgumentNullException(nameof(authorisation));
-        _actorContextResolver = actorContextResolver ?? throw new ArgumentNullException(nameof(actorContextResolver));
         _requirement = requirement ?? throw new ArgumentNullException(nameof(requirement));
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationName);
         _operationName = operationName;
     }
 
@@ -49,37 +46,56 @@ public sealed class ProtectedOperationFilter : IEndpointFilter
         ArgumentNullException.ThrowIfNull(next);
 
         HttpContext http = context.HttpContext;
+        IServiceProvider services = http.RequestServices;
+        ITenantContext tenantContext = services.GetRequiredService<ITenantContext>();
+
         string correlationId = ReadHeader(http, CorrelationHeaderName) ?? Guid.NewGuid().ToString("N");
-        AuthenticatedActor? actor = _actorContextResolver.Resolve(ReadHeader(http, AuthenticationHeaderName));
+        AuthenticatedActor? actor = services.GetRequiredService<IActorContextResolver>()
+            .Resolve(ReadHeader(http, AuthenticationHeaderName));
 
-        AuthorisationRequest request = new()
+        try
         {
-            Requirement = _requirement,
-            Scope = BuildRequestedScope(http),
-            Actor = actor,
-        };
-
-        AuthorisationDecision decision = _authorisation.Authorise(request, _operationName, correlationId);
-        if (!decision.IsAllowed)
-        {
-            AuthorisationProblem problem = AuthorisationProblem.From(decision, correlationId);
-            Dictionary<string, object?> extensions = new(StringComparer.Ordinal)
+            if (actor is not null)
             {
-                ["code"] = problem.Code,
-                ["correlationId"] = problem.CorrelationId,
+                // The institution comes from the validated authentication context, never from a request field.
+                tenantContext.Establish(actor.InstitutionId);
+            }
+
+            AuthorisationRequest request = new()
+            {
+                Requirement = _requirement,
+                Scope = BuildRequestedScope(http),
+                Actor = actor,
             };
 
-            return Results.Problem(
-                detail: problem.Detail,
-                statusCode: problem.Status,
-                title: problem.Title,
-                extensions: extensions);
+            AuthorisationDecision decision = services.GetRequiredService<AuthorisationService>()
+                .Authorise(request, _operationName, correlationId);
+
+            if (!decision.IsAllowed)
+            {
+                AuthorisationProblem problem = AuthorisationProblem.From(decision, correlationId);
+                System.Collections.Generic.Dictionary<string, object?> extensions = new(StringComparer.Ordinal)
+                {
+                    ["code"] = problem.Code,
+                    ["correlationId"] = problem.CorrelationId,
+                };
+
+                return Results.Problem(
+                    detail: problem.Detail,
+                    statusCode: problem.Status,
+                    title: problem.Title,
+                    extensions: extensions);
+            }
+
+            http.Items[ActorItemKey] = actor;
+            http.Items[CorrelationItemKey] = correlationId;
+
+            return await next(context);
         }
-
-        http.Items[ActorItemKey] = actor;
-        http.Items[CorrelationItemKey] = correlationId;
-
-        return await next(context);
+        finally
+        {
+            tenantContext.Clear();
+        }
     }
 
     private static ResourceScope BuildRequestedScope(HttpContext http)

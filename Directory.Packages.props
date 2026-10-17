@@ -14,6 +14,19 @@
   </PropertyGroup>
 
   <!--
+    Persistence. EF Core and the PostgreSQL provider move together: the provider is
+    pinned to the major line that matches EF Core, and both are bumped in one change
+    with a restore, build, migration diff and test run as the evidence.
+    See docs/adr/ADR-0004-database-per-service-and-tenant-isolation.md.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <!--
     The xunit v2 test toolchain. Versions are pinned exactly and bumped
     deliberately, with a full restore, build and test run as the evidence.
   -->

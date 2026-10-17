@@ -76,12 +76,14 @@ function Initialize-EnvironmentFile {
     $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
 
     try {
+        # Only assignment values are replaced; a placeholder that appears in a comment stays
+        # literal so the generated file does not leak a credential-shaped token into its header.
         $content = Get-Content -Path $environmentExample -Raw
-        $content = [regex]::Replace($content, '__GENERATE__', {
+        $content = [regex]::Replace($content, '(?m)^([A-Za-z0-9_]+=)__GENERATE__$', {
                 param($match)
                 $bytes = New-Object byte[] 32
                 $generator.GetBytes($bytes)
-                -join ($bytes | ForEach-Object { $alphabet[$_ % $alphabet.Length] })
+                $match.Groups[1].Value + (-join ($bytes | ForEach-Object { $alphabet[$_ % $alphabet.Length] }))
             })
 
         Set-Content -Path $environmentFile -Value $content -NoNewline -Encoding UTF8

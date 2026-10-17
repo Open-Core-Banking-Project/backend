@@ -3,7 +3,7 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Identity and Permission Foundation"
 owning_service: "Identity and Access"
 modules: [Authentication Contracts, Tenant Context, Roles, Permissions, Policy Enforcement]
-status: In progress
+status: Implemented
 requirements: [IAM-001, IAM-003, IAM-004, IAM-005, IAM-006, IAM-007, IAM-010, IAM-011, SEC-009, SEC-010]
 stories: [US-005, US-006, US-007]
 dependencies: [Repository and Build Foundation, Local Infrastructure]
@@ -23,9 +23,21 @@ Implementation evidence, 2026-10-16:
 - `AuthorisationService` writes one audit entry per decision, including denials, through `IAuthorisationAuditWriter`. `AuthorisationProblem` projects a refusal to problem details: 401 only for missing authentication, 403 with a unique stable `auth.*` code for every other reason.
 - The reference protected flow is `POST /api/v1/identity/foundation-executions`, which declares `platform.foundation.execute` through `ProtectedOperationFilter`. The filter reads the requested institution and branch from the request and the policy refuses a mismatch, so client-supplied context cannot widen access.
 - Replaceable development stand-ins live in Identity and Access Infrastructure: `InMemoryEntitlementStore` (incrementing the version invalidates issued entitlements), `InMemoryAuthorisationAuditWriter` and `DevelopmentActorContextResolver`, which is registered only when the environment is Development and ignores permission, role and super-user claims in the payload.
-- Verification: `dotnet build CoreBanking.sln -c Release` reports 0 warnings and 0 errors; `dotnet test` reports 40 passed, 0 failed (12 architecture tests, 28 Identity and Access tests); `dotnet format --verify-no-changes` passes.
+- Verification: `dotnet build CoreBanking.sln -c Release` reports 0 warnings and 0 errors; `scripts/verify.ps1` passes restore, build, 46 tests (12 architecture, 34 Identity and Access) and `dotnet format --verify-no-changes`.
 - HTTP evidence from the running reference API: no material returns 401 `auth.missing_authentication`; the seeded operator without grants returns 403 `auth.missing_permission`; the operator smuggling permission, role and super-user claims still returns 403 `auth.missing_permission`; the administrator targeting another institution returns 403 `auth.wrong_institution`; the administrator with entitlement version 99 returns 403 `auth.stale_entitlement`; the administrator presented as a service identity returns 403 `auth.service_identity_not_permitted`; malformed material returns 401; the correct administrator, institution and entitlement version returns 200 with the declared permission echoed.
-- Outstanding: slice 4 (EF Core mappings and migrations for the 15 tables of the persistence foundation below) is not implemented, so effective permissions are served by the in-memory store; slice 7 telemetry is deferred to epic 05, which owns collector configuration, redaction and audit retention. Status is `In progress`, not `Implemented`.
+- Persistence (slice 4) is implemented in `CoreBanking.IdentityAccess.Infrastructure/Persistence`: 13 tables across the `identity`, `access` and `security` schemas, mapped with explicit snake_case columns, with the institution column leading every primary key and every foreign key that points at another tenant-owned table. `access.permissions` is the only table without an institution column, because a permission code is platform-owned and identical in every institution.
+- `IdentityAccessDbContext` applies a mandatory institution query filter to all twelve tenant-owned tables. The filter reads `ITenantContext`, which the protected-operation filter establishes from the validated actor, and it returns nothing when no institution is established. There is no fallback institution.
+- `RelationalEntitlementStore` replaces the in-memory store as soon as `ConnectionStrings:IdentityAccess` is configured: role assignments and temporary grants are combined into one snapshot, expired or revoked grants disappear, and incrementing `access.entitlement_versions` invalidates every previously issued entitlement.
+- Migrations: `InitialIdentityAccessSchema` creates the schema and seeds the six foundation permission codes as reference data; `GrantApplicationPrincipalPrivileges` grants `identityaccess_app` usage and data rights on the service's own schemas, because the cluster initialisation script can only set default privileges for schemas that exist when the cluster is created. Migrations are executed by the migration principal through `scripts/db-verify.ps1`, never at service startup.
+- Database evidence from `scripts/db-verify.ps1` against PostgreSQL 16.15, with 6 database tests passing as `identityaccess_app`: an assigned role yields one institution-scoped grant; an actor without an entitlement version has no snapshot; another institution's grants are invisible; a query with no established institution reads nothing; incrementing the version denies the previously issued entitlement with `auth.stale_entitlement`; an expired assignment is not a grant. The same script lists both migrations as applied.
+- HTTP evidence with the relational store: a granted actor read from `identity_access_db` receives 200; an actor without a grant receives 403 `auth.missing_permission`; a stale entitlement version receives 403 `auth.stale_entitlement`; a foreign institution receives 403 `auth.wrong_institution`; and deleting the role assignment makes the next request 403 `auth.missing_permission` without any token change, which is the invalidation path working end to end.
+- Structural evidence: 6 model tests build the EF Core model without a connection and fail if a tenant-owned table loses the institution column, its query filter or its tenant-aware foreign key.
+
+Status is `Implemented`, not `Verified`: human acceptance and operational review remain to be recorded. Two items are deliberately outside this epic:
+
+- `integration.outbox_messages` and `integration.inbox_messages` from the persistence foundation below are not created here. Epic 04 owns the event envelope and the shared outbox/inbox mappings, and duplicating them now would create two sources of truth. The remaining 13 tables are complete.
+- Telemetry instrumentation is delivered by epic 05, which owns the OpenTelemetry pipeline, redaction and audit retention. This epic delivers the audit evidence writer and the negative tests.
+- PostgreSQL row-level security remains a required pre-production gate recorded in ADR-0004, not a Phase 0 deliverable.
 
 ## Objective
 
@@ -98,6 +110,8 @@ integration.inbox_messages
 
 The actual identity provider may own credential and protocol-specific storage. Do not duplicate password or token storage without an approved reason.
 
+Implemented as 13 tables in one migration plus a privilege migration; `integration.outbox_messages` and `integration.inbox_messages` are deferred to epic 04, which owns the shared event envelope and outbox mappings.
+
 ## Required contracts
 
 Define domain-neutral contracts for:
@@ -148,13 +162,13 @@ Authenticated synthetic administrator
 
 ## Implementation slices
 
-1. Approve identity-provider and authorisation ADRs.
-2. Define actor, tenant, permission and authorisation contracts.
-3. Create Identity and Access domain/application foundation.
-4. Create EF Core mappings and migrations for roles, permissions, grants and scopes.
-5. Implement reference policy evaluator and entitlement invalidation.
-6. Integrate one protected reference API.
-7. Add audit events, telemetry, negative tests and architecture tests.
+1. [x] Approve identity-provider and authorisation ADRs. ADR-0008 and ADR-0009 are accepted.
+2. [x] Define actor, tenant, permission and authorisation contracts.
+3. [x] Create Identity and Access domain/application foundation.
+4. [x] Create EF Core mappings and migrations for roles, permissions, grants and scopes. The two integration tables from the persistence foundation belong to epic 04.
+5. [x] Implement reference policy evaluator and entitlement invalidation.
+6. [x] Integrate one protected reference API.
+7. [x] Add audit events, negative tests and architecture tests. Telemetry instrumentation is delivered by epic 05.
 
 ## Acceptance criteria
 

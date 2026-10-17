@@ -26,4 +26,10 @@ internal static partial class StartupLog
         long administratorVersion,
         string operatorActorId,
         long operatorVersion);
+
+    [LoggerMessage(
+        EventId = 1003,
+        Level = LogLevel.Information,
+        Message = "Effective permissions are read from identity_access_db; development identities are not seeded.")]
+    public static partial void RelationalEntitlementStoreInUse(ILogger logger);
 }

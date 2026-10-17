@@ -407,9 +407,17 @@ When a solution exists, the normal verification sequence is:
 ```powershell
 dotnet restore
 dotnet build --no-restore
-dotnet test --no-build
+dotnet test --no-build --filter "Category!=Database"
 dotnet format --verify-no-changes
 ```
+
+`scripts/verify.ps1` runs exactly that sequence. Database tests are excluded because they need
+the local infrastructure stack; `scripts/db-verify.ps1` starts nothing itself, applies the
+migrations with the migration principal and then runs them against the running stack.
+
+Pinned command-line tools live in `.config/dotnet-tools.json`. Run `dotnet tool restore` once per
+clone before using `dotnet-ef`, and invoke it as `dotnet tool run dotnet-ef` so the pinned version
+is used instead of any globally installed one.
 
 Use the repository's actual solution paths and scripts. Do not report a command as successful unless it was run successfully.
 

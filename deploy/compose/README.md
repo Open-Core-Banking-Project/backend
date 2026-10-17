@@ -70,6 +70,24 @@ already owns a port:
 7. the migration principal may change schema while the application principal may not, and the migration principal is refused on another service's database;
 8. a database backup produces a non-empty archive, restores into a scratch database, and the restored rows match.
 
+## Migrations and database tests
+
+Applied migrations are part of the environment, not of the service startup. The migration
+principal owns schema change; the application principal only reads and writes data.
+
+```powershell
+powershell -File scripts/db-verify.ps1
+```
+
+The script restores the pinned tools from `.config/dotnet-tools.json`, applies every migration to
+`identity_access_db` as `identityaccess_migrator`, lists the applied migrations, and then runs the
+`Category=Database` tests as `identityaccess_app`. It never starts the stack: run
+`scripts/infra.ps1 -Action up` first, and expect a clear error if PostgreSQL is not reachable.
+
+Schema privileges for a service's own schemas are granted by the migration that creates them,
+because the cluster initialisation script can only set default privileges for schemas that exist
+when the cluster is created.
+
 ## Backup, restore and reset
 
 ```powershell

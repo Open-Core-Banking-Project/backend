@@ -1,5 +1,7 @@
 # Repository verification gate for the backend.
 # Mirrors the sequence documented in AGENTS.md: restore, build, test, format.
+# Database tests need the local infrastructure stack and are excluded here; run
+# scripts/db-verify.ps1 to apply migrations and execute them.
 #
 # Usage (PowerShell 7 as `pwsh`, or Windows PowerShell 5.1 as `powershell`):
 #   pwsh scripts/verify.ps1
@@ -19,7 +21,7 @@ try {
     $steps = [ordered]@{
         'restore' = { dotnet restore }
         'build'   = { dotnet build --no-restore --configuration $Configuration }
-        'test'    = { dotnet test --no-build --configuration $Configuration }
+        'test'    = { dotnet test --no-build --configuration $Configuration --filter 'Category!=Database' }
         'format'  = { dotnet format --verify-no-changes }
     }
 
