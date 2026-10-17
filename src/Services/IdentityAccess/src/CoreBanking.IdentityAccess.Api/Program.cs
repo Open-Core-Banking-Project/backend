@@ -1,12 +1,16 @@
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
+using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.IdentityAccess.Api;
 using CoreBanking.IdentityAccess.Api.Authorisation;
 using CoreBanking.IdentityAccess.Application.Authorisation;
 using CoreBanking.IdentityAccess.Application.Permissions;
 using CoreBanking.IdentityAccess.Infrastructure.Authorisation;
+using CoreBanking.IdentityAccess.Infrastructure.Foundation;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -14,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Npgsql;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +38,12 @@ if (useRelationalStore)
     builder.Services.AddScoped<RelationalEntitlementStore>();
     builder.Services.AddScoped<IEffectivePermissionSource>(provider => provider.GetRequiredService<RelationalEntitlementStore>());
     builder.Services.AddScoped<IEntitlementVersionSource>(provider => provider.GetRequiredService<RelationalEntitlementStore>());
+
+    // The messaging primitives work against the service's own context, which is what makes the
+    // reference record and its outbox row commit in one transaction.
+    builder.Services.AddScoped<IIntegrationStore>(provider => provider.GetRequiredService<IdentityAccessDbContext>());
+    builder.Services.AddScoped<IdempotencyService>();
+    builder.Services.AddScoped<FoundationRecordService>();
 }
 else
 {
@@ -84,6 +95,29 @@ if (useRelationalStore)
     StartupLog.RelationalEntitlementStoreInUse(app.Logger);
 }
 
+app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
+app.MapGet("/health/ready", async (CancellationToken cancellationToken) =>
+{
+    if (!useRelationalStore)
+    {
+        return Results.Ok(new { status = "Healthy" });
+    }
+
+    try
+    {
+        await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+        IdentityAccessDbContext context = scope.ServiceProvider.GetRequiredService<IdentityAccessDbContext>();
+        return await context.Database.CanConnectAsync(cancellationToken)
+            ? Results.Ok(new { status = "Healthy" })
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (NpgsqlException exception)
+    {
+        StartupLog.IdentityAccessDatabaseReadinessFailed(app.Logger, exception);
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
 // Reference protected operation. The declared permission is the only reason this endpoint is
 // reachable; the policy resolves permissions from entitlements, never from the request.
 app.MapPost("/api/v1/identity/foundation-executions", (HttpContext http) =>
@@ -102,6 +136,70 @@ app.MapPost("/api/v1/identity/foundation-executions", (HttpContext http) =>
     PermissionRequirement.For(IdentityPermissions.PlatformFoundationExecute),
     "identity.foundation.execute"));
 
+// The epic 04 reference producer: the record and its outbox row are written in one transaction,
+// and the relay in the worker host publishes the event afterwards. It exists only where the
+// relational store is configured, because the in-memory stand-ins have no durable outbox.
+if (useRelationalStore)
+{
+    app.MapPost("/api/v1/identity/foundation-records", async (
+        HttpContext http,
+        FoundationRecordRequest request,
+        FoundationRecordService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+
+        string? idempotencyKey = http.Request.Headers["Idempotency-Key"].ToString();
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return Results.Problem(
+                detail: "An Idempotency-Key header is required for this command.",
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Idempotency key required",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_key_required" });
+        }
+
+        string correlationId = http.Items[ProtectedOperationFilter.CorrelationItemKey] as string ?? Guid.NewGuid().ToString("N");
+
+        try
+        {
+            FoundationRecordResult result = await service.CreateAsync(
+                actor.InstitutionId,
+                actor.Id,
+                idempotencyKey,
+                request.Description ?? string.Empty,
+                correlationId,
+                cancellationToken);
+
+            return Results.Ok(new FoundationRecordResponse(result.FoundationRecordId, result.EventId, result.Replayed));
+        }
+        catch (IdempotencyConflictException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Idempotency key reused with a different request",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_conflict" });
+        }
+        catch (IdempotencyInProgressException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "An equivalent request is in progress",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_in_progress" });
+        }
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(
+        PermissionRequirement.For(IdentityPermissions.PlatformFoundationExecute),
+        "identity.foundation.record.create"));
+
+    StartupLog.ReferenceProducerEnabled(app.Logger);
+}
+
 app.Run();
 
 /// <summary>Result of the reference protected operation. Contains no sensitive data.</summary>
@@ -112,3 +210,9 @@ internal sealed record FoundationExecutionResult(
     string? ActorType,
     string? InstitutionId,
     string? CorrelationId);
+
+/// <summary>The reference command body. Contains no sensitive data.</summary>
+internal sealed record FoundationRecordRequest(string? Description);
+
+/// <summary>The reference command outcome, including whether the result was replayed.</summary>
+internal sealed record FoundationRecordResponse(string FoundationRecordId, string EventId, bool Replayed);

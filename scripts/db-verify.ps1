@@ -20,6 +20,8 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $environmentFile = Join-Path $repositoryRoot 'deploy/compose/.env'
 $infrastructureProject = Join-Path $repositoryRoot 'src/Services/IdentityAccess/src/CoreBanking.IdentityAccess.Infrastructure'
 $testProject = Join-Path $repositoryRoot 'src/Services/IdentityAccess/tests/CoreBanking.IdentityAccess.UnitTests'
+$auditInfrastructureProject = Join-Path $repositoryRoot 'src/Services/AuditReconciliation/src/CoreBanking.AuditReconciliation.Infrastructure'
+$auditTestProject = Join-Path $repositoryRoot 'src/Services/AuditReconciliation/tests/CoreBanking.AuditReconciliation.UnitTests'
 
 function Read-EnvironmentFile {
     param([string]$Path)
@@ -36,6 +38,16 @@ function Read-EnvironmentFile {
     }
 
     return $values
+}
+
+function New-ServiceConnectionString {
+    param([string]$Port, [string]$Database, [string]$Username, [string]$Password)
+
+    if ([string]::IsNullOrWhiteSpace($Password)) {
+        throw "No password is configured for '$Username' in deploy/compose/.env."
+    }
+
+    return "Host=127.0.0.1;Port=$Port;Database=$Database;Username=$Username;Password=$Password"
 }
 
 function New-ConnectionString {
@@ -56,6 +68,9 @@ try {
     if ([string]::IsNullOrWhiteSpace($environment['CB_POSTGRES_PORT'])) {
         throw 'CB_POSTGRES_PORT is not set in deploy/compose/.env.'
     }
+
+    $auditMigratorConnection = New-ServiceConnectionString -Port $environment['CB_POSTGRES_PORT'] -Database 'audit_reconciliation_db' -Username 'auditreconciliation_migrator' -Password $environment['AUDITRECONCILIATION_MIGRATOR_PASSWORD']
+    $auditApplicationConnection = New-ServiceConnectionString -Port $environment['CB_POSTGRES_PORT'] -Database 'audit_reconciliation_db' -Username 'auditreconciliation_app' -Password $environment['AUDITRECONCILIATION_APP_PASSWORD']
 
     $migratorConnection = New-ConnectionString -Port $environment['CB_POSTGRES_PORT'] -Username 'identityaccess_migrator' -Password $environment['IDENTITYACCESS_MIGRATOR_PASSWORD']
     $applicationConnection = New-ConnectionString -Port $environment['CB_POSTGRES_PORT'] -Username 'identityaccess_app' -Password $environment['IDENTITYACCESS_APP_PASSWORD']
@@ -85,16 +100,27 @@ try {
     dotnet tool run dotnet-ef migrations list --project $infrastructureProject --startup-project $infrastructureProject
     if ($LASTEXITCODE -ne 0) { throw "dotnet ef migrations list failed with exit code $LASTEXITCODE." }
 
+    Write-Host '==> apply Audit Reconciliation migrations as auditreconciliation_migrator' -ForegroundColor Cyan
+    $env:ConnectionStrings__AuditReconciliation = $auditMigratorConnection
+    dotnet tool run dotnet-ef database update --project $auditInfrastructureProject --startup-project $auditInfrastructureProject
+    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation database migration failed with exit code $LASTEXITCODE." }
+
     Write-Host '==> database tests as identityaccess_app' -ForegroundColor Cyan
     $env:ConnectionStrings__IdentityAccess = $applicationConnection
     $env:CB_BROKER_BOOTSTRAP_SERVERS = '127.0.0.1:' + $environment['CB_BROKER_PORT']
     dotnet test $testProject --configuration $Configuration --filter 'Category=Database|Category=Integration'
     if ($LASTEXITCODE -ne 0) { throw "Database tests failed with exit code $LASTEXITCODE." }
 
+    Write-Host '==> Audit Reconciliation model tests as auditreconciliation_app' -ForegroundColor Cyan
+    $env:ConnectionStrings__AuditReconciliation = $auditApplicationConnection
+    dotnet test $auditTestProject --configuration $Configuration
+    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation tests failed with exit code $LASTEXITCODE." }
+
     Write-Host 'Database verification passed.' -ForegroundColor Green
 }
 finally {
     Remove-Item Env:\ConnectionStrings__IdentityAccess -ErrorAction SilentlyContinue
+    Remove-Item Env:\ConnectionStrings__AuditReconciliation -ErrorAction SilentlyContinue
     Remove-Item Env:\CB_BROKER_BOOTSTRAP_SERVERS -ErrorAction SilentlyContinue
     Pop-Location
 }

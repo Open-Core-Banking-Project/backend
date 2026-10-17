@@ -89,7 +89,7 @@ public sealed class OutboxAndInboxTests : IDisposable
         Assert.Equal(1, result.Published);
 
         PublishedMessage message = Assert.Single(publisher.Published);
-        Assert.Equal("corebanking.identity.foundation.v1", message.Topic);
+        Assert.Equal(EventContract.TopicFor("identity-access", "foundation", SchemaVersion), message.Topic);
         Assert.Equal("foundation-1", message.PartitionKey);
 
         await using (IdentityAccessDbContext verification = CreateContext())
@@ -376,7 +376,7 @@ public sealed class OutboxAndInboxTests : IDisposable
         EventId = eventId,
         EventType = "foundation_record_created",
         SchemaVersion = SchemaVersion,
-        Topic = EventContract.TopicFor("identity", "foundation", SchemaVersion),
+        Topic = EventContract.TopicFor("identity-access", "foundation", SchemaVersion),
         BusinessReference = "foundation-1",
         CorrelationId = "correlation-1",
         Producer = "identity-access",

@@ -5,6 +5,7 @@ using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Access;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Identity;
+using CoreBanking.IdentityAccess.Infrastructure.Persistence.Platform;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -61,6 +62,8 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
 
     public DbSet<DeadLetterRecord> DeadLetters => Set<DeadLetterRecord>();
 
+    public DbSet<FoundationRecord> FoundationRecords => Set<FoundationRecord>();
+
     /// <summary>
     /// The institution of the current operation, read as a parameter by every tenant query filter.
     /// A block-bodied property is required: a null-propagating expression cannot be placed in an
@@ -99,6 +102,7 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<InboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<IdempotencyRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<DeadLetterRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<FoundationRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
     }
 
     /// <summary>Opens the transaction that makes source state and outbox record atomic.</summary>

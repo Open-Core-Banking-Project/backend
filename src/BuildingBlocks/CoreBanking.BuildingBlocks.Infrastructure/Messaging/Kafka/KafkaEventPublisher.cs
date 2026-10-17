@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 
@@ -46,6 +47,9 @@ public sealed class KafkaEventPublisher : IEventPublisher, IDisposable
             MessageSendMaxRetries = 3,
             MessageTimeoutMs = options.MessageTimeoutMs,
             RequestTimeoutMs = options.MessageTimeoutMs,
+            // The local broker advertises an IPv4 loopback address; resolving localhost to ::1
+            // first would fail to connect.
+            BrokerAddressFamily = BrokerAddressFamily.V4,
         };
 
         _producer = new ProducerBuilder<string, string>(configuration).Build();
@@ -89,5 +93,20 @@ public sealed class KafkaEventPublisher : IEventPublisher, IDisposable
         _producer.Flush(_flushTimeout);
         _producer.Dispose();
         _disposed = true;
+    }
+}
+
+/// <summary>Registers the Kafka publisher behind the transport-neutral publisher port.</summary>
+public static class KafkaEventPublisherRegistration
+{
+    public static IServiceCollection AddKafkaEventPublisher(
+        this IServiceCollection services,
+        KafkaMessagingOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
+
+        services.AddSingleton<IEventPublisher>(_ => new KafkaEventPublisher(options));
+        return services;
     }
 }

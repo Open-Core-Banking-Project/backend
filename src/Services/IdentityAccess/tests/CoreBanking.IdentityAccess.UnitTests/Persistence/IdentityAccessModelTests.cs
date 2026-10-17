@@ -39,6 +39,7 @@ public sealed class IdentityAccessModelTests
         "integration.idempotency_records",
         "integration.inbox_messages",
         "integration.outbox_messages",
+        "platform.foundation_records",
         "security.authentication_events",
     ];
 

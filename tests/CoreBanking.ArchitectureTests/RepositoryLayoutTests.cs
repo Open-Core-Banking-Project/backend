@@ -436,7 +436,9 @@ public sealed class RepositoryLayoutTests
             }
 
             if (content.Contains("using Confluent.Kafka", StringComparison.Ordinal)
-                && !relative.EndsWith(Path.Combine("Messaging", "Kafka", "KafkaEventPublisher.cs"), StringComparison.OrdinalIgnoreCase))
+                && !relative.Contains(
+                    Path.Combine("Messaging", "Kafka") + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase))
             {
                 brokerViolations.Add(relative);
             }

@@ -28,11 +28,23 @@ Implementation evidence, 2026-10-17 (slices 1 to 6 and the failure-scenario test
 - The failure scenarios of the epic are covered by passing tests: source state and the outbox record commit together or not at all (committed and rolled-back cases); a record that is not yet due is not claimed; a broker failure schedules a retry with the same event identity; exhausted attempts produce `manual_repair` plus a visible dead letter; a duplicate delivery is a no-op; two concurrent consumers converge on one outcome; an unsupported schema version is dead-lettered without running the handler; a command failure releases the idempotency claim.
 - The Kafka adapter is proven against the real local broker, not a mock: a published envelope round-trips with its partition key and payload intact, and an unreachable broker surfaces as a publication failure rather than a silent loss.
 
-Status is `In progress`, not `Implemented`, because the participating processes are not built yet. Outstanding, in the epic's own order:
+Status is `In progress`, not `Implemented`. The Identity Access API now writes a synthetic foundation
+record and outbox row in one transaction; its separate worker relays committed events, while the
+Audit Reconciliation worker consumes the versioned event into its independent database. Its inbox
+identity and append-only audit evidence are persisted atomically. The operator runbook covers the
+two processes and database-specific repair path. Automated unit and model tests cover the audit
+contract and tenant-scoped schema; real broker/database restart and replay verification still
+requires the local infrastructure stack.
 
-- Slice 3 and 6 need a real relay host: ADR-0007 places the relay in the owning service's `Workers` project, which does not exist yet, so nothing runs the relay on a schedule.
-- The reference flow needs its producer and consumer: a synthetic foundation record written with its outbox row in one transaction, a consumer worker, and the operator replay procedure.
-- Slice 8 (operations and recovery documentation) is not written, and the outbox backlog gauges are not registered with a meter listener yet. Both belong with the relay host.
+Outstanding:
+
+- Run the complete local infrastructure verification against both service databases and the real
+  broker, including restart-after-commit and replay-after-consumption.
+- Add end-to-end correlation/causation tracing, standard liveness/readiness endpoints and telemetry
+  redaction evidence under epic 05.
+- Add durable audit evidence for authorization allow/deny decisions and the operator replay action.
+- Complete the remaining outbox/inbox operational gauges and confirm the relevant meter instruments
+  through a listener.
 
 ## Objective
 
@@ -172,4 +184,3 @@ Trace producer and consumer spans using correlation and causation identifiers wi
 - Do not claim exactly-once delivery; implement effectively-once business outcomes through idempotency.
 - Do not use Redis as the only durable idempotency store for authoritative operations.
 - Do not include domain-specific banking events in the shared foundation unless an approved epic defines them.
-

@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Logging;
 
 namespace CoreBanking.IdentityAccess.Api;
@@ -32,4 +33,15 @@ internal static partial class StartupLog
         Level = LogLevel.Information,
         Message = "Effective permissions are read from identity_access_db; development identities are not seeded.")]
     public static partial void RelationalEntitlementStoreInUse(ILogger logger);
+    [LoggerMessage(
+        EventId = 1004,
+        Level = LogLevel.Information,
+        Message = "The reference producer endpoint is enabled; events are published by the worker host, never by this API.")]
+    public static partial void ReferenceProducerEnabled(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1005,
+        Level = LogLevel.Warning,
+        Message = "Readiness check failed for the required Identity Access database.")]
+    public static partial void IdentityAccessDatabaseReadinessFailed(ILogger logger, Exception exception);
 }
