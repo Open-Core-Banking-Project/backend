@@ -22,6 +22,241 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("CoreBanking.BuildingBlocks.Infrastructure.Messaging.DeadLetterRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasColumnType("text")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("DeadLetterId")
+                        .HasColumnType("text")
+                        .HasColumnName("dead_letter_id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("EventType")
+                        .HasColumnType("text")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("text")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("RepairedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("repaired_at");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.HasKey("InstitutionId", "DeadLetterId");
+
+                    b.HasIndex("RepairedAt", "CreatedAt");
+
+                    b.ToTable("dead_letters", "integration");
+                });
+
+            modelBuilder.Entity("CoreBanking.BuildingBlocks.Infrastructure.Messaging.IdempotencyRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasColumnType("text")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("Operation")
+                        .HasColumnType("text")
+                        .HasColumnName("operation");
+
+                    b.Property<string>("Initiator")
+                        .HasColumnType("text")
+                        .HasColumnName("initiator");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasColumnType("text")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_fingerprint");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("text")
+                        .HasColumnName("result");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.HasKey("InstitutionId", "Operation", "Initiator", "IdempotencyKey");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("idempotency_records", "integration");
+                });
+
+            modelBuilder.Entity("CoreBanking.BuildingBlocks.Infrastructure.Messaging.InboxRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasColumnType("text")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("Consumer")
+                        .HasColumnType("text")
+                        .HasColumnName("consumer");
+
+                    b.Property<string>("EventId")
+                        .HasColumnType("text")
+                        .HasColumnName("event_id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<string>("Outcome")
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.HasKey("InstitutionId", "Consumer", "EventId");
+
+                    b.ToTable("inbox_messages", "integration");
+                });
+
+            modelBuilder.Entity("CoreBanking.BuildingBlocks.Infrastructure.Messaging.OutboxRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasColumnType("text")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("MessageId")
+                        .HasColumnType("text")
+                        .HasColumnName("message_id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("BusinessReference")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("business_reference");
+
+                    b.Property<string>("CausationId")
+                        .HasColumnType("text")
+                        .HasColumnName("causation_id");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Envelope")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("envelope");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("Producer")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("producer");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("topic");
+
+                    b.HasKey("InstitutionId", "MessageId");
+
+                    b.HasIndex("InstitutionId", "EventId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "NextAttemptAt");
+
+                    b.ToTable("outbox_messages", "integration");
+                });
+
             modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.ConflictRuleRecord", b =>
                 {
                     b.Property<string>("InstitutionId")

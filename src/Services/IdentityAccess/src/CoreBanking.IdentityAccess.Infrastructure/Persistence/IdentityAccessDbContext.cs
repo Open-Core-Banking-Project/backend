@@ -1,9 +1,13 @@
+using System.Threading;
+using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
+using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Access;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Identity;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CoreBanking.IdentityAccess.Infrastructure.Persistence;
 
@@ -13,7 +17,7 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence;
 /// filter fails closed when no trusted institution context has been established.
 /// Decision: docs/adr/ADR-0004-database-per-service-and-tenant-isolation.md
 /// </summary>
-public sealed class IdentityAccessDbContext : DbContext
+public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
 {
     private readonly ITenantContext _tenantContext;
 
@@ -49,6 +53,14 @@ public sealed class IdentityAccessDbContext : DbContext
 
     public DbSet<AuthenticationEventRecord> AuthenticationEvents => Set<AuthenticationEventRecord>();
 
+    public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
+
+    public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
+
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
+    public DbSet<DeadLetterRecord> DeadLetters => Set<DeadLetterRecord>();
+
     /// <summary>
     /// The institution of the current operation, read as a parameter by every tenant query filter.
     /// A block-bodied property is required: a null-propagating expression cannot be placed in an
@@ -69,6 +81,7 @@ public sealed class IdentityAccessDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityAccessDbContext).Assembly);
+        modelBuilder.ApplyIntegrationRecords();
 
         modelBuilder.Entity<IdentityRecord>().HasQueryFilter(identity => CurrentInstitutionId != null && identity.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<ServiceClientRecord>().HasQueryFilter(client => CurrentInstitutionId != null && client.InstitutionId == CurrentInstitutionId);
@@ -82,5 +95,13 @@ public sealed class IdentityAccessDbContext : DbContext
         modelBuilder.Entity<TemporaryGrantRecord>().HasQueryFilter(grant => CurrentInstitutionId != null && grant.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<EntitlementVersionRecord>().HasQueryFilter(version => CurrentInstitutionId != null && version.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AuthenticationEventRecord>().HasQueryFilter(evidence => CurrentInstitutionId != null && evidence.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<InboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<IdempotencyRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<DeadLetterRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
     }
+
+    /// <summary>Opens the transaction that makes source state and outbox record atomic.</summary>
+    public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken) =>
+        Database.BeginTransactionAsync(cancellationToken);
 }

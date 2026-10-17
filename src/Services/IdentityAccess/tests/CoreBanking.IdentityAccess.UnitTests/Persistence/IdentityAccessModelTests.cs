@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CoreBanking.BuildingBlocks.Application.Persistence;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
@@ -34,6 +35,10 @@ public sealed class IdentityAccessModelTests
         "identity.identities",
         "identity.service_clients",
         "identity.sessions",
+        "integration.dead_letters",
+        "integration.idempotency_records",
+        "integration.inbox_messages",
+        "integration.outbox_messages",
         "security.authentication_events",
     ];
 

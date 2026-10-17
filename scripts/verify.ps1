@@ -21,7 +21,7 @@ try {
     $steps = [ordered]@{
         'restore' = { dotnet restore }
         'build'   = { dotnet build --no-restore --configuration $Configuration }
-        'test'    = { dotnet test --no-build --configuration $Configuration --filter 'Category!=Database' }
+        'test'    = { dotnet test --no-build --configuration $Configuration --filter 'Category!=Database&Category!=Integration' }
         'format'  = { dotnet format --verify-no-changes }
     }
 

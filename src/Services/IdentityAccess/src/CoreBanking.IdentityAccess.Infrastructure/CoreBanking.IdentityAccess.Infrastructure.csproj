@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CoreBanking.IdentityAccess.Application\CoreBanking.IdentityAccess.Application.csproj" />
     <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Application\CoreBanking.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Infrastructure\CoreBanking.BuildingBlocks.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

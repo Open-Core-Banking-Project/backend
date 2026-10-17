@@ -1,4 +1,5 @@
 using System;
+using CoreBanking.BuildingBlocks.Application.Persistence;
 using CoreBanking.BuildingBlocks.Application.Security;
 
 namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Identity;

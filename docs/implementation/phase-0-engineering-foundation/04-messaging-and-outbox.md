@@ -3,7 +3,7 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Messaging, Outbox, Inbox and Idempotency"
 owning_service: "Platform-wide"
 modules: [Event Contracts, Transactional Outbox, Inbox, Idempotency, Replay]
-status: Approved
+status: In progress
 requirements: [ARC-002, ARC-003, LED-004, LED-005, NFR-RES-002, API-007]
 stories: [US-020, US-068, US-071]
 dependencies: [Repository and Build Foundation, Local Infrastructure, Identity and Permission Foundation]
@@ -14,6 +14,25 @@ last_updated: 2026-10-16
 # Epic: Messaging, Outbox, Inbox and Idempotency
 
 Approved 2026-10-16 on the instruction of the repository owner, after ADR-0007 was accepted. Ready to implement.
+
+Implementation evidence, 2026-10-17 (slices 1 to 6 and the failure-scenario tests; the participants and the runbook are still outstanding):
+
+- The envelope is `IntegrationEventEnvelope` in `CoreBanking.BuildingBlocks.Application/Messaging`, carrying exactly the ten documented fields. `EventContract` fixes the serializer (UTF-8 JSON, camel case, ISO 8601, null causation omitted) and the topic rule `corebanking.<service>.<event-family>.v<major>`, and can read the major version back out of a topic. `PartitionKey` is the business reference.
+- `IdempotencyKey` scopes a key to institution, operation and initiator, and fingerprints the request body with SHA-256 so a materially different request can be recognised. `RetrySchedule` is a pure exponential-backoff-with-jitter function, so retry timing is provable instead of wall-clock dependent.
+- The four integration tables exist in `identity_access_db` under the `integration` schema: `outbox_messages`, `inbox_messages`, `idempotency_records` and `dead_letters`. All four are tenant-owned, carry the institution column in their keys, and receive the mandatory institution query filter. Their technical mappings live in the shared building block; the table, the migration and the retention belong to Identity and Access, as ADR-0007 requires.
+- `OutboxRelay` claims pending records with `FOR UPDATE SKIP LOCKED`, publishes, and marks a record `published` only after the broker acknowledged it. A broker failure increments attempts and schedules the next attempt; exhausted attempts move the record to `manual_repair` and raise a dead letter. Retry never recreates the event identity. The relay is the only production code allowed to publish, and an architecture test now fails if anything else references the publisher port or the broker client.
+- `InboxProcessor` registers the event identity in the same unit of work as the consumer outcome, treats a repeat delivery as a no-op that leaves the recorded outcome, and converges two concurrent consumers through the unique inbox key. An unsupported schema version is dead-lettered without invoking the handler.
+- `IdempotencyService` writes the claim before the command runs, returns the recorded result for an equivalent request, returns a stable conflict for a materially different request, and releases the claim when the command fails so a retry can execute. The record is durable in PostgreSQL, never only in Redis.
+- `KafkaEventPublisher` is the adapter behind the publisher port: `acks=all`, idempotent producer, broker failure translated into `EventPublicationException`. `MessagingMetrics` publishes the counters and the consumer-duration histogram that the epic requires, with bounded labels only.
+- Verification, run and passed: `dotnet build CoreBanking.sln -c Release` reports 0 warnings and 0 errors; `scripts/verify.ps1` passes with 48 tests (13 architecture, 35 Identity and Access) and a clean format gate; `scripts/db-verify.ps1` applies the migrations and passes 18 tests (12 database, 6 integration categories) as the application principal.
+- The failure scenarios of the epic are covered by passing tests: source state and the outbox record commit together or not at all (committed and rolled-back cases); a record that is not yet due is not claimed; a broker failure schedules a retry with the same event identity; exhausted attempts produce `manual_repair` plus a visible dead letter; a duplicate delivery is a no-op; two concurrent consumers converge on one outcome; an unsupported schema version is dead-lettered without running the handler; a command failure releases the idempotency claim.
+- The Kafka adapter is proven against the real local broker, not a mock: a published envelope round-trips with its partition key and payload intact, and an unreachable broker surfaces as a publication failure rather than a silent loss.
+
+Status is `In progress`, not `Implemented`, because the participating processes are not built yet. Outstanding, in the epic's own order:
+
+- Slice 3 and 6 need a real relay host: ADR-0007 places the relay in the owning service's `Workers` project, which does not exist yet, so nothing runs the relay on a schedule.
+- The reference flow needs its producer and consumer: a synthetic foundation record written with its outbox row in one transaction, a consumer worker, and the operator replay procedure.
+- Slice 8 (operations and recovery documentation) is not written, and the outbox backlog gauges are not registered with a meter listener yet. Both belong with the relay host.
 
 ## Objective
 

@@ -87,12 +87,14 @@ try {
 
     Write-Host '==> database tests as identityaccess_app' -ForegroundColor Cyan
     $env:ConnectionStrings__IdentityAccess = $applicationConnection
-    dotnet test $testProject --configuration $Configuration --filter 'Category=Database'
+    $env:CB_BROKER_BOOTSTRAP_SERVERS = '127.0.0.1:' + $environment['CB_BROKER_PORT']
+    dotnet test $testProject --configuration $Configuration --filter 'Category=Database|Category=Integration'
     if ($LASTEXITCODE -ne 0) { throw "Database tests failed with exit code $LASTEXITCODE." }
 
     Write-Host 'Database verification passed.' -ForegroundColor Green
 }
 finally {
     Remove-Item Env:\ConnectionStrings__IdentityAccess -ErrorAction SilentlyContinue
+    Remove-Item Env:\CB_BROKER_BOOTSTRAP_SERVERS -ErrorAction SilentlyContinue
     Pop-Location
 }

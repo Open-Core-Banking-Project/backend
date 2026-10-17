@@ -398,6 +398,72 @@ public sealed class RepositoryLayoutTests
         !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
         && !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
+    /// <summary>
+    /// ADR-0007 allows publication only through the outbox relay, so nothing in a request path can
+    /// publish an event that was not committed first, and only the adapter knows the broker.
+    /// </summary>
+    [Fact]
+    public void Only_the_outbox_relay_publishes_events_and_only_the_adapter_knows_the_broker()
+    {
+        string messaging = "CoreBanking.BuildingBlocks.Infrastructure" + Path.DirectorySeparatorChar + "Messaging";
+
+        string[] publisherAllowed =
+        [
+            Path.Combine(messaging, "IIntegrationStore.cs"),
+            Path.Combine(messaging, "OutboxRelay.cs"),
+            Path.Combine(messaging, "Kafka", "KafkaEventPublisher.cs"),
+        ];
+
+        List<string> publishViolations = new();
+        List<string> brokerViolations = new();
+
+        foreach (string file in SourceFiles(Path.Combine(RepositoryRoot, "src")))
+        {
+            string relative = Path.GetRelativePath(RepositoryRoot, file);
+
+            // Test doubles legitimately implement the port; the rule is about production code.
+            if (relative.Contains(Path.DirectorySeparatorChar + "tests" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string content = File.ReadAllText(file);
+
+            if (content.Contains("IEventPublisher", StringComparison.Ordinal)
+                && !publisherAllowed.Any(allowed => relative.EndsWith(allowed, StringComparison.OrdinalIgnoreCase)))
+            {
+                publishViolations.Add(relative);
+            }
+
+            if (content.Contains("using Confluent.Kafka", StringComparison.Ordinal)
+                && !relative.EndsWith(Path.Combine("Messaging", "Kafka", "KafkaEventPublisher.cs"), StringComparison.OrdinalIgnoreCase))
+            {
+                brokerViolations.Add(relative);
+            }
+        }
+
+        Assert.True(
+            publishViolations.Count == 0,
+            "Only the outbox relay may publish events (ADR-0007): " + string.Join("; ", publishViolations));
+
+        Assert.True(
+            brokerViolations.Count == 0,
+            "Only the Kafka adapter may reference the broker client (ADR-0007): " + string.Join("; ", brokerViolations));
+    }
+
+    private static IEnumerable<string> SourceFiles(string root)
+    {
+        if (!Directory.Exists(root))
+        {
+            yield break;
+        }
+
+        foreach (string file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories).Where(IsSourceFile).OrderBy(path => path, StringComparer.Ordinal))
+        {
+            yield return file;
+        }
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

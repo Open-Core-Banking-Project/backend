@@ -60,7 +60,7 @@ jobs:
       - name: Tests
         run: >-
           dotnet test --no-build --configuration Release
-          --filter "Category!=Database"
+          --filter "Category!=Database&Category!=Integration"
           --logger "trx;LogFileName=test-results.trx"
           --collect:"XPlat Code Coverage"
           --results-directory artifacts/test-results
