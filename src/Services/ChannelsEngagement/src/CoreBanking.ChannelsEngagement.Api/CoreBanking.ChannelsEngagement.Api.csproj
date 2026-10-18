@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Observability\CoreBanking.BuildingBlocks.Observability.csproj" />
     <ProjectReference Include="..\CoreBanking.ChannelsEngagement.Application\CoreBanking.ChannelsEngagement.Application.csproj" />
     <ProjectReference Include="..\CoreBanking.ChannelsEngagement.Contracts\CoreBanking.ChannelsEngagement.Contracts.csproj" />
     <ProjectReference Include="..\CoreBanking.ChannelsEngagement.Infrastructure\CoreBanking.ChannelsEngagement.Infrastructure.csproj" />

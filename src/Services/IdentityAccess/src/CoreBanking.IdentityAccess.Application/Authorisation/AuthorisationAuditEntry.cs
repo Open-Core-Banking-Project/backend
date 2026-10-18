@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 
@@ -52,5 +54,5 @@ public sealed record AuthorisationAuditEntry
 /// </summary>
 public interface IAuthorisationAuditWriter
 {
-    void Write(AuthorisationAuditEntry entry);
+    Task WriteAsync(AuthorisationAuditEntry entry, CancellationToken cancellationToken);
 }

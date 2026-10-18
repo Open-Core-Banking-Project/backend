@@ -76,6 +76,53 @@ namespace CoreBanking.AuditReconciliation.Infrastructure.Persistence.Migrations
                     b.ToTable("events", "audit");
                 });
 
+            modelBuilder.Entity("CoreBanking.AuditReconciliation.Infrastructure.Persistence.UntrustedMessageQuarantineRecord", b =>
+                {
+                    b.Property<string>("Transport")
+                        .HasColumnType("text")
+                        .HasColumnName("transport");
+
+                    b.Property<string>("Stream")
+                        .HasColumnType("text")
+                        .HasColumnName("stream");
+
+                    b.Property<int>("Partition")
+                        .HasColumnType("integer")
+                        .HasColumnName("partition");
+
+                    b.Property<long>("Position")
+                        .HasColumnType("bigint")
+                        .HasColumnName("position");
+
+                    b.Property<string>("MessageKey")
+                        .HasColumnType("text")
+                        .HasColumnName("message_key");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTimeOffset>("QuarantinedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("quarantined_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("RepairedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("repaired_at");
+
+                    b.HasKey("Transport", "Stream", "Partition", "Position");
+
+                    b.HasIndex("RepairedAt", "QuarantinedAt");
+
+                    b.ToTable("untrusted_message_quarantine", "integration");
+                });
+
             modelBuilder.Entity("CoreBanking.BuildingBlocks.Infrastructure.Messaging.DeadLetterRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -300,6 +347,14 @@ namespace CoreBanking.AuditReconciliation.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("topic");
+
+                    b.Property<string>("TraceParent")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_parent");
+
+                    b.Property<string>("TraceState")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_state");
 
                     b.HasKey("InstitutionId", "MessageId");
 

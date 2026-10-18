@@ -1,8 +1,11 @@
 using System;
+using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
+using CoreBanking.BuildingBlocks.Application.Diagnostics;
 using CoreBanking.BuildingBlocks.Application.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
@@ -67,7 +70,13 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
                     continue;
                 }
 
-                InboxResult outcome = await HandleAsync(json, stoppingToken).ConfigureAwait(false);
+                using Activity? processingActivity = StartProcessingActivity(result.Message.Headers);
+                InboxResult outcome = await HandleAsync(result, json, stoppingToken).ConfigureAwait(false);
+                if (outcome == InboxResult.Deferred)
+                {
+                    processingActivity?.SetStatus(ActivityStatusCode.Error);
+                }
+
                 if (outcome is InboxResult.Processed or InboxResult.Duplicate or InboxResult.Rejected)
                 {
                     try
@@ -95,7 +104,47 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
         }
     }
 
-    private async Task<InboxResult> HandleAsync(string json, CancellationToken cancellationToken)
+    private Activity? StartProcessingActivity(Headers? headers)
+    {
+        string? traceParent = ReadHeader(headers, "traceparent");
+        string? traceState = ReadHeader(headers, "tracestate");
+        ActivityContext parentContext = default;
+        bool hasParent = ActivityContext.TryParse(traceParent, traceState, isRemote: true, out parentContext);
+
+        Activity? activity = hasParent
+            ? CoreBankingActivitySource.Instance.StartActivity("messaging.process", ActivityKind.Consumer, parentContext)
+            : CoreBankingActivitySource.Instance.StartActivity("messaging.process", ActivityKind.Consumer);
+
+        activity?.SetTag("messaging.system", "kafka");
+        activity?.SetTag("messaging.destination.name", _options.Topic);
+        activity?.SetTag("messaging.operation.type", "process");
+        return activity;
+    }
+
+    private static string? ReadHeader(Headers? headers, string name)
+    {
+        if (headers is null)
+        {
+            return null;
+        }
+
+        for (int index = headers.Count - 1; index >= 0; index--)
+        {
+            IHeader header = headers[index];
+            if (string.Equals(header.Key, name, StringComparison.Ordinal))
+            {
+                byte[]? value = header.GetValueBytes();
+                return value is null ? null : Encoding.UTF8.GetString(value);
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<InboxResult> HandleAsync(
+        ConsumeResult<string, string> result,
+        string json,
+        CancellationToken cancellationToken)
     {
         IntegrationEventEnvelope? envelope;
         try
@@ -105,7 +154,7 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
         catch (JsonException exception)
         {
             LogUnreadable(_logger, exception.GetType().Name);
-            return InboxResult.Deferred;
+            return await QuarantineAsync(result, json, exception.GetType().Name, cancellationToken).ConfigureAwait(false);
         }
 
         if (envelope is null
@@ -116,7 +165,7 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
             || string.IsNullOrWhiteSpace(envelope.Payload))
         {
             LogUnreadable(_logger, "EnvelopeMissingRequiredFields");
-            return InboxResult.Deferred;
+            return await QuarantineAsync(result, json, "EnvelopeMissingRequiredFields", cancellationToken).ConfigureAwait(false);
         }
 
         await using AsyncServiceScope scope = _scopeFactory.CreateAsyncScope();
@@ -137,13 +186,44 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
         }
     }
 
+    private async Task<InboxResult> QuarantineAsync(
+        ConsumeResult<string, string> result,
+        string payload,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        await using AsyncServiceScope scope = _scopeFactory.CreateAsyncScope();
+        IUntrustedMessageQuarantine quarantine = scope.ServiceProvider.GetRequiredService<IUntrustedMessageQuarantine>();
+
+        try
+        {
+            await quarantine.QuarantineAsync(
+                new UntrustedMessage(
+                    "kafka",
+                    result.Topic,
+                    result.Partition.Value,
+                    result.Offset.Value,
+                    result.Message.Key,
+                    payload,
+                    reason),
+                cancellationToken).ConfigureAwait(false);
+
+            return InboxResult.Rejected;
+        }
+        catch (DbUpdateException exception)
+        {
+            LogPersistenceFailure(_logger, exception.GetType().Name);
+            return InboxResult.Deferred;
+        }
+    }
+
     [LoggerMessage(EventId = 2201, Level = LogLevel.Warning, Message = "Kafka consume failed with broker error {Code}; the offset remains uncommitted")]
     private static partial void LogConsumeFailure(ILogger logger, string code);
 
     [LoggerMessage(EventId = 2202, Level = LogLevel.Warning, Message = "Event {Key} was deferred and will be redelivered")]
     private static partial void LogDeferred(ILogger logger, string key);
 
-    [LoggerMessage(EventId = 2203, Level = LogLevel.Error, Message = "An unreadable message was retained for operator repair: {Reason}")]
+    [LoggerMessage(EventId = 2203, Level = LogLevel.Error, Message = "An unreadable message was deferred without logging its payload: {Reason}")]
     private static partial void LogUnreadable(ILogger logger, string reason);
 
     [LoggerMessage(EventId = 2204, Level = LogLevel.Error, Message = "Kafka offset commit failed with broker error {Code}; the event may be delivered again")]

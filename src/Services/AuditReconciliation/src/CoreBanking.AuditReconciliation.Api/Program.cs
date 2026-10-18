@@ -2,6 +2,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBankingObservability(
+    builder.Services,
+    builder.Configuration,
+    builder.Environment,
+    "corebanking.audit-reconciliation.api");
 WebApplication app = builder.Build();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));

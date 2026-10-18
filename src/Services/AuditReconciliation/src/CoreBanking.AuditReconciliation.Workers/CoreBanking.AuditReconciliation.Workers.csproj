@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Observability\CoreBanking.BuildingBlocks.Observability.csproj" />
     <ProjectReference Include="..\CoreBanking.AuditReconciliation.Infrastructure\CoreBanking.AuditReconciliation.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Infrastructure\CoreBanking.BuildingBlocks.Infrastructure.csproj" />
   </ItemGroup>

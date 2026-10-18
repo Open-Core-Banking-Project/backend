@@ -20,6 +20,11 @@ public static partial class Program
     public static async Task<int> Main(string[] args)
     {
         HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+        CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBankingObservability(
+            builder.Services,
+            builder.Configuration,
+            builder.Environment,
+            "corebanking.audit-reconciliation.worker");
 
         string? connectionString = builder.Configuration.GetConnectionString("AuditReconciliation");
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -38,6 +43,7 @@ public static partial class Program
         builder.Services.AddSingleton<ITenantContext>(provider => provider.GetRequiredService<AmbientTenantContext>());
         builder.Services.AddDbContext<AuditReconciliationDbContext>(options => options.UseNpgsql(connectionString));
         builder.Services.AddScoped<IIntegrationStore>(provider => provider.GetRequiredService<AuditReconciliationDbContext>());
+        builder.Services.AddScoped<IUntrustedMessageQuarantine, PersistentUntrustedMessageQuarantine>();
         builder.Services.AddScoped(provider => new InboxProcessor(
             provider.GetRequiredService<IIntegrationStore>(),
             provider.GetRequiredService<TimeProvider>()));
@@ -53,6 +59,10 @@ public static partial class Program
         builder.Services.AddHostedService<KafkaInboxConsumerWorker>();
 
         IHost host = builder.Build();
+        MessagingBacklogGauges.Register(
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            host.Services.GetRequiredService<TimeProvider>());
+
         ILogger startedLogger = host.Services.GetRequiredService<ILoggerFactory>()
             .CreateLogger("CoreBanking.AuditReconciliation.Workers");
         LogStarted(startedLogger);

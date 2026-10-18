@@ -36,6 +36,8 @@ public static class IntegrationRecordConfiguration
             builder.Property(record => record.BusinessReference).HasColumnName("business_reference");
             builder.Property(record => record.CorrelationId).HasColumnName("correlation_id");
             builder.Property(record => record.CausationId).HasColumnName("causation_id");
+            builder.Property(record => record.TraceParent).HasColumnName("trace_parent");
+            builder.Property(record => record.TraceState).HasColumnName("trace_state");
             builder.Property(record => record.Producer).HasColumnName("producer");
             builder.Property(record => record.Envelope).HasColumnName("envelope");
             builder.Property(record => record.Status).HasColumnName("status").HasConversion<string>();

@@ -9,6 +9,7 @@
     <ProjectReference Include="..\CoreBanking.IdentityAccess.Infrastructure\CoreBanking.IdentityAccess.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Application\CoreBanking.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Infrastructure\CoreBanking.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Observability\CoreBanking.BuildingBlocks.Observability.csproj" />
   </ItemGroup>
 
   <ItemGroup>

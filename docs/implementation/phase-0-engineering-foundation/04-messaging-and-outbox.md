@@ -3,48 +3,58 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Messaging, Outbox, Inbox and Idempotency"
 owning_service: "Platform-wide"
 modules: [Event Contracts, Transactional Outbox, Inbox, Idempotency, Replay]
-status: In progress
+status: Implemented
 requirements: [ARC-002, ARC-003, LED-004, LED-005, NFR-RES-002, API-007]
 stories: [US-020, US-068, US-071]
 dependencies: [Repository and Build Foundation, Local Infrastructure, Identity and Permission Foundation]
 adrs: [ADR-0007]
-last_updated: 2026-10-16
+last_updated: 2026-10-18
 ---
 
 # Epic: Messaging, Outbox, Inbox and Idempotency
 
-Approved 2026-10-16 on the instruction of the repository owner, after ADR-0007 was accepted. Ready to implement.
+Approved 2026-10-16 on the instruction of the repository owner, after ADR-0007 was accepted.
+Implementation and runtime infrastructure proof are complete. Retention remains a policy decision
+and end-to-end trace inspection is tracked by epic 05 rather than this messaging epic.
 
-Implementation evidence, 2026-10-17 (slices 1 to 6 and the failure-scenario tests; the participants and the runbook are still outstanding):
+Implementation evidence, 2026-10-18:
 
 - The envelope is `IntegrationEventEnvelope` in `CoreBanking.BuildingBlocks.Application/Messaging`, carrying exactly the ten documented fields. `EventContract` fixes the serializer (UTF-8 JSON, camel case, ISO 8601, null causation omitted) and the topic rule `corebanking.<service>.<event-family>.v<major>`, and can read the major version back out of a topic. `PartitionKey` is the business reference.
 - `IdempotencyKey` scopes a key to institution, operation and initiator, and fingerprints the request body with SHA-256 so a materially different request can be recognised. `RetrySchedule` is a pure exponential-backoff-with-jitter function, so retry timing is provable instead of wall-clock dependent.
-- The four integration tables exist in `identity_access_db` under the `integration` schema: `outbox_messages`, `inbox_messages`, `idempotency_records` and `dead_letters`. All four are tenant-owned, carry the institution column in their keys, and receive the mandatory institution query filter. Their technical mappings live in the shared building block; the table, the migration and the retention belong to Identity and Access, as ADR-0007 requires.
+- Identity Access and Audit Reconciliation each own local `integration` tables for `outbox_messages`, `inbox_messages`, `idempotency_records` and `dead_letters`. All four are tenant-owned, carry the institution column in their keys, and receive the mandatory institution query filter. Their technical mappings live in the shared building block; each service owns its migrations and retention, as ADR-0007 requires.
 - `OutboxRelay` claims pending records with `FOR UPDATE SKIP LOCKED`, publishes, and marks a record `published` only after the broker acknowledged it. A broker failure increments attempts and schedules the next attempt; exhausted attempts move the record to `manual_repair` and raise a dead letter. Retry never recreates the event identity. The relay is the only production code allowed to publish, and an architecture test now fails if anything else references the publisher port or the broker client.
 - `InboxProcessor` registers the event identity in the same unit of work as the consumer outcome, treats a repeat delivery as a no-op that leaves the recorded outcome, and converges two concurrent consumers through the unique inbox key. An unsupported schema version is dead-lettered without invoking the handler.
 - `IdempotencyService` writes the claim before the command runs, returns the recorded result for an equivalent request, returns a stable conflict for a materially different request, and releases the claim when the command fails so a retry can execute. The record is durable in PostgreSQL, never only in Redis.
 - `KafkaEventPublisher` is the adapter behind the publisher port: `acks=all`, idempotent producer, broker failure translated into `EventPublicationException`. `MessagingMetrics` publishes the counters and the consumer-duration histogram that the epic requires, with bounded labels only.
-- Verification, run and passed: `dotnet build CoreBanking.sln -c Release` reports 0 warnings and 0 errors; `scripts/verify.ps1` passes with 48 tests (13 architecture, 35 Identity and Access) and a clean format gate; `scripts/db-verify.ps1` applies the migrations and passes 18 tests (12 database, 6 integration categories) as the application principal.
-- The failure scenarios of the epic are covered by passing tests: source state and the outbox record commit together or not at all (committed and rolled-back cases); a record that is not yet due is not claimed; a broker failure schedules a retry with the same event identity; exhausted attempts produce `manual_repair` plus a visible dead letter; a duplicate delivery is a no-op; two concurrent consumers converge on one outcome; an unsupported schema version is dead-lettered without running the handler; a command failure releases the idempotency claim.
-- The Kafka adapter is proven against the real local broker, not a mock: a published envelope round-trips with its partition key and payload intact, and an unreachable broker surfaces as a publication failure rather than a silent loss.
+- The API payload contains only the foundation record and actor identifiers; the synthetic description is not copied into the integration event.
+- The outbox stores W3C `traceparent` and `tracestate` metadata separately from the business event
+  envelope. The relay creates a producer span from that context and the Kafka adapter propagates
+  it in standard message headers; the Audit Reconciliation consumer creates a child processing
+  span. Runtime inspection of a complete trace remains outstanding.
+- The current Release solution build passes with zero warnings and errors. All 63 offline-safe
+  tests pass (14 architecture, 46 Identity Access, 3 Audit Reconciliation).
+- `scripts/db-verify.ps1 -Configuration Release` applies both services' migrations and passes 25
+  Identity Access database/integration tests and 5 Audit Reconciliation tests. The local
+  infrastructure verification separately reports 37/37 checks passing, including a Kafka message
+  retained across an actual broker-container restart.
+- The Identity Access application principal can insert audit evidence but database tests confirm it
+  cannot update or delete it. EF reports no pending model changes for either service.
+- A database-backed replay test delivers the same committed event twice through the real Audit
+  Reconciliation consumer and proves one inbox outcome and one audit event.
+- Malformed or structurally untrusted Kafka messages are stored idempotently in
+  `integration.untrusted_message_quarantine` before their offsets are committed, preventing a
+  poison envelope from blocking its partition.
+- Operator replay writes append-only evidence to `audit.operator_actions` in the same repair
+  transaction. Database grants and tests reject runtime-role updates and deletes.
+- Messaging counters, latency and backlog/dead-letter age gauges are exported through OpenTelemetry
+  and their required instrument names are verified through a meter listener.
 
-Status is `In progress`, not `Implemented`. The Identity Access API now writes a synthetic foundation
+Status is `Implemented`. The Identity Access API writes a synthetic foundation
 record and outbox row in one transaction; its separate worker relays committed events, while the
 Audit Reconciliation worker consumes the versioned event into its independent database. Its inbox
 identity and append-only audit evidence are persisted atomically. The operator runbook covers the
-two processes and database-specific repair path. Automated unit and model tests cover the audit
-contract and tenant-scoped schema; real broker/database restart and replay verification still
-requires the local infrastructure stack.
-
-Outstanding:
-
-- Run the complete local infrastructure verification against both service databases and the real
-  broker, including restart-after-commit and replay-after-consumption.
-- Add end-to-end correlation/causation tracing, standard liveness/readiness endpoints and telemetry
-  redaction evidence under epic 05.
-- Add durable audit evidence for authorization allow/deny decisions and the operator replay action.
-- Complete the remaining outbox/inbox operational gauges and confirm the relevant meter instruments
-  through a listener.
+two processes, database-specific repair path and quarantine path. Automated unit, database and
+broker tests cover the audit contract, tenant-scoped schema, restart persistence and replay safety.
 
 ## Objective
 
@@ -68,6 +78,8 @@ payload
 ```
 
 The envelope is transport-neutral. Broker-specific headers and serialization details are defined by the messaging ADR.
+W3C trace context is stored as outbox transport metadata and propagated in broker headers; it does
+not alter the versioned business envelope.
 
 ## Outbox rules
 
@@ -162,13 +174,13 @@ Trace producer and consumer spans using correlation and causation identifiers wi
 
 ## Acceptance criteria
 
-- [ ] Source state and outbox are atomic.
-- [ ] Duplicate publication and consumption do not duplicate outcomes.
-- [ ] Concurrent duplicate commands produce one outcome.
-- [ ] Replay is safe and observable.
-- [ ] Dead letters and stuck outbox records are visible and repairable.
-- [ ] Event contracts are versioned and documented.
-- [ ] No distributed transaction is introduced.
+- [x] Source state and outbox are atomic.
+- [x] Duplicate publication and consumption do not duplicate outcomes.
+- [x] Concurrent duplicate commands produce one outcome.
+- [x] Replay is safe and observable.
+- [x] Dead letters and stuck outbox records are visible and repairable.
+- [x] Event contracts are versioned and documented.
+- [x] No distributed transaction is introduced.
 
 ## Open decisions
 

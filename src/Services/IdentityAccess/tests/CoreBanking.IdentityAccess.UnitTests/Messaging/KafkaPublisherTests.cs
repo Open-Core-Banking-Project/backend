@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
@@ -40,6 +42,10 @@ public sealed class KafkaPublisherTests
             Payload = "{\"foundationRecordId\":\"record-1\"}",
         };
 
+        using Activity parent = new("reference-api-request");
+        parent.SetIdFormat(ActivityIdFormat.W3C);
+        parent.Start();
+
         // Topic auto-creation on first publish can take longer than the default budget, so the
         // round-trip test allows a generous timeout; the unreachable-broker test keeps a short one.
         using (KafkaEventPublisher publisher = new(new KafkaMessagingOptions { BootstrapServers = bootstrap, MessageTimeoutMs = 30000 }))
@@ -77,6 +83,12 @@ public sealed class KafkaPublisherTests
                 Assert.Equal(envelope.InstitutionId, received.InstitutionId);
                 Assert.Equal(envelope.Payload, received.Payload);
 
+                string? traceParent = ReadHeader(result.Message.Headers, "traceparent");
+                Assert.NotNull(traceParent);
+                Assert.True(ActivityContext.TryParse(traceParent, ReadHeader(result.Message.Headers, "tracestate"), out ActivityContext context));
+                Assert.Equal(parent.TraceId, context.TraceId);
+                Assert.Equal(parent.SpanId, context.SpanId);
+
                 return;
             }
 
@@ -106,5 +118,25 @@ public sealed class KafkaPublisherTests
         string? configured = Environment.GetEnvironmentVariable(BootstrapVariableName);
 
         return string.IsNullOrWhiteSpace(configured) ? "127.0.0.1:9092" : configured;
+    }
+
+    private static string? ReadHeader(Headers? headers, string name)
+    {
+        if (headers is null)
+        {
+            return null;
+        }
+
+        for (int index = headers.Count - 1; index >= 0; index--)
+        {
+            IHeader header = headers[index];
+            if (string.Equals(header.Key, name, StringComparison.Ordinal))
+            {
+                byte[]? value = header.GetValueBytes();
+                return value is null ? null : Encoding.UTF8.GetString(value);
+            }
+        }
+
+        return null;
     }
 }

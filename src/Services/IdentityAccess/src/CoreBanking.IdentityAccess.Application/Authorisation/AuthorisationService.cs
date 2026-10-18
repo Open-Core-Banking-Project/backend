@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 
@@ -34,14 +36,20 @@ public sealed class AuthorisationService
         _policyVersion = policyVersion;
     }
 
-    public AuthorisationDecision Authorise(AuthorisationRequest request, string operationName, string correlationId)
+    public async Task<AuthorisationDecision> AuthoriseAsync(
+        AuthorisationRequest request,
+        string operationName,
+        string correlationId,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(operationName);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
 
         AuthorisationDecision decision = _policy.Evaluate(request);
-        _auditWriter.Write(ToEvidence(request, decision, operationName, correlationId));
+        await _auditWriter.WriteAsync(
+            ToEvidence(request, decision, operationName, correlationId),
+            cancellationToken).ConfigureAwait(false);
 
         return decision;
     }

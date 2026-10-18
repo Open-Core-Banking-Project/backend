@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.IdentityAccess.Application.Authorisation;
@@ -22,12 +23,12 @@ public sealed class AuthorisationServiceTests
     private static readonly DateTimeOffset Now = new(2026, 10, 16, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Allowed_decision_records_evidence()
+    public async Task Allowed_decision_records_evidence()
     {
         TestSetup setup = CreateSetup();
         setup.Store.Grant(Administrator, Institution, Execute, GrantScope.ForInstitution(Institution));
 
-        setup.Service.Authorise(Request(setup.VersionFor(Administrator), null, null), "identity.foundation.execute", "correlation-1");
+        await setup.Service.AuthoriseAsync(Request(setup.VersionFor(Administrator), null, null), "identity.foundation.execute", "correlation-1");
 
         AuthorisationAuditEntry entry = Assert.Single(setup.Audit.Entries);
         Assert.Equal("allowed", entry.Decision);
@@ -40,11 +41,11 @@ public sealed class AuthorisationServiceTests
     }
 
     [Fact]
-    public void Denied_decision_records_evidence_with_a_stable_reason()
+    public async Task Denied_decision_records_evidence_with_a_stable_reason()
     {
         TestSetup setup = CreateSetup();
 
-        setup.Service.Authorise(Request(setup.VersionFor(Administrator), null, null), "identity.foundation.execute", "correlation-2");
+        await setup.Service.AuthoriseAsync(Request(setup.VersionFor(Administrator), null, null), "identity.foundation.execute", "correlation-2");
 
         AuthorisationAuditEntry entry = Assert.Single(setup.Audit.Entries);
         Assert.Equal("denied", entry.Decision);
@@ -52,11 +53,11 @@ public sealed class AuthorisationServiceTests
     }
 
     [Fact]
-    public void Evidence_never_contains_resource_identifiers()
+    public async Task Evidence_never_contains_resource_identifiers()
     {
         TestSetup setup = CreateSetup();
 
-        setup.Service.Authorise(
+        await setup.Service.AuthoriseAsync(
             Request(setup.VersionFor(Administrator), "customer-9182", "account-4417"),
             "identity.foundation.execute",
             "correlation-3");
@@ -80,7 +81,7 @@ public sealed class AuthorisationServiceTests
     }
 
     [Fact]
-    public void Missing_authentication_evidence_has_no_actor_or_institution()
+    public async Task Missing_authentication_evidence_has_no_actor_or_institution()
     {
         TestSetup setup = CreateSetup();
 
@@ -91,7 +92,7 @@ public sealed class AuthorisationServiceTests
             Actor = null,
         };
 
-        setup.Service.Authorise(request, "identity.foundation.execute", "correlation-4");
+        await setup.Service.AuthoriseAsync(request, "identity.foundation.execute", "correlation-4");
 
         AuthorisationAuditEntry entry = Assert.Single(setup.Audit.Entries);
         Assert.Null(entry.ActorId);
@@ -100,12 +101,12 @@ public sealed class AuthorisationServiceTests
     }
 
     [Fact]
-    public void Evidence_is_append_only()
+    public async Task Evidence_is_append_only()
     {
         TestSetup setup = CreateSetup();
 
-        setup.Service.Authorise(Request(setup.VersionFor(Administrator), null, null), "identity.foundation.execute", "correlation-5");
-        setup.Service.Authorise(Request(setup.VersionFor(Administrator), null, null), "identity.foundation.execute", "correlation-6");
+        await setup.Service.AuthoriseAsync(Request(setup.VersionFor(Administrator), null, null), "identity.foundation.execute", "correlation-5");
+        await setup.Service.AuthoriseAsync(Request(setup.VersionFor(Administrator), null, null), "identity.foundation.execute", "correlation-6");
 
         Assert.Equal(2, setup.Audit.Entries.Count);
         Assert.Equal(2, setup.Audit.Entries.Select(entry => entry.AuditEventId).Distinct(StringComparer.Ordinal).Count());

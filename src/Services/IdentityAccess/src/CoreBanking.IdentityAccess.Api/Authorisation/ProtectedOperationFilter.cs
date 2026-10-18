@@ -68,8 +68,9 @@ public sealed class ProtectedOperationFilter : IEndpointFilter
                 Actor = actor,
             };
 
-            AuthorisationDecision decision = services.GetRequiredService<AuthorisationService>()
-                .Authorise(request, _operationName, correlationId);
+            AuthorisationDecision decision = await services.GetRequiredService<AuthorisationService>()
+                .AuthoriseAsync(request, _operationName, correlationId, http.RequestAborted)
+                .ConfigureAwait(false);
 
             if (!decision.IsAllowed)
             {

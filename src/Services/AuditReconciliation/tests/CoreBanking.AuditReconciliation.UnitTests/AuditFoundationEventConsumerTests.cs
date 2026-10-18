@@ -48,6 +48,7 @@ public sealed class AuditFoundationEventConsumerTests
 
         Assert.Contains("audit.events", tables);
         Assert.Contains("integration.inbox_messages", tables);
+        Assert.Contains("integration.untrusted_message_quarantine", tables);
 
         IEntityType audit = model.FindEntityType(typeof(AuditEvidenceRecord))!;
         Assert.Contains("InstitutionId", audit.FindPrimaryKey()!.Properties.Select(property => property.Name));
@@ -55,6 +56,11 @@ public sealed class AuditFoundationEventConsumerTests
         Assert.DoesNotContain(audit.GetProperties(), property =>
             property.Name.Contains("Description", StringComparison.OrdinalIgnoreCase)
             || property.Name.Contains("Payload", StringComparison.OrdinalIgnoreCase));
+
+        IEntityType quarantine = model.FindEntityType(typeof(UntrustedMessageQuarantineRecord))!;
+        Assert.Empty(quarantine.GetDeclaredQueryFilters());
+        Assert.DoesNotContain(quarantine.GetProperties(), property =>
+            string.Equals(property.Name, "InstitutionId", StringComparison.Ordinal));
     }
 
     private static IModel CreateModel()

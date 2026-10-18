@@ -33,6 +33,12 @@ the file does not exist. The file is git-ignored and its values are never printe
 
 Every published port binds to `127.0.0.1`. Nothing is exposed on the local network.
 
+In Development, APIs and workers export traces to `http://127.0.0.1:4317` by default. Outside
+Development, set `OTEL_EXPORTER_OTLP_ENDPOINT` explicitly. The default protocol is `grpc`; set
+`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` when using the collector's HTTP receiver on port 4318.
+`OTEL_SERVICE_NAME` can override the service resource name; deployment environment and service
+version are set by the process.
+
 ## Databases and principals
 
 Nine databases carry the names fixed by the architecture document. Each has:

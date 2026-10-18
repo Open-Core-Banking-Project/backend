@@ -17,7 +17,9 @@ approved_on: 2026-10-16
 
 ## Status
 
-`Proposed` - decision drafted and ready for owner approval. Effective only when the owners listed below record `Accepted`. Until then the audit envelope, telemetry pipeline and retention configuration must not be finalised; local development telemetry marked development-only may proceed under `02-local-infrastructure.md`.
+`Accepted` 2026-10-16 on the instruction of the repository owner. The audit envelope and telemetry
+requirements in this decision are binding. Product-specific telemetry storage, retention periods,
+additional CI scanning tools and protected-branch settings remain open decisions.
 
 ## Context
 

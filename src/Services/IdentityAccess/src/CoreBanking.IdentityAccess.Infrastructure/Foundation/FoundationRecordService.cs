@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Messaging;
@@ -98,6 +99,8 @@ public sealed class FoundationRecordService
                     Topic = EventContract.TopicFor(Producer, EventFamily, SchemaVersion),
                     BusinessReference = record.FoundationRecordId,
                     CorrelationId = correlationId,
+                    TraceParent = Activity.Current?.Id,
+                    TraceState = Activity.Current?.TraceStateString,
                     Producer = Producer,
                     Envelope = EventContract.Serialize(envelope),
                     Status = OutboxStatus.Pending,

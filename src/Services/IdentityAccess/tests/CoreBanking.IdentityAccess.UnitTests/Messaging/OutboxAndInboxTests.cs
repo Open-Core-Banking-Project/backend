@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CoreBanking.BuildingBlocks.Application.Diagnostics;
 using CoreBanking.BuildingBlocks.Application.Messaging;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
@@ -105,6 +107,36 @@ public sealed class OutboxAndInboxTests : IDisposable
 
         Assert.Equal(0, second.Claimed);
         Assert.Empty(secondPublisher.Published);
+    }
+
+    [Fact]
+    public async Task The_relay_resumes_the_w3c_context_persisted_with_the_outbox_record()
+    {
+        using ActivityListener listener = new()
+        {
+            ShouldListenTo = source => source.Name == CoreBankingActivitySource.Name,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        using Activity parent = new("reference-api-request");
+        parent.SetIdFormat(ActivityIdFormat.W3C);
+        parent.Start();
+
+        OutboxRecord record = NewOutbox("event-trace-context");
+        record.TraceParent = parent.Id;
+        record.TraceState = parent.TraceStateString;
+        await SeedOutboxAsync(record);
+
+        RecordingPublisher publisher = new();
+        await using IdentityAccessDbContext context = CreateContext();
+        OutboxRelayResult result = await new OutboxRelay(context, publisher, TimeProvider.System)
+            .RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Published);
+        Assert.True(publisher.PublishedContext.HasValue);
+        Assert.Equal(parent.TraceId, publisher.PublishedContext!.Value.TraceId);
+        Assert.Equal(parent.SpanId, publisher.PublishedParentSpanId);
     }
 
     [Fact]
@@ -414,11 +446,21 @@ public sealed class OutboxAndInboxTests : IDisposable
 
         public List<PublishedMessage> Published { get; } = [];
 
+        public ActivityContext? PublishedContext { get; private set; }
+
+        public ActivitySpanId? PublishedParentSpanId { get; private set; }
+
         public Task PublishAsync(string topic, string partitionKey, string envelope, CancellationToken cancellationToken)
         {
             if (_failure is not null)
             {
                 throw _failure;
+            }
+
+            if (Activity.Current is Activity activity)
+            {
+                PublishedContext = activity.Context;
+                PublishedParentSpanId = activity.ParentSpanId;
             }
 
             Published.Add(new PublishedMessage(topic, partitionKey, envelope));

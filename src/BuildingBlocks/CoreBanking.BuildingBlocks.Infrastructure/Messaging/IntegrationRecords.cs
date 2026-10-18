@@ -42,6 +42,10 @@ public sealed class OutboxRecord : ITenantOwnedEntity
 
     public string? CausationId { get; set; }
 
+    public string? TraceParent { get; set; }
+
+    public string? TraceState { get; set; }
+
     public required string Producer { get; set; }
 
     /// <summary>The serialized envelope, exactly as it is published.</summary>

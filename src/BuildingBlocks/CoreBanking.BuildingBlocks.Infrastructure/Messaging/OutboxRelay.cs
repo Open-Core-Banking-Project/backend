@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CoreBanking.BuildingBlocks.Application.Diagnostics;
 using CoreBanking.BuildingBlocks.Application.Messaging;
 using Microsoft.EntityFrameworkCore;
 
@@ -93,6 +95,7 @@ public sealed class OutboxRelay
                 .SingleAsync(candidate => candidate.MessageId == messageId, cancellationToken)
                 .ConfigureAwait(false);
 
+            using Activity? activity = StartPublishActivity(record);
             try
             {
                 await _publisher.PublishAsync(record.Topic, record.BusinessReference, record.Envelope, cancellationToken).ConfigureAwait(false);
@@ -105,6 +108,7 @@ public sealed class OutboxRelay
             }
             catch (EventPublicationException exception)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, exception.GetType().Name);
                 failed++;
                 record.Attempts++;
                 record.LastError = exception.Message;
@@ -130,6 +134,27 @@ public sealed class OutboxRelay
         await _store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return new OutboxRelayResult(claimed.Count, published, failed, deadLettered);
+    }
+
+    private static Activity? StartPublishActivity(OutboxRecord record)
+    {
+        ActivityContext parentContext = default;
+        bool hasParent = ActivityContext.TryParse(
+            record.TraceParent,
+            record.TraceState,
+            isRemote: true,
+            out parentContext);
+
+        Activity? activity = hasParent
+            ? CoreBankingActivitySource.Instance.StartActivity("messaging.publish", ActivityKind.Producer, parentContext)
+            : CoreBankingActivitySource.Instance.StartActivity("messaging.publish", ActivityKind.Producer);
+
+        activity?.SetTag("messaging.system", "kafka");
+        activity?.SetTag("messaging.destination.name", record.Topic);
+        activity?.SetTag("messaging.operation.type", "publish");
+        activity?.SetTag("messaging.event.type", record.EventType);
+        activity?.SetTag("correlation.id", record.CorrelationId);
+        return activity;
     }
 
     /// <summary>Unpublished count and oldest age, the two gauges the epic requires.</summary>

@@ -90,30 +90,52 @@ try {
     dotnet tool restore
     if ($LASTEXITCODE -ne 0) { throw "dotnet tool restore failed with exit code $LASTEXITCODE." }
 
+    # Vulnerability metadata is fetched from nuget.org; local verification must also work offline.
+    Write-Host '==> restore Identity Access migration project from available package sources' -ForegroundColor Cyan
+    dotnet restore $infrastructureProject --ignore-failed-sources -p:NuGetAudit=false
+    if ($LASTEXITCODE -ne 0) { throw "Identity Access infrastructure restore failed with exit code $LASTEXITCODE." }
+
+    Write-Host '==> restore Audit Reconciliation migration project from available package sources' -ForegroundColor Cyan
+    dotnet restore $auditInfrastructureProject --ignore-failed-sources -p:NuGetAudit=false
+    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation infrastructure restore failed with exit code $LASTEXITCODE." }
+
+    Write-Host '==> build Identity Access migrations from restored assets' -ForegroundColor Cyan
+    dotnet build $infrastructureProject --no-restore --configuration $Configuration
+    if ($LASTEXITCODE -ne 0) { throw "Identity Access infrastructure build failed with exit code $LASTEXITCODE." }
+
+    Write-Host '==> build Audit Reconciliation migrations from restored assets' -ForegroundColor Cyan
+    dotnet build $auditInfrastructureProject --no-restore --configuration $Configuration
+    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation infrastructure build failed with exit code $LASTEXITCODE." }
+
     Write-Host '==> apply migrations as identityaccess_migrator' -ForegroundColor Cyan
     $env:ConnectionStrings__IdentityAccess = $migratorConnection
-    dotnet tool run dotnet-ef database update --project $infrastructureProject --startup-project $infrastructureProject
+    dotnet tool run dotnet-ef database update --project $infrastructureProject --startup-project $infrastructureProject --configuration $Configuration --no-build
     if ($LASTEXITCODE -ne 0) { throw "dotnet ef database update failed with exit code $LASTEXITCODE." }
 
     Write-Host '==> applied migrations' -ForegroundColor Cyan
-    dotnet tool run dotnet-ef migrations list --project $infrastructureProject --startup-project $infrastructureProject --no-connect
-    dotnet tool run dotnet-ef migrations list --project $infrastructureProject --startup-project $infrastructureProject
+    dotnet tool run dotnet-ef migrations list --project $infrastructureProject --startup-project $infrastructureProject --configuration $Configuration --no-build
     if ($LASTEXITCODE -ne 0) { throw "dotnet ef migrations list failed with exit code $LASTEXITCODE." }
 
     Write-Host '==> apply Audit Reconciliation migrations as auditreconciliation_migrator' -ForegroundColor Cyan
     $env:ConnectionStrings__AuditReconciliation = $auditMigratorConnection
-    dotnet tool run dotnet-ef database update --project $auditInfrastructureProject --startup-project $auditInfrastructureProject
+    dotnet tool run dotnet-ef database update --project $auditInfrastructureProject --startup-project $auditInfrastructureProject --configuration $Configuration --no-build
     if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation database migration failed with exit code $LASTEXITCODE." }
 
     Write-Host '==> database tests as identityaccess_app' -ForegroundColor Cyan
+    dotnet restore $testProject --ignore-failed-sources -p:NuGetAudit=false
+    if ($LASTEXITCODE -ne 0) { throw "Identity Access test restore failed with exit code $LASTEXITCODE." }
+
     $env:ConnectionStrings__IdentityAccess = $applicationConnection
     $env:CB_BROKER_BOOTSTRAP_SERVERS = '127.0.0.1:' + $environment['CB_BROKER_PORT']
-    dotnet test $testProject --configuration $Configuration --filter 'Category=Database|Category=Integration'
+    dotnet test $testProject --no-restore --configuration $Configuration --filter 'Category=Database|Category=Integration'
     if ($LASTEXITCODE -ne 0) { throw "Database tests failed with exit code $LASTEXITCODE." }
 
     Write-Host '==> Audit Reconciliation model tests as auditreconciliation_app' -ForegroundColor Cyan
+    dotnet restore $auditTestProject --ignore-failed-sources -p:NuGetAudit=false
+    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation test restore failed with exit code $LASTEXITCODE." }
+
     $env:ConnectionStrings__AuditReconciliation = $auditApplicationConnection
-    dotnet test $auditTestProject --configuration $Configuration
+    dotnet test $auditTestProject --no-restore --configuration $Configuration
     if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation tests failed with exit code $LASTEXITCODE." }
 
     Write-Host 'Database verification passed.' -ForegroundColor Green

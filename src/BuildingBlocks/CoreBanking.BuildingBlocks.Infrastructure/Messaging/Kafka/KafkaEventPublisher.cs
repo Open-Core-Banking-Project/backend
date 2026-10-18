@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
@@ -61,7 +63,9 @@ public sealed class KafkaEventPublisher : IEventPublisher, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(partitionKey);
         ArgumentNullException.ThrowIfNull(envelope);
 
-        Message<string, string> message = new() { Key = partitionKey, Value = envelope };
+        Activity? activity = Activity.Current;
+        Headers headers = CreateTraceHeaders(activity);
+        Message<string, string> message = new() { Key = partitionKey, Value = envelope, Headers = headers };
 
         try
         {
@@ -69,16 +73,37 @@ public sealed class KafkaEventPublisher : IEventPublisher, IDisposable
         }
         catch (ProduceException<string, string> exception)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, exception.Error.Code.ToString());
             throw new EventPublicationException(
                 $"the broker rejected a message on topic '{topic}': {exception.Error.Code}",
                 exception);
         }
         catch (KafkaException exception)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, exception.Error.Code.ToString());
             throw new EventPublicationException(
                 $"the broker is unavailable for topic '{topic}': {exception.Error.Code}",
                 exception);
         }
+    }
+
+    private static Headers CreateTraceHeaders(Activity? activity)
+    {
+        Headers headers = new();
+        string? traceParent = activity?.Id;
+        string? traceState = activity?.TraceStateString;
+
+        if (!string.IsNullOrWhiteSpace(traceParent))
+        {
+            headers.Add("traceparent", Encoding.UTF8.GetBytes(traceParent));
+        }
+
+        if (!string.IsNullOrWhiteSpace(traceState))
+        {
+            headers.Add("tracestate", Encoding.UTF8.GetBytes(traceState));
+        }
+
+        return headers;
     }
 
     public void Dispose()

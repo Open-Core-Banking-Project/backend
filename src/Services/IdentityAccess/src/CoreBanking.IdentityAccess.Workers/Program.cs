@@ -23,6 +23,11 @@ public static partial class Program
     public static async Task<int> Main(string[] args)
     {
         HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+        CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBankingObservability(
+            builder.Services,
+            builder.Configuration,
+            builder.Environment,
+            "corebanking.identity-access.worker");
 
         string? connectionString = builder.Configuration.GetConnectionString("IdentityAccess");
         if (string.IsNullOrWhiteSpace(connectionString))

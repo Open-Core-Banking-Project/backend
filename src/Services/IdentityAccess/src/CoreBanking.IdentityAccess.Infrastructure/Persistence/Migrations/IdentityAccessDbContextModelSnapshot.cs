@@ -247,6 +247,14 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("topic");
 
+                    b.Property<string>("TraceParent")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_parent");
+
+                    b.Property<string>("TraceState")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_state");
+
                     b.HasKey("InstitutionId", "MessageId");
 
                     b.HasIndex("InstitutionId", "EventId")
@@ -800,6 +808,132 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                     b.HasIndex("InstitutionId", "IdentityId", "OccurredAt");
 
                     b.ToTable("authentication_events", "security");
+                });
+
+            modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Security.AuthorisationAuditRecord", b =>
+                {
+                    b.Property<string>("AuditEventId")
+                        .HasColumnType("text")
+                        .HasColumnName("audit_event_id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorId")
+                        .HasColumnType("text")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorType")
+                        .HasColumnType("text")
+                        .HasColumnName("actor_type");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("decision");
+
+                    b.Property<string>("DeviceId")
+                        .HasColumnType("text")
+                        .HasColumnName("device_id");
+
+                    b.Property<long?>("EntitlementVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entitlement_version");
+
+                    b.Property<string>("InstitutionId")
+                        .HasColumnType("text")
+                        .HasColumnName("institution_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("permission");
+
+                    b.Property<string>("PolicyVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("policy_version");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SessionId")
+                        .HasColumnType("text")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.HasKey("AuditEventId");
+
+                    b.HasIndex("InstitutionId", "OccurredAt");
+
+                    b.ToTable("authorisation_events", "audit");
+                });
+
+            modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Security.OperatorActionAuditRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasColumnType("text")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("AuditEventId")
+                        .HasColumnType("text")
+                        .HasColumnName("audit_event_id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("resource_type");
+
+                    b.HasKey("InstitutionId", "AuditEventId");
+
+                    b.HasIndex("InstitutionId", "OccurredAt");
+
+                    b.ToTable("operator_actions", "audit");
                 });
 
             modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.ConflictRuleRecord", b =>

@@ -31,6 +31,8 @@ public sealed class AuditReconciliationDbContext : DbContext, IIntegrationStore
 
     public DbSet<DeadLetterRecord> DeadLetters => Set<DeadLetterRecord>();
 
+    public DbSet<UntrustedMessageQuarantineRecord> UntrustedMessageQuarantine => Set<UntrustedMessageQuarantineRecord>();
+
     internal string? CurrentInstitutionId
     {
         get
@@ -60,6 +62,22 @@ public sealed class AuditReconciliationDbContext : DbContext, IIntegrationStore
             entity.Property(record => record.Source).HasColumnName("source");
             entity.Property(record => record.CorrelationId).HasColumnName("correlation_id");
             entity.Property(record => record.OccurredAt).HasColumnName("occurred_at");
+        });
+
+        modelBuilder.Entity<UntrustedMessageQuarantineRecord>(entity =>
+        {
+            entity.ToTable("untrusted_message_quarantine", "integration");
+            entity.HasKey(record => new { record.Transport, record.Stream, record.Partition, record.Position });
+            entity.Property(record => record.Transport).HasColumnName("transport");
+            entity.Property(record => record.Stream).HasColumnName("stream");
+            entity.Property(record => record.Partition).HasColumnName("partition");
+            entity.Property(record => record.Position).HasColumnName("position");
+            entity.Property(record => record.MessageKey).HasColumnName("message_key");
+            entity.Property(record => record.Payload).HasColumnName("payload");
+            entity.Property(record => record.Reason).HasColumnName("reason");
+            entity.Property(record => record.QuarantinedAt).HasColumnName("quarantined_at");
+            entity.Property(record => record.RepairedAt).HasColumnName("repaired_at");
+            entity.HasIndex(record => new { record.RepairedAt, record.QuarantinedAt });
         });
 
         modelBuilder.Entity<AuditEvidenceRecord>()

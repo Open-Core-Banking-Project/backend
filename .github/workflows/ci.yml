@@ -1,11 +1,9 @@
 # Continuous integration for the backend.
 #
-# Scope note: the CI provider, the required check set and the scanning tools are
-# governed by ADR-0010 (observability, audit evidence, sensitive-data redaction and
-# retention) and by the observability and CI epic, neither of which is accepted yet.
-# This workflow therefore implements only the Phase 0 epic 01 requirement to be
-# CI-ready: restore, build, format verification, tests and dependency audit.
-# Pin action versions and add the remaining scanning steps once ADR-0010 is accepted.
+# Scope note: ADR-0010 and ADR-0011 are accepted. This workflow provides restore,
+# build, formatting, architecture/unit tests, dependency audit and evidence upload.
+# Integration tests run against the local container stack. Secret/container scanner tooling and
+# protected-branch settings remain explicit open decisions.
 
 name: backend-ci
 
@@ -75,3 +73,32 @@ jobs:
           name: test-results
           path: artifacts/test-results
           if-no-files-found: ignore
+
+  integration:
+    name: Infrastructure and database integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install the pinned SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Start local infrastructure
+        shell: pwsh
+        run: ./scripts/infra.ps1 -Action up
+
+      - name: Verify infrastructure
+        shell: pwsh
+        run: ./scripts/infra-verify.ps1
+
+      - name: Run migrations and integration tests
+        shell: pwsh
+        run: ./scripts/db-verify.ps1 -Configuration Release
+
+      - name: Stop local infrastructure
+        if: always()
+        shell: pwsh
+        run: ./scripts/infra.ps1 -Action down

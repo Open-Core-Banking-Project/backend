@@ -54,6 +54,10 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
 
     public DbSet<AuthenticationEventRecord> AuthenticationEvents => Set<AuthenticationEventRecord>();
 
+    public DbSet<AuthorisationAuditRecord> AuthorisationAuditEvents => Set<AuthorisationAuditRecord>();
+
+    public DbSet<OperatorActionAuditRecord> OperatorActionAuditEvents => Set<OperatorActionAuditRecord>();
+
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
 
     public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
@@ -98,6 +102,7 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<TemporaryGrantRecord>().HasQueryFilter(grant => CurrentInstitutionId != null && grant.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<EntitlementVersionRecord>().HasQueryFilter(version => CurrentInstitutionId != null && version.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AuthenticationEventRecord>().HasQueryFilter(evidence => CurrentInstitutionId != null && evidence.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<OperatorActionAuditRecord>().HasQueryFilter(evidence => CurrentInstitutionId != null && evidence.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<IdempotencyRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);

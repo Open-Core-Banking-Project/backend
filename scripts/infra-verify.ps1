@@ -7,7 +7,7 @@
 #   1. every container reports healthy and every published port is bound to loopback
 #   2. each service application principal connects to its own database over TCP
 #   3. cross-service access is denied for every application principal
-#   4. the broker can create a topic and round-trip a published message
+#   4. the broker can round-trip a message and retain it across restart
 #   5. Redis answers, and persistence is deliberately disabled
 #   6. the collector accepts an OTLP trace and emits it
 #
@@ -164,6 +164,34 @@ Invoke-External { $payload | docker exec -i corebanking-broker /opt/kafka/bin/ka
 $consumed = Invoke-External { docker exec corebanking-broker /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic $topic --from-beginning --max-messages 3 }
 $received = @($consumed.Output -split "`n" | Where-Object { $_ -match '^smoke-' })
 Add-Result 'three messages published and consumed' ($received.Count -eq 3) ("received " + $received.Count)
+
+$restartSuffix = [guid]::NewGuid().ToString('N').Substring(0, 8)
+$restartTopic = "corebanking.smoke.restart-$restartSuffix.v1"
+$restartPayload = "restart-smoke-$restartSuffix"
+Invoke-External { docker exec corebanking-broker /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic $restartTopic --partitions 1 --replication-factor 1 } | Out-Null
+Invoke-External { $restartPayload | docker exec -i corebanking-broker /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic $restartTopic } | Out-Null
+
+$restart = Invoke-External { docker restart corebanking-broker }
+$brokerHealthy = $false
+if ($restart.ExitCode -eq 0) {
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        $health = Invoke-External { docker inspect --format '{{.State.Health.Status}}' corebanking-broker }
+        if ($health.ExitCode -eq 0 -and $health.Output -eq 'healthy') {
+            $brokerHealthy = $true
+            break
+        }
+
+        Start-Sleep -Seconds 2
+    }
+}
+
+if ($brokerHealthy) {
+    $afterRestart = Invoke-External { docker exec corebanking-broker /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic $restartTopic --from-beginning --max-messages 1 }
+    Add-Result 'committed broker message survives restart' ($afterRestart.Output -match [regex]::Escape($restartPayload)) $restartTopic
+}
+else {
+    Add-Result 'committed broker message survives restart' $false 'broker did not return healthy within 60 seconds'
+}
 
 Write-Host ''
 Write-Host '5. Cache is available and explicitly non-durable' -ForegroundColor Cyan

@@ -299,6 +299,47 @@ public sealed class RepositoryLayoutTests
         Assert.True(missing.Count == 0, "Every project belongs in CoreBanking.sln (ADR-0003): " + string.Join("; ", missing));
     }
 
+    [Fact]
+    public void Every_service_api_registers_observability_liveness_and_readiness()
+    {
+        List<string> violations = new();
+        string servicesRoot = Path.Combine(RepositoryRoot, "src", "Services");
+
+        foreach (string project in ProjectFiles().Where(project =>
+                     string.Equals(LayerOf(ProjectName(project)), "Api", StringComparison.Ordinal)
+                     && project.StartsWith(servicesRoot, StringComparison.OrdinalIgnoreCase)))
+        {
+            string? directory = Path.GetDirectoryName(project);
+            string program = Path.Combine(directory ?? string.Empty, "Program.cs");
+            if (!File.Exists(program))
+            {
+                violations.Add(ProjectName(project) + " has no Program.cs");
+                continue;
+            }
+
+            string content = File.ReadAllText(program);
+            if (!content.Contains("AddCoreBankingObservability", StringComparison.Ordinal))
+            {
+                violations.Add(ProjectName(project) + " does not register shared observability");
+            }
+
+            if (!content.Contains("/health/live", StringComparison.Ordinal))
+            {
+                violations.Add(ProjectName(project) + " has no liveness route");
+            }
+
+            if (!content.Contains("/health/ready", StringComparison.Ordinal))
+            {
+                violations.Add(ProjectName(project) + " has no readiness route");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Every service API must expose the Phase 0 observability and health surface (ADR-0010): "
+            + string.Join("; ", violations));
+    }
+
     private static void AssertNoReferenceToLayers(string[] sourceLayers, string[] forbiddenLayers)
     {
         List<string> violations = new();

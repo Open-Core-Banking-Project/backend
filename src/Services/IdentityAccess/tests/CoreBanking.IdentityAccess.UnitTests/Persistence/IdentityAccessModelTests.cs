@@ -32,6 +32,8 @@ public sealed class IdentityAccessModelTests
         "access.role_permissions",
         "access.roles",
         "access.temporary_grants",
+        "audit.authorisation_events",
+        "audit.operator_actions",
         "identity.identities",
         "identity.service_clients",
         "identity.sessions",
@@ -53,6 +55,17 @@ public sealed class IdentityAccessModelTests
             .ToArray();
 
         Assert.Equal(ExpectedTables, actual);
+    }
+
+    [Fact]
+    public void The_outbox_persists_w3c_context_for_background_publication()
+    {
+        IEntityType outbox = CreateModel().GetEntityTypes()
+            .Single(entity => entity.GetTableName() == "outbox_messages");
+        StoreObjectIdentifier table = StoreObjectIdentifier.Table("outbox_messages", "integration");
+
+        Assert.Equal("trace_parent", outbox.FindProperty("TraceParent")!.GetColumnName(table));
+        Assert.Equal("trace_state", outbox.FindProperty("TraceState")!.GetColumnName(table));
     }
 
     [Fact]
@@ -79,15 +92,21 @@ public sealed class IdentityAccessModelTests
     }
 
     [Fact]
-    public void The_permission_catalogue_is_the_only_table_without_an_institution_column()
+    public void Permission_catalogue_and_append_only_audit_tables_are_not_query_filtered()
     {
         string[] notTenantOwned = CreateModel()
             .GetEntityTypes()
             .Where(entity => !typeof(ITenantOwnedEntity).IsAssignableFrom(entity.ClrType))
             .Select(entity => entity.ClrType.FullName!)
+            .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.PermissionRecord"], notTenantOwned);
+        Assert.Equal(
+            [
+                "CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.PermissionRecord",
+                "CoreBanking.IdentityAccess.Infrastructure.Persistence.Security.AuthorisationAuditRecord",
+            ],
+            notTenantOwned);
     }
 
     [Fact]

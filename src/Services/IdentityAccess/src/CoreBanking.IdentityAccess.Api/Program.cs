@@ -21,10 +21,14 @@ using Microsoft.Extensions.Hosting;
 using Npgsql;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBankingObservability(
+    builder.Services,
+    builder.Configuration,
+    builder.Environment,
+    "corebanking.identity-access.api");
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITenantContext, AmbientTenantContext>();
-builder.Services.AddSingleton<IAuthorisationAuditWriter, InMemoryAuthorisationAuditWriter>();
 
 // The relational entitlement store is used as soon as a connection string is configured. Without
 // one, the replaceable in-memory stand-ins keep the reference flow runnable for a developer who
@@ -32,9 +36,15 @@ builder.Services.AddSingleton<IAuthorisationAuditWriter, InMemoryAuthorisationAu
 string? connectionString = builder.Configuration.GetConnectionString("IdentityAccess");
 bool useRelationalStore = !string.IsNullOrWhiteSpace(connectionString);
 
+if (!useRelationalStore && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException("ConnectionStrings:IdentityAccess is required outside Development.");
+}
+
 if (useRelationalStore)
 {
     builder.Services.AddDbContext<IdentityAccessDbContext>(options => options.UseNpgsql(connectionString));
+    builder.Services.AddScoped<IAuthorisationAuditWriter, PersistentAuthorisationAuditWriter>();
     builder.Services.AddScoped<RelationalEntitlementStore>();
     builder.Services.AddScoped<IEffectivePermissionSource>(provider => provider.GetRequiredService<RelationalEntitlementStore>());
     builder.Services.AddScoped<IEntitlementVersionSource>(provider => provider.GetRequiredService<RelationalEntitlementStore>());
@@ -47,6 +57,7 @@ if (useRelationalStore)
 }
 else
 {
+    builder.Services.AddSingleton<IAuthorisationAuditWriter, InMemoryAuthorisationAuditWriter>();
     builder.Services.AddSingleton<InMemoryEntitlementStore>();
     builder.Services.AddSingleton<IEffectivePermissionSource>(provider => provider.GetRequiredService<InMemoryEntitlementStore>());
     builder.Services.AddSingleton<IEntitlementVersionSource>(provider => provider.GetRequiredService<InMemoryEntitlementStore>());
