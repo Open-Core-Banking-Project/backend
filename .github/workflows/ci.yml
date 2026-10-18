@@ -1,0 +1,108 @@
+# Continuous integration for the backend.
+#
+# Scope note: ADR-0010 and ADR-0011 are accepted. This workflow provides restore,
+# build, formatting, architecture/unit tests, dependency audit and evidence upload.
+# Integration tests run against the local container stack. Secret/container scanner tooling and
+# protected-branch settings remain explicit open decisions.
+
+name: backend-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  verify:
+    name: Build, format and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install the pinned SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Confirm the pinned SDK
+        run: dotnet --version
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Restore pinned tools
+        run: dotnet tool restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Verify formatting
+        run: dotnet format --verify-no-changes
+
+      - name: Architecture tests
+        run: dotnet test --no-build --configuration Release --filter Category=Architecture
+
+      # Database tests need the local infrastructure stack, so they are excluded here and run by
+      # scripts/db-verify.ps1 wherever a PostgreSQL instance is available.
+      - name: Tests
+        run: >-
+          dotnet test --no-build --configuration Release
+          --filter "Category!=Database&Category!=Integration"
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory artifacts/test-results
+
+      - name: Dependency vulnerability scan
+        run: dotnet list package --vulnerable --include-transitive
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results
+          if-no-files-found: ignore
+
+  integration:
+    name: Infrastructure and database integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install the pinned SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Start local infrastructure
+        shell: pwsh
+        run: ./scripts/infra.ps1 -Action up
+
+      - name: Verify infrastructure
+        shell: pwsh
+        run: ./scripts/infra-verify.ps1
+
+      - name: Run migrations and integration tests
+        shell: pwsh
+        run: ./scripts/db-verify.ps1 -Configuration Release
+
+      - name: Verify the complete walking skeleton and trace
+        shell: pwsh
+        run: ./scripts/walking-skeleton-verify.ps1 -Configuration Release
+
+      - name: Stop local infrastructure
+        if: always()
+        shell: pwsh
+        run: ./scripts/infra.ps1 -Action down

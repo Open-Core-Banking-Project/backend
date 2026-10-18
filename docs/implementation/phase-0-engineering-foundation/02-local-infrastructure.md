@@ -3,15 +3,28 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Local Infrastructure"
 owning_service: "Platform-wide"
 modules: [PostgreSQL, Messaging, Redis, Observability, Development Secrets]
-status: Draft
+status: Implemented
 requirements: [ARC-004, ARC-008, NFR-RES-001, NFR-DR-001, SEC-007, SEC-018]
 stories: [US-072, US-079, US-080]
 dependencies: [Repository and Build Foundation]
 adrs: [ADR-0004, ADR-0007, ADR-0009, ADR-0011]
-last_updated: 2026-10-15
+last_updated: 2026-10-16
 ---
 
 # Epic: Local Infrastructure
+
+Approved 2026-10-16 on the instruction of the repository owner, after ADR-0004, ADR-0007, ADR-0009 and ADR-0011 were accepted. Ready to implement.
+
+Implementation evidence, 2026-10-16:
+
+- `deploy/compose/compose.yml` runs PostgreSQL 16.15, Apache Kafka 4.2.2, Redis 7.4.11 and the OpenTelemetry collector 0.163.1, with every published port bound to 127.0.0.1.
+- `deploy/compose/postgres/init/01-create-databases.sh` creates the nine databases, an application and a migration principal per service, revokes `CONNECT` from `PUBLIC`, and sets default privileges. It aborts when any password is missing: there are no fallback credentials.
+- `scripts/infra.ps1` provides `up`, `status`, `down`, `reset`, `backup` and `restore`. `-Action up` generates `deploy/compose/.env` with random development-only credentials; the file is git-ignored and its values are never printed.
+- `scripts/infra-verify.ps1` runs 36 checks and all pass: nine principals reach their own database, nine cross-service connections are refused with `permission denied`, the migration principal may change schema while the application principal may not, the broker round-trips three messages, Redis answers with persistence deliberately disabled, the collector accepts and emits an OTLP trace, and a backup restores into a scratch database with matching rows.
+- A full reset and recreation from the documented commands was exercised, and `scripts/verify.ps1` still passes.
+- Host ports are overridable in `.env`. On the current machine `CB_POSTGRES_PORT=15432` and `CB_CACHE_PORT=16379` are required because native PostgreSQL and Redis services already own the defaults.
+
+Status is `Implemented`, not `Verified`: human acceptance and operational review remain to be recorded. Object storage and search backends are intentionally not provisioned yet; add them when the walking skeleton requires them.
 
 ## Objective
 

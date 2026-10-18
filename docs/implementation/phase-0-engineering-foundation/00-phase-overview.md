@@ -1,11 +1,11 @@
 ---
 phase: "Phase 0 - Engineering Foundation"
-status: Draft
+status: In progress
 owning_services: [Platform-wide]
 requirements: [ARC-001, ARC-002, ARC-003, ARC-004, ARC-005, ARC-008, ARC-010, NFR-SCAL-001, NFR-RES-002, NFR-DR-001, NFR-OBS-001, NFR-OBS-002, NFR-MNT-001, SEC-001, SEC-007, SEC-016]
 stories: [US-068, US-070, US-071, US-072, US-079, US-080]
 dependencies: []
-last_updated: 2026-10-15
+last_updated: 2026-10-18
 ---
 
 # Phase 0 - Engineering Foundation
@@ -147,18 +147,46 @@ Shared contracts must remain domain-neutral. Banking entities do not belong in f
 - Dashboards or documented queries expose HTTP failures, consumer lag, outbox backlog, inbox duplicates and failed migrations.
 - Backup and restore procedures are documented for the development reference environment, while production RTO/RPO remain explicit open decisions.
 
+## Current implementation evidence (2026-10-18)
+
+- The Release solution build succeeds with zero warnings and zero errors.
+- The offline-safe test filter passes all 65 tests: 15 architecture, 47 Identity Access, and 3
+  Audit Reconciliation tests. Database- and integration-category tests are excluded.
+- `dotnet format CoreBanking.sln --verify-no-changes --no-restore` passes.
+- EF reports no pending model changes for Identity Access or Audit Reconciliation.
+- Local infrastructure verification reports 37/37 checks passing, including PostgreSQL isolation,
+  Kafka round-trip and persistence across a broker restart, Redis, telemetry collector, backup and
+  restore.
+- `scripts/db-verify.ps1 -Configuration Release` applies migrations to both service databases and
+  passes 25 Identity Access database/integration tests plus all 5 Audit Reconciliation tests.
+  These prove replay deduplication, durable malformed-message quarantine, audit insertion and
+  rejection of application-principal audit updates and deletes.
+- The Audit Reconciliation worker now consumes the foundation topic using its own database; the
+  Identity Access authorisation writer persists evidence using an insert-only database grant.
+- Shared OpenTelemetry tracing and metrics export are registered in all nine APIs and both
+  messaging workers; W3C context is persisted with outbox metadata and propagated in Kafka headers.
+- `scripts/walking-skeleton-verify.ps1` proves one synthetic request through the relational API,
+  committed outbox, Kafka, independent consumer inbox and append-only audit database. Collector
+  evidence shows the API, publisher and consumer on one W3C trace with the business correlation ID.
+  The verifier and exporter-level unit test reject the sensitive canary and raw URL/SQL tags.
+- Every API exposes liveness and readiness routes, enforced by an architecture test. CI now runs
+  build, format, offline tests, dependency audit, disposable infrastructure verification,
+  migrations, database/broker integration tests and the complete walking-skeleton verifier.
+- An approved secret-scanning policy and protected branch configuration remain open. Phase 0
+  acceptance therefore remains open.
+
 ## Phase acceptance
 
 Phase 0 is complete when:
 
-- [ ] The repository foundation builds deterministically.
-- [ ] All nine service boundaries exist and are enforced by architecture tests.
-- [ ] Local infrastructure starts from documented commands and passes health checks.
-- [ ] Authentication, tenant context, roles and permissions work in a reference API.
-- [ ] Outbox publication and idempotent consumption survive restart and replay tests.
-- [ ] Audit and distributed tracing cover the walking skeleton end to end.
+- [x] The repository foundation builds deterministically.
+- [x] All nine service boundaries exist and are enforced by architecture tests.
+- [x] Local infrastructure starts from documented commands and passes health checks.
+- [x] Authentication, tenant context, roles and permissions work in a reference API.
+- [x] Outbox publication and idempotent consumption survive restart and replay tests.
+- [x] Audit and distributed tracing cover the walking skeleton end to end.
 - [ ] CI performs restore, build, tests, formatting, analysis and approved security checks.
-- [ ] No banking feature is falsely represented as production-ready.
+- [x] No banking feature is falsely represented as production-ready.
 - [ ] All Phase 0 ADRs, runbooks and verification evidence are reviewed.
 
 ## Agent instructions
@@ -167,4 +195,3 @@ Phase 0 is complete when:
 - Keep reference flows explicitly named as foundation/test flows.
 - Do not choose production vendors, identity licensing, RTO/RPO or regulatory policies without approval.
 - After each epic, update this overview with status, evidence and accepted deviations.
-

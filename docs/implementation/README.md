@@ -54,7 +54,7 @@ Implementation instructions derive from:
 
 1. Approved user request or work item.
 2. Applicable `AGENTS.md` instructions.
-3. Approved ADRs and versioned contracts.
+3. Approved ADRs and versioned contracts. ADR identifiers, statuses, and the mapping to the decisions required by the architecture document are recorded in [`docs/adr/README.md`](../adr/README.md).
 4. `docs/architecture/BACKEND_ARCHITECTURE.md`.
 5. Software Requirements Specification.
 6. User stories and acceptance criteria.

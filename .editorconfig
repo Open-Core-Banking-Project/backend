@@ -1,0 +1,70 @@
+# Formatting and naming rules for the backend repository.
+# Decisions: docs/adr/ADR-0003-monorepo-solution-and-project-organisation.md
+# `dotnet format --verify-no-changes` is the formatting gate. Severities here are
+# deliberately non-blocking until the codebase exists; raise them deliberately.
+
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,md}]
+indent_size = 2
+
+# Line endings are normalised to LF so Windows and Linux produce identical working
+# trees and the `dotnet format` gate behaves the same on developer machines and CI.
+# .gitattributes takes precedence over core.autocrlf.
+[*.{cs,csproj,props,targets,json,sln}]
+end_of_line = lf
+
+[*.cs]
+# Language and quality settings that belong to the editor experience only.
+# Build-level policy lives in Directory.Build.props.
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+
+# Naming conventions. Recorded as suggestions until the codebase exists; they are
+# not enforced by the build, so they cannot break CI while severities are raised.
+dotnet_naming_rule.interfaces_start_with_i.severity = suggestion
+dotnet_naming_rule.interfaces_start_with_i.symbols = interface_symbols
+dotnet_naming_rule.interfaces_start_with_i.style = i_pascal_case
+dotnet_naming_rule.private_fields_use_underscore.severity = suggestion
+dotnet_naming_rule.private_fields_use_underscore.symbols = private_field_symbols
+dotnet_naming_rule.private_fields_use_underscore.style = underscore_camel_case
+dotnet_naming_rule.types_use_pascal_case.severity = suggestion
+dotnet_naming_rule.types_use_pascal_case.symbols = type_symbols
+dotnet_naming_rule.types_use_pascal_case.style = pascal_case
+
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_symbols.interface_symbols.applicable_accessibilities = *
+dotnet_naming_symbols.private_field_symbols.applicable_kinds = field
+dotnet_naming_symbols.private_field_symbols.applicable_accessibilities = private
+dotnet_naming_symbols.type_symbols.applicable_kinds = class,struct,enum,delegate
+dotnet_naming_symbols.type_symbols.applicable_accessibilities = *
+
+dotnet_naming_style.i_pascal_case.required_prefix = I
+dotnet_naming_style.i_pascal_case.capitalization = pascal_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+# Entity Framework generated migrations are not hand-edited. The generator emits block-scoped
+# namespaces and its own formatting, so code-style rules that fight the generator are relaxed
+# for this folder rather than by editing generated files.
+[**/Migrations/*.cs]
+generated_code = true
+csharp_style_namespace_declarations = block_scoped
+dotnet_diagnostic.IDE0161.severity = none
+
+# Tests may use a deliberate naming vocabulary for behaviour descriptions.
+# Architecture tests live in tests/; service test projects live in src/**/tests/.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+
+[src/**/tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none

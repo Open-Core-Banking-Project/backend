@@ -3,15 +3,49 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Observability, Audit and Continuous Integration"
 owning_service: "Platform-wide"
 modules: [OpenTelemetry, Audit Foundation, Health, CI, Security Checks]
-status: Draft
+status: In progress
 requirements: [NFR-OBS-001, NFR-OBS-002, NFR-MNT-001, SEC-016, SEC-017, AUD-001, AUD-002, AUD-003, AUD-004]
 stories: [US-070, US-071, US-079, US-080]
 dependencies: [Repository and Build Foundation, Local Infrastructure, Identity and Permission Foundation, Messaging and Outbox]
 adrs: [ADR-0010, ADR-0011]
-last_updated: 2026-10-15
+last_updated: 2026-10-18
 ---
 
 # Epic: Observability, Audit and Continuous Integration
+
+Approved 2026-10-16 on the instruction of the repository owner, after ADR-0010 and ADR-0011 were accepted.
+
+Implementation evidence, 2026-10-18:
+
+- All nine APIs expose separate liveness and readiness routes, enforced by an architecture test.
+- Relational Identity Access persists permission allow/deny evidence in
+  `audit.authorisation_events`; the application principal is granted select/insert only.
+- Audit Reconciliation consumes the foundation event in its independent database and atomically
+  records inbox identity with append-only audit evidence.
+- `scripts/db-verify.ps1 -Configuration Release` applies both databases' migrations and passes 25
+  Identity Access database/integration tests and 5 Audit Reconciliation tests. Application-role
+  inserts succeed while updates and deletes of authorisation and operator-replay evidence are
+  rejected.
+- Local infrastructure verification reports 37/37 checks passing, including the telemetry
+  collector and a committed Kafka message surviving an actual broker restart.
+- The shared observability building block configures OTLP tracing and metrics export for all nine
+  APIs and both messaging workers, including ASP.NET Core, HttpClient, Npgsql, messaging spans and
+  bounded messaging instruments.
+- W3C trace context is persisted in outbox metadata and propagated through Kafka `traceparent` and
+  `tracestate` headers. Telemetry processing removes URL path/query and database statement tags.
+- A Development smoke request to Identity Access `/health/live` returned 200 and the local
+  collector emitted its `corebanking.identity-access.api` span. A focused unit test verifies
+  removal of URL and SQL tags.
+- CI runs restore, build, formatter verification, architecture/unit tests, dependency audit,
+  disposable infrastructure verification, migrations, database/broker integration tests and the
+  complete walking-skeleton verifier.
+- `scripts/walking-skeleton-verify.ps1` records one trace through the API, Npgsql, outbox publisher,
+  Kafka consumer and Audit Reconciliation database. It verifies the correlation ID, permission
+  evidence, consumer audit evidence and absence of a sensitive canary and raw URL/SQL tags in
+  exported telemetry, host logs and the response. A separate exporter-level unit test proves the
+  redaction processor runs before export.
+- Automated secret scanning and protected-branch enforcement await the approved tool and repository
+  settings; no container artifact is currently produced for a container scan.
 
 ## Objective
 
@@ -105,13 +139,13 @@ The reference flow must show:
 
 ## Acceptance criteria
 
-- [ ] The walking skeleton is traceable end to end.
-- [ ] Sensitive actions generate immutable audit evidence.
-- [ ] Logs and traces contain no prohibited sensitive data.
-- [ ] Health endpoints distinguish liveness and readiness.
-- [ ] CI verifies build, formatting, analysis and required tests.
+- [x] The walking skeleton is traceable end to end.
+- [x] Sensitive actions generate immutable audit evidence.
+- [x] Logs and traces contain no prohibited sensitive data.
+- [x] Health endpoints distinguish liveness and readiness.
+- [x] CI verifies build, formatting, analysis and required tests.
 - [ ] Security and secret checks run automatically.
-- [ ] Failed outbox, inbox and permission states are observable.
+- [x] Failed outbox, inbox and permission states are observable.
 - [ ] A clean pull request cannot merge when a required check fails.
 
 ## Open decisions
@@ -128,4 +162,3 @@ The reference flow must show:
 - Do not make readiness permanently fail for optional local tooling.
 - Do not weaken analyzers or CI checks to obtain a green pipeline.
 - Include exact pipeline or local verification results in completion reports.
-

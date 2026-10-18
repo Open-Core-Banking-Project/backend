@@ -1,0 +1,97 @@
+# Local development infrastructure for the backend.
+#
+# Decisions: docs/adr/ADR-0004-database-per-service-and-tenant-isolation.md (nine
+# databases, one principal pair per service), ADR-0007 (Kafka-compatible broker),
+# ADR-0010 (OpenTelemetry pipeline), ADR-0011 (development secret handling).
+#
+# Safety rules enforced here:
+#   - every published port is bound to 127.0.0.1, never to all interfaces;
+#   - no production credential is permitted, only values generated into .env;
+#   - Redis runs without persistence because it is never durable financial truth.
+
+name: corebanking
+
+services:
+  postgres:
+    image: postgres:16.15
+    container_name: corebanking-postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: cb_admin
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?POSTGRES_ADMIN_PASSWORD must be set in deploy/compose/.env}
+    ports:
+      - "127.0.0.1:${CB_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cb_admin -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    restart: unless-stopped
+
+  broker:
+    image: apache/kafka:4.2.2
+    container_name: corebanking-broker
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # 127.0.0.1 rather than localhost: every published port binds to loopback IPv4, and a client
+      # that resolves localhost to ::1 first cannot reach the broker.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:${CB_BROKER_PORT:-9092}
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      # The image defaults to /tmp/kraft-combined-logs, which is not the mounted volume, so a
+      # recreated container would silently lose every message. Point the log directory at the volume.
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - "127.0.0.1:${CB_BROKER_PORT:-9092}:9092"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 40s
+    restart: unless-stopped
+
+  cache:
+    image: redis:7.4.11
+    container_name: corebanking-cache
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:${CB_CACHE_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  telemetry:
+    image: otel/opentelemetry-collector:0.163.1
+    container_name: corebanking-telemetry
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel/collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:${CB_OTLP_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${CB_OTLP_HTTP_PORT:-4318}:4318"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  kafkadata:

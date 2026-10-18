@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    Central build policy for every project in the repository.
+    Decisions: docs/adr/ADR-0001-csharp-dotnet-only-backend-and-sdk-policy.md and
+    docs/adr/ADR-0003-monorepo-solution-and-project-organisation.md.
+
+    Project files must not restate TargetFramework, Nullable, ImplicitUsings,
+    TreatWarningsAsErrors, AnalysisMode or EnforceCodeStyleInBuild. ADR-0003 also
+    prohibits NoWarn entries in this file.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+</Project>

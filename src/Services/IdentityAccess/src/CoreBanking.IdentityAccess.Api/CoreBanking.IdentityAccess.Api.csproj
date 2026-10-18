@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CoreBanking.IdentityAccess.Application\CoreBanking.IdentityAccess.Application.csproj" />
+    <ProjectReference Include="..\CoreBanking.IdentityAccess.Contracts\CoreBanking.IdentityAccess.Contracts.csproj" />
+    <ProjectReference Include="..\CoreBanking.IdentityAccess.Infrastructure\CoreBanking.IdentityAccess.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Infrastructure\CoreBanking.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Observability\CoreBanking.BuildingBlocks.Observability.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+</Project>

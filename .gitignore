@@ -55,3 +55,12 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Test, coverage and CI artifact output
+artifacts/
+
+# Local development infrastructure secrets and output
+.env
+deploy/compose/.env
+!deploy/compose/.env.example
+artifacts/

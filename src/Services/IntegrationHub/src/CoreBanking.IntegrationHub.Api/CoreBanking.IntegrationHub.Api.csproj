@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Observability\CoreBanking.BuildingBlocks.Observability.csproj" />
+    <ProjectReference Include="..\CoreBanking.IntegrationHub.Application\CoreBanking.IntegrationHub.Application.csproj" />
+    <ProjectReference Include="..\CoreBanking.IntegrationHub.Contracts\CoreBanking.IntegrationHub.Contracts.csproj" />
+    <ProjectReference Include="..\CoreBanking.IntegrationHub.Infrastructure\CoreBanking.IntegrationHub.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+</Project>
