@@ -98,6 +98,10 @@ jobs:
         shell: pwsh
         run: ./scripts/db-verify.ps1 -Configuration Release
 
+      - name: Verify the complete walking skeleton and trace
+        shell: pwsh
+        run: ./scripts/walking-skeleton-verify.ps1 -Configuration Release
+
       - name: Stop local infrastructure
         if: always()
         shell: pwsh

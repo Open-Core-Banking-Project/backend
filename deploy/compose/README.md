@@ -16,6 +16,8 @@ a Kafka-compatible broker, Redis, and an OpenTelemetry collector.
 powershell -File scripts/infra.ps1 -Action up        # generate credentials if needed, start, wait for health
 powershell -File scripts/infra.ps1 -Action status    # show containers and health
 powershell -File scripts/infra-verify.ps1            # prove the environment works
+powershell -File scripts/db-verify.ps1               # apply migrations and run database tests
+powershell -File scripts/walking-skeleton-verify.ps1 # prove the API-to-consumer trace and audit flow
 powershell -File scripts/infra.ps1 -Action down      # stop, keep volumes
 ```
 
@@ -93,6 +95,11 @@ The script restores the pinned tools from `.config/dotnet-tools.json`, applies e
 Schema privileges for a service's own schemas are granted by the migration that creates them,
 because the cluster initialisation script can only set default privileges for schemas that exist
 when the cluster is created.
+
+After database verification, `scripts/walking-skeleton-verify.ps1` launches the Identity Access API
+and both messaging workers, submits one synthetic command, proves the event and audit evidence, and
+checks one W3C trace through the API, outbox publisher and consumer. Host output is retained under
+`artifacts/walking-skeleton/`; generated credentials and payloads are not printed.
 
 ## Backup, restore and reset
 

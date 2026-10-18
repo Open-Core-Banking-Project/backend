@@ -1,7 +1,9 @@
 using System;
 using System.Threading.Tasks;
+using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
+using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -42,6 +44,8 @@ public static partial class Program
         }
 
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<AmbientTenantContext>();
+        builder.Services.AddSingleton<ITenantContext>(provider => provider.GetRequiredService<AmbientTenantContext>());
         builder.Services.AddDbContext<IdentityAccessDbContext>(options => options.UseNpgsql(connectionString));
         builder.Services.AddScoped<IIntegrationStore>(provider => provider.GetRequiredService<IdentityAccessDbContext>());
         builder.Services.AddSingleton(new OutboxRelayOptions());

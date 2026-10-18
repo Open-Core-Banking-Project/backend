@@ -30,9 +30,9 @@ Implementation evidence, 2026-10-18:
 - The outbox stores W3C `traceparent` and `tracestate` metadata separately from the business event
   envelope. The relay creates a producer span from that context and the Kafka adapter propagates
   it in standard message headers; the Audit Reconciliation consumer creates a child processing
-  span. Runtime inspection of a complete trace remains outstanding.
-- The current Release solution build passes with zero warnings and errors. All 63 offline-safe
-  tests pass (14 architecture, 46 Identity Access, 3 Audit Reconciliation).
+  span. The walking-skeleton verifier confirms the API, producer and consumer use one trace.
+- The current Release solution build passes with zero warnings and errors. All 65 offline-safe
+  tests pass (15 architecture, 47 Identity Access, 3 Audit Reconciliation).
 - `scripts/db-verify.ps1 -Configuration Release` applies both services' migrations and passes 25
   Identity Access database/integration tests and 5 Audit Reconciliation tests. The local
   infrastructure verification separately reports 37/37 checks passing, including a Kafka message
@@ -48,6 +48,8 @@ Implementation evidence, 2026-10-18:
   transaction. Database grants and tests reject runtime-role updates and deletes.
 - Messaging counters, latency and backlog/dead-letter age gauges are exported through OpenTelemetry
   and their required instrument names are verified through a meter listener.
+- The complete walking-skeleton verifier launches both executable worker hosts and proves one trace
+  across the relational API, outbox publisher and independent consumer.
 
 Status is `Implemented`. The Identity Access API writes a synthetic foundation
 record and outbox row in one transaction; its separate worker relays committed events, while the

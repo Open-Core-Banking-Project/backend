@@ -340,6 +340,23 @@ public sealed class RepositoryLayoutTests
             + string.Join("; ", violations));
     }
 
+    [Fact]
+    public void Every_service_worker_project_is_runnable()
+    {
+        string servicesRoot = Path.Combine(RepositoryRoot, "src", "Services");
+        List<string> violations = ProjectFiles()
+            .Where(project =>
+                string.Equals(LayerOf(ProjectName(project)), "Workers", StringComparison.Ordinal)
+                && project.StartsWith(servicesRoot, StringComparison.OrdinalIgnoreCase))
+            .Where(project => !string.Equals(PropertyValue(XDocument.Load(project), "OutputType"), "Exe", StringComparison.Ordinal))
+            .Select(ProjectName)
+            .ToList();
+
+        Assert.True(
+            violations.Count == 0,
+            "Every service worker project must be an executable host: " + string.Join("; ", violations));
+    }
+
     private static void AssertNoReferenceToLayers(string[] sourceLayers, string[] forbiddenLayers)
     {
         List<string> violations = new();

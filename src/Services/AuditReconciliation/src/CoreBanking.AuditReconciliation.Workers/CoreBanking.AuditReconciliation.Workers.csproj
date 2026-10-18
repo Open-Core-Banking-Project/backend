@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>CoreBanking.AuditReconciliation.Workers</RootNamespace>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Observability\CoreBanking.BuildingBlocks.Observability.csproj" />
     <ProjectReference Include="..\CoreBanking.AuditReconciliation.Infrastructure\CoreBanking.AuditReconciliation.Infrastructure.csproj" />

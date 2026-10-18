@@ -150,7 +150,7 @@ Shared contracts must remain domain-neutral. Banking entities do not belong in f
 ## Current implementation evidence (2026-10-18)
 
 - The Release solution build succeeds with zero warnings and zero errors.
-- The offline-safe test filter passes all 63 tests: 14 architecture, 46 Identity Access, and 3
+- The offline-safe test filter passes all 65 tests: 15 architecture, 47 Identity Access, and 3
   Audit Reconciliation tests. Database- and integration-category tests are excluded.
 - `dotnet format CoreBanking.sln --verify-no-changes --no-restore` passes.
 - EF reports no pending model changes for Identity Access or Audit Reconciliation.
@@ -164,15 +164,16 @@ Shared contracts must remain domain-neutral. Banking entities do not belong in f
 - The Audit Reconciliation worker now consumes the foundation topic using its own database; the
   Identity Access authorisation writer persists evidence using an insert-only database grant.
 - Shared OpenTelemetry tracing and metrics export are registered in all nine APIs and both
-  messaging workers; W3C
-  context is persisted with outbox metadata and propagated in Kafka headers. Collector-level
-  smoke verification confirmed an Identity Access API span reached the local collector; inspection
-  of a complete walking-skeleton trace remains outstanding.
+  messaging workers; W3C context is persisted with outbox metadata and propagated in Kafka headers.
+- `scripts/walking-skeleton-verify.ps1` proves one synthetic request through the relational API,
+  committed outbox, Kafka, independent consumer inbox and append-only audit database. Collector
+  evidence shows the API, publisher and consumer on one W3C trace with the business correlation ID.
+  The verifier and exporter-level unit test reject the sensitive canary and raw URL/SQL tags.
 - Every API exposes liveness and readiness routes, enforced by an architecture test. CI now runs
   build, format, offline tests, dependency audit, disposable infrastructure verification,
-  migrations and database/broker integration tests.
-- End-to-end walking-skeleton trace inspection, an approved secret-scanning policy and protected
-  branch configuration remain open. Phase 0 acceptance therefore remains open.
+  migrations, database/broker integration tests and the complete walking-skeleton verifier.
+- An approved secret-scanning policy and protected branch configuration remain open. Phase 0
+  acceptance therefore remains open.
 
 ## Phase acceptance
 
@@ -183,7 +184,7 @@ Phase 0 is complete when:
 - [x] Local infrastructure starts from documented commands and passes health checks.
 - [x] Authentication, tenant context, roles and permissions work in a reference API.
 - [x] Outbox publication and idempotent consumption survive restart and replay tests.
-- [ ] Audit and distributed tracing cover the walking skeleton end to end.
+- [x] Audit and distributed tracing cover the walking skeleton end to end.
 - [ ] CI performs restore, build, tests, formatting, analysis and approved security checks.
 - [x] No banking feature is falsely represented as production-ready.
 - [ ] All Phase 0 ADRs, runbooks and verification evidence are reviewed.

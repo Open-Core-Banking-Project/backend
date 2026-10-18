@@ -37,11 +37,15 @@ Implementation evidence, 2026-10-18:
   collector emitted its `corebanking.identity-access.api` span. A focused unit test verifies
   removal of URL and SQL tags.
 - CI runs restore, build, formatter verification, architecture/unit tests, dependency audit,
-  disposable infrastructure verification, migrations and database/broker integration tests.
-- Full walking-skeleton trace inspection through outbox, Kafka and Audit Reconciliation, plus an
-  exporter-level redaction test, remain outstanding. Automated secret scanning and protected-branch
-  enforcement await the approved tool and repository settings; no container artifact is currently
-  produced for a container scan.
+  disposable infrastructure verification, migrations, database/broker integration tests and the
+  complete walking-skeleton verifier.
+- `scripts/walking-skeleton-verify.ps1` records one trace through the API, Npgsql, outbox publisher,
+  Kafka consumer and Audit Reconciliation database. It verifies the correlation ID, permission
+  evidence, consumer audit evidence and absence of a sensitive canary and raw URL/SQL tags in
+  exported telemetry, host logs and the response. A separate exporter-level unit test proves the
+  redaction processor runs before export.
+- Automated secret scanning and protected-branch enforcement await the approved tool and repository
+  settings; no container artifact is currently produced for a container scan.
 
 ## Objective
 
@@ -135,9 +139,9 @@ The reference flow must show:
 
 ## Acceptance criteria
 
-- [ ] The walking skeleton is traceable end to end.
+- [x] The walking skeleton is traceable end to end.
 - [x] Sensitive actions generate immutable audit evidence.
-- [ ] Logs and traces contain no prohibited sensitive data.
+- [x] Logs and traces contain no prohibited sensitive data.
 - [x] Health endpoints distinguish liveness and readiness.
 - [x] CI verifies build, formatting, analysis and required tests.
 - [ ] Security and secret checks run automatically.

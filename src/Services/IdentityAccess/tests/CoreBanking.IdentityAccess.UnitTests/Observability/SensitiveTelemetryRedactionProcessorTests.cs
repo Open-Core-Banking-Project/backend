@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using CoreBanking.BuildingBlocks.Observability;
 using OpenTelemetry;
 using OpenTelemetry.Trace;
