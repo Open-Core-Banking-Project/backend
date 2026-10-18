@@ -68,6 +68,8 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
 
     public DbSet<FoundationRecord> FoundationRecords => Set<FoundationRecord>();
 
+    public DbSet<InstitutionBoundaryRecord> InstitutionBoundaries => Set<InstitutionBoundaryRecord>();
+
     /// <summary>
     /// The institution of the current operation, read as a parameter by every tenant query filter.
     /// A block-bodied property is required: a null-propagating expression cannot be placed in an
@@ -108,6 +110,7 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<IdempotencyRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<DeadLetterRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<FoundationRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<InstitutionBoundaryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
     }
 
     /// <summary>Opens the transaction that makes source state and outbox record atomic.</summary>

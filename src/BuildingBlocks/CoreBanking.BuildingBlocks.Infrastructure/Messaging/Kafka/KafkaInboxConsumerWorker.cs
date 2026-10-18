@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -47,7 +48,12 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
             BrokerAddressFamily = BrokerAddressFamily.V4,
         }).Build();
 
-        consumer.Subscribe(_options.Topic);
+        if (_options.Topics.Count == 0)
+        {
+            throw new InvalidOperationException("At least one Kafka topic must be configured.");
+        }
+
+        consumer.Subscribe(_options.Topics);
 
         try
         {
@@ -70,7 +76,7 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
                     continue;
                 }
 
-                using Activity? processingActivity = StartProcessingActivity(result.Message.Headers);
+                using Activity? processingActivity = StartProcessingActivity(result.Topic, result.Message.Headers);
                 InboxResult outcome = await HandleAsync(result, json, stoppingToken).ConfigureAwait(false);
                 if (outcome == InboxResult.Deferred)
                 {
@@ -104,7 +110,7 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
         }
     }
 
-    private Activity? StartProcessingActivity(Headers? headers)
+    private static Activity? StartProcessingActivity(string topic, Headers? headers)
     {
         string? traceParent = ReadHeader(headers, "traceparent");
         string? traceState = ReadHeader(headers, "tracestate");
@@ -116,7 +122,7 @@ public sealed partial class KafkaInboxConsumerWorker : BackgroundService
             : CoreBankingActivitySource.Instance.StartActivity("messaging.process", ActivityKind.Consumer);
 
         activity?.SetTag("messaging.system", "kafka");
-        activity?.SetTag("messaging.destination.name", _options.Topic);
+        activity?.SetTag("messaging.destination.name", topic);
         activity?.SetTag("messaging.operation.type", "process");
         return activity;
     }
@@ -240,7 +246,7 @@ public sealed record KafkaConsumerOptions
 
     public required string GroupId { get; init; }
 
-    public required string Topic { get; init; }
+    public required IReadOnlyList<string> Topics { get; init; }
 
     public bool AllowAutoCreateTopics { get; init; } = true;
 }

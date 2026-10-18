@@ -4,6 +4,7 @@ using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
+using CoreBanking.IdentityAccess.Infrastructure.Institutions;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -14,8 +15,8 @@ using Microsoft.Extensions.Logging;
 namespace CoreBanking.IdentityAccess.Workers;
 
 /// <summary>
-/// The Identity and Access worker host runs its outbox relay in a separate process from the API,
-/// so a request can never publish and a relay failure can never fail a caller.
+/// The Identity and Access worker host runs its outbox relay and institution-provisioning consumer
+/// in a separate process from the API, so a request never publishes directly.
 /// Configuration comes from the environment:
 ///   ConnectionStrings__IdentityAccess  the application principal connection string
 ///   Messaging__Kafka__BootstrapServers  the broker address
@@ -48,6 +49,12 @@ public static partial class Program
         builder.Services.AddSingleton<ITenantContext>(provider => provider.GetRequiredService<AmbientTenantContext>());
         builder.Services.AddDbContext<IdentityAccessDbContext>(options => options.UseNpgsql(connectionString));
         builder.Services.AddScoped<IIntegrationStore>(provider => provider.GetRequiredService<IdentityAccessDbContext>());
+        builder.Services.AddScoped(provider => new InboxProcessor(
+            provider.GetRequiredService<IIntegrationStore>(),
+            provider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddScoped<InstitutionProvisioningConsumer>();
+        builder.Services.AddScoped<IIntegrationEventConsumer>(provider =>
+            provider.GetRequiredService<InstitutionProvisioningConsumer>());
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
         builder.Services.AddKafkaEventPublisher(new KafkaMessagingOptions
@@ -55,8 +62,15 @@ public static partial class Program
             BootstrapServers = bootstrapServers,
             ClientId = "identity-access-relay",
         });
+        builder.Services.AddSingleton(new KafkaConsumerOptions
+        {
+            BootstrapServers = bootstrapServers,
+            GroupId = InstitutionProvisioningConsumer.ConsumerName,
+            Topics = [InstitutionProvisioningConsumer.TopicName],
+        });
 
         builder.Services.AddHostedService<OutboxRelayWorker>();
+        builder.Services.AddHostedService<KafkaInboxConsumerWorker>();
 
         IHost host = builder.Build();
 
@@ -73,6 +87,6 @@ public static partial class Program
     [LoggerMessage(
         EventId = 2000,
         Level = LogLevel.Information,
-        Message = "Identity and Access outbox relay worker started.")]
+        Message = "Identity and Access messaging workers started.")]
     private static partial void LogStarted(ILogger logger);
 }

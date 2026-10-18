@@ -14,7 +14,7 @@ modules:
   - Business Calendar
   - Configuration Lifecycle
   - Tenant Provisioning
-status: Draft
+status: In progress
 requirements: [CFG-001, CFG-002, CFG-003, CFG-004, CFG-005, CFG-006, CFG-007, CFG-008, ARC-004, ARC-006, ARC-007, DAT-005, DAT-007, DAT-008, AUD-001, AUD-002]
 stories: [US-001, US-002, US-003, US-004]
 dependencies:
@@ -24,7 +24,7 @@ dependencies:
   - Phase 0 - Messaging, Outbox, Inbox and Idempotency
   - Phase 0 - Observability, Audit and Continuous Integration
 adrs: [ADR-0002, ADR-0004, ADR-0007, ADR-0008, ADR-0009]
-last_updated: 2026-10-15
+last_updated: 2026-10-18
 ---
 
 # Epic: Institution and Tenancy
@@ -517,6 +517,8 @@ Evidence includes actor, role/service context, permission, institution, branch i
 | Certificate references | Secret/key manager | Reference only in app DB | Expiry/usage validation | Versioned rotation |
 
 ## 21. Implementation slices
+
+Implementation progress as of 2026-10-18: the initial slice-3 institution and tenant-provisioning lifecycle is implemented in the Core Ledger domain with a versioned `InstitutionProvisioningStarted.v1` payload and focused domain/contract tests. The configured mandatory-service list is validated at API startup. Slice 4 includes the initial `institution.institutions`, `institution.provisioning_runs` and `institution.provisioning_steps` migration, institution-scoped keys, fail-closed query filters and database readiness wiring. Slice 5 includes the application command boundary and relational service that atomically commits the institution, provisioning run/steps and `InstitutionProvisioningStarted.v1` outbox record, with durable scoped idempotency and stable conflicts. Slice 6 now has Identity and Access and Audit Reconciliation consumers: each creates a non-active local institution boundary through inbox deduplication and emits durable success or controlled-failure evidence through its outbox. Core Ledger initialises its own local step atomically, listens to every configured remote-service acknowledgement topic, records exact step evidence, marks controlled failures and advances a fully acknowledged run only to `pending_activation`. The shared Kafka inbox worker now supports multiple explicit topic subscriptions so services can retain one durable routing boundary. Rollout to Customer Onboarding, Payments and VTU, Channels and Engagement, Operations Workflow, Risk and Reporting, and Integration Hub, plus the HTTP route, platform authentication/permission enforcement and activation endpoints, remain intentionally inaccessible until their dependent slices are implemented.
 
 1. Approve tenant-isolation, configuration-lifecycle and service-ownership decisions.
 2. Define institution, branch, calendar and configuration contracts plus failing acceptance tests.

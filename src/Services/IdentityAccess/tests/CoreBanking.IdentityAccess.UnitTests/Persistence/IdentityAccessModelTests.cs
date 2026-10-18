@@ -42,6 +42,7 @@ public sealed class IdentityAccessModelTests
         "integration.inbox_messages",
         "integration.outbox_messages",
         "platform.foundation_records",
+        "platform.institution_boundaries",
         "security.authentication_events",
     ];
 
@@ -153,6 +154,18 @@ public sealed class IdentityAccessModelTests
                 "platform.foundation.execute",
             ],
             seeded);
+    }
+
+    [Fact]
+    public void Institution_boundary_is_unique_and_retains_the_source_event()
+    {
+        IEntityType boundary = CreateModel().GetEntityTypes()
+            .Single(entity => entity.GetTableName() == "institution_boundaries");
+
+        Assert.Equal(["InstitutionId"], boundary.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Contains(boundary.GetIndexes(), index =>
+            index.IsUnique
+            && index.Properties.Select(property => property.Name).SequenceEqual(["SourceEventId"]));
     }
 
     private static IEnumerable<IEntityType> TenantOwned(IModel model) =>

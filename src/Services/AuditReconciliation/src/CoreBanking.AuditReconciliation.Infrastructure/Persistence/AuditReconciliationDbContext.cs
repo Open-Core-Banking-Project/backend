@@ -23,6 +23,8 @@ public sealed class AuditReconciliationDbContext : DbContext, IIntegrationStore
 
     public DbSet<AuditEvidenceRecord> AuditEvidence => Set<AuditEvidenceRecord>();
 
+    public DbSet<InstitutionBoundaryRecord> InstitutionBoundaries => Set<InstitutionBoundaryRecord>();
+
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
 
     public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
@@ -80,7 +82,25 @@ public sealed class AuditReconciliationDbContext : DbContext, IIntegrationStore
             entity.HasIndex(record => new { record.RepairedAt, record.QuarantinedAt });
         });
 
+        modelBuilder.Entity<InstitutionBoundaryRecord>(entity =>
+        {
+            entity.ToTable("institution_boundaries", "platform", table =>
+            {
+                table.HasCheckConstraint("ck_institution_boundaries_plan_version", "provisioning_plan_version > 0");
+                table.HasCheckConstraint("ck_institution_boundaries_status", "status IN ('provisioning', 'active', 'suspended')");
+            });
+            entity.HasKey(record => record.InstitutionId);
+            entity.HasIndex(record => record.SourceEventId).IsUnique();
+            entity.Property(record => record.InstitutionId).HasColumnName("institution_id").HasMaxLength(128);
+            entity.Property(record => record.ProvisioningPlanVersion).HasColumnName("provisioning_plan_version");
+            entity.Property(record => record.Status).HasColumnName("status").HasMaxLength(32);
+            entity.Property(record => record.SourceEventId).HasColumnName("source_event_id").HasMaxLength(128);
+            entity.Property(record => record.InitialisedAt).HasColumnName("initialised_at");
+        });
+
         modelBuilder.Entity<AuditEvidenceRecord>()
+            .HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<InstitutionBoundaryRecord>()
             .HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>()
             .HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);

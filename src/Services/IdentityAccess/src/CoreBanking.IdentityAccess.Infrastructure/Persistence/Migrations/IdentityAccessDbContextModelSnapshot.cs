@@ -771,6 +771,46 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                     b.ToTable("foundation_records", "platform");
                 });
 
+            modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Platform.InstitutionBoundaryRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<DateTimeOffset>("InitialisedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("initialised_at");
+
+                    b.Property<int>("ProvisioningPlanVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("provisioning_plan_version");
+
+                    b.Property<string>("SourceEventId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_event_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("InstitutionId");
+
+                    b.HasIndex("SourceEventId")
+                        .IsUnique();
+
+                    b.ToTable("institution_boundaries", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_institution_boundaries_plan_version", "provisioning_plan_version > 0");
+
+                            t.HasCheckConstraint("ck_institution_boundaries_status", "status IN ('provisioning', 'active', 'suspended')");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Security.AuthenticationEventRecord", b =>
                 {
                     b.Property<string>("InstitutionId")

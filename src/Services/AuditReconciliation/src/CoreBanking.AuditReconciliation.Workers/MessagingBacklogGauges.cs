@@ -21,6 +21,11 @@ internal static class MessagingBacklogGauges
             description: "Inbox records that have not reached a durable outcome.");
 
         MessagingMetrics.Shared.Meter.CreateObservableGauge(
+            "messaging.outbox.unpublished",
+            () => Measure(scopeFactory, timeProvider).Unpublished,
+            description: "Outbox records awaiting publication.");
+
+        MessagingMetrics.Shared.Meter.CreateObservableGauge(
             "messaging.dead_letters.unrepaired",
             () => Measure(scopeFactory, timeProvider).DeadLetters,
             description: "Dead letters awaiting operator repair.");
@@ -39,6 +44,9 @@ internal static class MessagingBacklogGauges
         long unprocessed = context.InboxMessages
             .IgnoreQueryFilters()
             .LongCount(record => record.ProcessedAt == null);
+        long unpublished = context.OutboxMessages
+            .IgnoreQueryFilters()
+            .LongCount(record => record.Status != OutboxStatus.Published);
 
         DateTimeOffset[] deadLetters = [.. context.DeadLetters
             .IgnoreQueryFilters()
@@ -49,8 +57,12 @@ internal static class MessagingBacklogGauges
             ? TimeSpan.Zero
             : timeProvider.GetUtcNow() - deadLetters.Min();
 
-        return new BacklogMeasurement(unprocessed, deadLetters.LongLength, oldestAge);
+        return new BacklogMeasurement(unprocessed, unpublished, deadLetters.LongLength, oldestAge);
     }
 
-    private sealed record BacklogMeasurement(long Unprocessed, long DeadLetters, TimeSpan OldestDeadLetterAge);
+    private sealed record BacklogMeasurement(
+        long Unprocessed,
+        long Unpublished,
+        long DeadLetters,
+        TimeSpan OldestDeadLetterAge);
 }

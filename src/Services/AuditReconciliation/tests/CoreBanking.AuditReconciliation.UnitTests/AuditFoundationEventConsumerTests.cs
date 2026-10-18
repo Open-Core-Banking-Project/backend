@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.Json;
 using CoreBanking.AuditReconciliation.Contracts;
 using CoreBanking.AuditReconciliation.Infrastructure.Foundation;
+using CoreBanking.AuditReconciliation.Infrastructure.Institutions;
 using CoreBanking.AuditReconciliation.Infrastructure.Persistence;
 using CoreBanking.BuildingBlocks.Application.Messaging;
 using CoreBanking.BuildingBlocks.Application.Persistence;
@@ -22,6 +23,28 @@ public sealed class AuditFoundationEventConsumerTests
     public void Consumer_subscribes_to_the_versioned_identity_access_foundation_topic()
     {
         Assert.Equal("corebanking.identity-access.foundation.v1", AuditFoundationEventConsumer.TopicName);
+    }
+
+    [Fact]
+    public void Provisioning_consumer_subscribes_to_the_versioned_core_ledger_institution_topic()
+    {
+        Assert.Equal("corebanking.core-ledger.institution.v1", InstitutionProvisioningConsumer.TopicName);
+    }
+
+    [Fact]
+    public void Provisioning_acknowledgement_carries_service_and_source_evidence()
+    {
+        InstitutionBoundaryInitialisedV1 payload = new(
+            "institution-1",
+            "audit-reconciliation",
+            1,
+            "source-event-1");
+
+        string json = EventContract.Serialize(payload);
+        InstitutionBoundaryInitialisedV1 restored =
+            EventContract.Deserialize<InstitutionBoundaryInitialisedV1>(json)!;
+
+        Assert.Equal(payload, restored);
     }
 
     [Fact]
@@ -49,6 +72,7 @@ public sealed class AuditFoundationEventConsumerTests
         Assert.Contains("audit.events", tables);
         Assert.Contains("integration.inbox_messages", tables);
         Assert.Contains("integration.untrusted_message_quarantine", tables);
+        Assert.Contains("platform.institution_boundaries", tables);
 
         IEntityType audit = model.FindEntityType(typeof(AuditEvidenceRecord))!;
         Assert.Contains("InstitutionId", audit.FindPrimaryKey()!.Properties.Select(property => property.Name));
@@ -61,6 +85,12 @@ public sealed class AuditFoundationEventConsumerTests
         Assert.Empty(quarantine.GetDeclaredQueryFilters());
         Assert.DoesNotContain(quarantine.GetProperties(), property =>
             string.Equals(property.Name, "InstitutionId", StringComparison.Ordinal));
+
+        IEntityType boundary = model.FindEntityType(typeof(InstitutionBoundaryRecord))!;
+        Assert.NotEmpty(boundary.GetDeclaredQueryFilters());
+        Assert.Contains(boundary.GetIndexes(), index =>
+            index.IsUnique
+            && index.Properties.Select(property => property.Name).SequenceEqual(["SourceEventId"]));
     }
 
     private static IModel CreateModel()

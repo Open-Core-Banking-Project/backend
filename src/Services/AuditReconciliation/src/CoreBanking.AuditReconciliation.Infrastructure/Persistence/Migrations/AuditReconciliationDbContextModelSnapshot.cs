@@ -76,6 +76,46 @@ namespace CoreBanking.AuditReconciliation.Infrastructure.Persistence.Migrations
                     b.ToTable("events", "audit");
                 });
 
+            modelBuilder.Entity("CoreBanking.AuditReconciliation.Infrastructure.Persistence.InstitutionBoundaryRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<DateTimeOffset>("InitialisedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("initialised_at");
+
+                    b.Property<int>("ProvisioningPlanVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("provisioning_plan_version");
+
+                    b.Property<string>("SourceEventId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_event_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("InstitutionId");
+
+                    b.HasIndex("SourceEventId")
+                        .IsUnique();
+
+                    b.ToTable("institution_boundaries", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_institution_boundaries_plan_version", "provisioning_plan_version > 0");
+
+                            t.HasCheckConstraint("ck_institution_boundaries_status", "status IN ('provisioning', 'active', 'suspended')");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.AuditReconciliation.Infrastructure.Persistence.UntrustedMessageQuarantineRecord", b =>
                 {
                     b.Property<string>("Transport")
