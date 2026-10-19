@@ -28,6 +28,24 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public DbSet<ProvisioningStepRecord> ProvisioningSteps => Set<ProvisioningStepRecord>();
 
+    public DbSet<RegionRecord> Regions => Set<RegionRecord>();
+
+    public DbSet<BranchRecord> Branches => Set<BranchRecord>();
+
+    public DbSet<OrganisationStatusHistoryRecord> OrganisationStatusHistory => Set<OrganisationStatusHistoryRecord>();
+
+    public DbSet<BusinessCalendarRecord> BusinessCalendars => Set<BusinessCalendarRecord>();
+
+    public DbSet<CalendarVersionRecord> CalendarVersions => Set<CalendarVersionRecord>();
+
+    public DbSet<CalendarDayRecord> CalendarDays => Set<CalendarDayRecord>();
+
+    public DbSet<BusinessDateControlRecord> BusinessDateControls => Set<BusinessDateControlRecord>();
+
+    public DbSet<BusinessDateAdvanceRequestRecord> BusinessDateAdvanceRequests => Set<BusinessDateAdvanceRequestRecord>();
+
+    public DbSet<BusinessDateHistoryRecord> BusinessDateHistory => Set<BusinessDateHistoryRecord>();
+
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
 
     public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
@@ -58,6 +76,15 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<ProvisioningStepRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<RegionRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<BranchRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<OrganisationStatusHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<BusinessCalendarRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CalendarVersionRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CalendarDayRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<BusinessDateControlRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<BusinessDateAdvanceRequestRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<BusinessDateHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InboxRecord>().HasQueryFilter(record =>

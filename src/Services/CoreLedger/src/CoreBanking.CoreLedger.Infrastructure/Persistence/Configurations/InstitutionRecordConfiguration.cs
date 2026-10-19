@@ -23,6 +23,13 @@ internal sealed class InstitutionRecordConfiguration : IEntityTypeConfiguration<
         builder.Property(record => record.CountryCode).HasColumnName("country_code").HasMaxLength(2).IsFixedLength();
         builder.Property(record => record.BaseCurrency).HasColumnName("base_currency").HasMaxLength(3).IsFixedLength();
         builder.Property(record => record.Status).HasColumnName("status").HasMaxLength(32);
+        builder.Property(record => record.CreatedByActorId).HasColumnName("created_by_actor_id").HasMaxLength(128);
+        builder.Property(record => record.ActivatedByActorId).HasColumnName("activated_by_actor_id").HasMaxLength(128);
+        builder.Property(record => record.ActivationCorrelationId).HasColumnName("activation_correlation_id").HasMaxLength(128);
+        builder.Property(record => record.SuspendedByActorId).HasColumnName("suspended_by_actor_id").HasMaxLength(128);
+        builder.Property(record => record.SuspensionReason).HasColumnName("suspension_reason").HasMaxLength(512);
+        builder.Property(record => record.SuspensionCorrelationId).HasColumnName("suspension_correlation_id").HasMaxLength(128);
+        builder.Property(record => record.Version).HasColumnName("version").IsConcurrencyToken();
         builder.Property(record => record.CreatedAt).HasColumnName("created_at");
         builder.Property(record => record.UpdatedAt).HasColumnName("updated_at");
         builder.Property(record => record.ProvisioningStartedAt).HasColumnName("provisioning_started_at");

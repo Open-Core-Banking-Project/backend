@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.IdentityAccess.Application.Authorisation;
 
@@ -11,5 +12,7 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Authorisation;
 /// </summary>
 public sealed class UnconfiguredActorContextResolver : IActorContextResolver
 {
-    public AuthenticatedActor? Resolve(string? authenticationMaterial) => null;
+    public AuthenticatedActor? Resolve(
+        ClaimsPrincipal authenticatedPrincipal,
+        string? developmentAuthenticationMaterial) => null;
 }

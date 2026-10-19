@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CoreBanking.BuildingBlocks.Application.Security;
 
 namespace CoreBanking.IdentityAccess.Application.Authorisation;
@@ -11,6 +12,10 @@ namespace CoreBanking.IdentityAccess.Application.Authorisation;
 /// </summary>
 public interface IActorContextResolver
 {
-    /// <summary>Returns the authenticated actor, or <c>null</c> when authentication did not succeed.</summary>
-    AuthenticatedActor? Resolve(string? authenticationMaterial);
+    /// <summary>
+    /// Returns the authenticated actor, or <c>null</c> when authentication did not succeed.
+    /// The principal is populated only by the configured authentication middleware. The separate
+    /// development material exists solely for the Development-only reference resolver.
+    /// </summary>
+    AuthenticatedActor? Resolve(ClaimsPrincipal authenticatedPrincipal, string? developmentAuthenticationMaterial);
 }

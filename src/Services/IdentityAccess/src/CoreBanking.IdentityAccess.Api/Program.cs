@@ -12,9 +12,11 @@ using CoreBanking.IdentityAccess.Application.Permissions;
 using CoreBanking.IdentityAccess.Infrastructure.Authorisation;
 using CoreBanking.IdentityAccess.Infrastructure.Foundation;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -29,6 +31,68 @@ CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBanking
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITenantContext, AmbientTenantContext>();
+
+IConfigurationSection keycloakSection = builder.Configuration.GetSection("Authentication:Keycloak");
+string? keycloakAuthority = keycloakSection["Authority"]?.Trim().TrimEnd('/');
+string? keycloakAudience = keycloakSection["Audience"]?.Trim();
+bool hasKeycloakAuthority = !string.IsNullOrWhiteSpace(keycloakAuthority);
+bool hasKeycloakAudience = !string.IsNullOrWhiteSpace(keycloakAudience);
+bool useKeycloak = hasKeycloakAuthority && hasKeycloakAudience;
+bool requireHttpsMetadata = keycloakSection.GetValue("RequireHttpsMetadata", true);
+
+if (hasKeycloakAuthority != hasKeycloakAudience)
+{
+    throw new InvalidOperationException(
+        "Authentication:Keycloak:Authority and Authentication:Keycloak:Audience must be configured together.");
+}
+
+if (useKeycloak)
+{
+    if (!Uri.TryCreate(keycloakAuthority, UriKind.Absolute, out Uri? authorityUri))
+    {
+        throw new InvalidOperationException("Authentication:Keycloak:Authority must be an absolute URI.");
+    }
+
+    bool usesHttps = string.Equals(authorityUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+    bool permittedDevelopmentHttp = builder.Environment.IsDevelopment()
+        && !requireHttpsMetadata
+        && authorityUri.IsLoopback
+        && string.Equals(authorityUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase);
+
+    if (!usesHttps && !permittedDevelopmentHttp)
+    {
+        throw new InvalidOperationException(
+            "Keycloak authority must use HTTPS, except loopback Development with RequireHttpsMetadata disabled.");
+    }
+
+    if (!builder.Environment.IsDevelopment() && !requireHttpsMetadata)
+    {
+        throw new InvalidOperationException(
+            "Keycloak discovery must use HTTPS and RequireHttpsMetadata must remain enabled outside Development.");
+    }
+
+    builder.Services
+        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.Authority = keycloakAuthority;
+            options.Audience = keycloakAudience;
+            options.RequireHttpsMetadata = requireHttpsMetadata;
+            options.MapInboundClaims = false;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateIssuerSigningKey = true,
+                ValidateLifetime = true,
+                RequireExpirationTime = true,
+                RequireSignedTokens = true,
+                ClockSkew = TimeSpan.FromSeconds(30),
+            };
+        });
+
+    builder.Services.AddSingleton<IActorContextResolver, KeycloakActorContextResolver>();
+}
 
 // The relational entitlement store is used as soon as a connection string is configured. Without
 // one, the replaceable in-memory stand-ins keep the reference flow runnable for a developer who
@@ -71,20 +135,26 @@ builder.Services.AddScoped(provider => new AuthorisationPolicy(
 
 builder.Services.AddScoped<AuthorisationService>();
 
-// The resolver emulates a validated access token and refuses to resolve anything outside
-// Development. Without it, every protected request is an unauthenticated request.
-if (builder.Environment.IsDevelopment())
+// The synthetic header resolver is retained only for local development when Keycloak has not
+// been configured. A non-development host cannot start without the real provider configuration.
+if (!useKeycloak && builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IActorContextResolver, DevelopmentActorContextResolver>();
 }
-else
+else if (!useKeycloak)
 {
-    builder.Services.AddSingleton<IActorContextResolver, UnconfiguredActorContextResolver>();
+    throw new InvalidOperationException(
+        "Authentication:Keycloak:Authority and Authentication:Keycloak:Audience are required outside Development.");
 }
 
 WebApplication app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
+if (useKeycloak)
+{
+    StartupLog.KeycloakAuthenticationEnabled(app.Logger, keycloakAuthority!, keycloakAudience!);
+    app.UseAuthentication();
+}
+else if (!app.Environment.IsDevelopment())
 {
     StartupLog.DevelopmentActorResolutionDisabled(app.Logger);
 }

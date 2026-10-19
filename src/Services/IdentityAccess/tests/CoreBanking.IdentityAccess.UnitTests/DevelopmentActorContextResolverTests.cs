@@ -1,4 +1,5 @@
 using System;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using CoreBanking.BuildingBlocks.Application.Security;
@@ -36,7 +37,7 @@ public sealed class DevelopmentActorContextResolverTests
             authenticationStrength = "MultiFactor",
         });
 
-        AuthenticatedActor? actor = _resolver.Resolve(material);
+        AuthenticatedActor? actor = Resolve(material);
 
         Assert.NotNull(actor);
         Assert.Equal("actor-1", actor!.Id.Value);
@@ -49,22 +50,22 @@ public sealed class DevelopmentActorContextResolverTests
     [Fact]
     public void Missing_material_yields_no_actor()
     {
-        Assert.Null(_resolver.Resolve(null));
-        Assert.Null(_resolver.Resolve("   "));
+        Assert.Null(Resolve(null));
+        Assert.Null(Resolve("   "));
     }
 
     [Fact]
     public void Malformed_material_yields_no_actor()
     {
-        Assert.Null(_resolver.Resolve("not-base64"));
-        Assert.Null(_resolver.Resolve(Convert.ToBase64String(Encoding.UTF8.GetBytes("not json"))));
+        Assert.Null(Resolve("not-base64"));
+        Assert.Null(Resolve(Convert.ToBase64String(Encoding.UTF8.GetBytes("not json"))));
     }
 
     [Fact]
     public void Material_without_actor_or_institution_yields_no_actor()
     {
-        Assert.Null(_resolver.Resolve(Material(new { actorType = "Human" })));
-        Assert.Null(_resolver.Resolve(Material(new { actorId = "actor-1" })));
+        Assert.Null(Resolve(Material(new { actorType = "Human" })));
+        Assert.Null(Resolve(Material(new { actorId = "actor-1" })));
     }
 
     [Fact]
@@ -82,7 +83,7 @@ public sealed class DevelopmentActorContextResolverTests
             isSuperUser = true,
         });
 
-        AuthenticatedActor? actor = _resolver.Resolve(material);
+        AuthenticatedActor? actor = Resolve(material);
 
         Assert.NotNull(actor);
         // The actor carries no permission, role or context claim from the request.
@@ -92,4 +93,7 @@ public sealed class DevelopmentActorContextResolverTests
 
     private static string Material(object payload) =>
         Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(payload));
+
+    private AuthenticatedActor? Resolve(string? material) =>
+        _resolver.Resolve(new ClaimsPrincipal(), material);
 }

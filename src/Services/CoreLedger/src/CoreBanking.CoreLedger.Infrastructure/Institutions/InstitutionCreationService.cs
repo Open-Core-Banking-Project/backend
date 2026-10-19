@@ -119,7 +119,7 @@ public sealed class InstitutionCreationService : IInstitutionCreationService
 
         string provisioningRunId = Guid.NewGuid().ToString("N");
         string eventId = Guid.NewGuid().ToString("N");
-        InstitutionRecord institutionRecord = Map(institution);
+        InstitutionRecord institutionRecord = Map(institution, command.ActorId);
         ProvisioningRunRecord run = new()
         {
             InstitutionId = institution.Id.Value,
@@ -208,7 +208,7 @@ public sealed class InstitutionCreationService : IInstitutionCreationService
         }
     }
 
-    private static InstitutionRecord Map(Institution institution) => new()
+    private static InstitutionRecord Map(Institution institution, ActorId creator) => new()
     {
         InstitutionId = institution.Id.Value,
         Code = institution.Code,
@@ -216,6 +216,8 @@ public sealed class InstitutionCreationService : IInstitutionCreationService
         CountryCode = institution.CountryCode,
         BaseCurrency = institution.BaseCurrency,
         Status = "provisioning",
+        CreatedByActorId = creator.Value,
+        Version = 1,
         CreatedAt = institution.CreatedAt,
         UpdatedAt = institution.UpdatedAt,
         ProvisioningStartedAt = institution.ProvisioningStartedAt,

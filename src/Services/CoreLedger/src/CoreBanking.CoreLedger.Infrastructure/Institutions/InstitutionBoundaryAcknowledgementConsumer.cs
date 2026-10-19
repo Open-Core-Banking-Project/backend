@@ -110,6 +110,7 @@ public sealed class InstitutionBoundaryAcknowledgementConsumer : IIntegrationEve
         step.UpdatedAt = now;
 
         InstitutionRecord institution = await _context.Institutions.SingleAsync(cancellationToken).ConfigureAwait(false);
+        institution.Version++;
         if (acknowledgement.IsFailure)
         {
             step.Status = "failed";

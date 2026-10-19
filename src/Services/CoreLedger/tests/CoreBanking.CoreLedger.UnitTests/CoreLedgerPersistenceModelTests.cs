@@ -82,6 +82,62 @@ public sealed class CoreLedgerPersistenceModelTests
                 .SequenceEqual(["InstitutionId", "EventId"]));
     }
 
+    [Fact]
+    public void Institution_lifecycle_uses_an_optimistic_concurrency_token_and_actor_evidence()
+    {
+        using CoreLedgerDbContext context = CreateContext();
+        IEntityType institution = context.Model.FindEntityType(typeof(InstitutionRecord))!;
+
+        Assert.True(institution.FindProperty(nameof(InstitutionRecord.Version))!.IsConcurrencyToken);
+        Assert.Equal(
+            "created_by_actor_id",
+            institution.FindProperty(nameof(InstitutionRecord.CreatedByActorId))!.GetColumnName());
+        Assert.Equal(
+            "activated_by_actor_id",
+            institution.FindProperty(nameof(InstitutionRecord.ActivatedByActorId))!.GetColumnName());
+    }
+
+    [Fact]
+    public void Regions_and_branches_are_institution_scoped_with_unique_codes_and_history()
+    {
+        using CoreLedgerDbContext context = CreateContext();
+        IEntityType region = context.Model.FindEntityType(typeof(RegionRecord))!;
+        IEntityType branch = context.Model.FindEntityType(typeof(BranchRecord))!;
+        IEntityType history = context.Model.FindEntityType(typeof(OrganisationStatusHistoryRecord))!;
+
+        Assert.Equal(["InstitutionId", "RegionId"], region.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(["InstitutionId", "BranchId"], branch.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Contains(region.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "Code"]));
+        Assert.Contains(branch.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "Code"]));
+        Assert.Contains(branch.GetForeignKeys(), foreignKey => foreignKey.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "RegionId"]));
+        Assert.True(region.FindProperty(nameof(RegionRecord.Version))!.IsConcurrencyToken);
+        Assert.True(branch.FindProperty(nameof(BranchRecord.Version))!.IsConcurrencyToken);
+        Assert.Equal("organisation_status_history", history.GetTableName());
+    }
+
+    [Fact]
+    public void Calendar_versions_and_business_date_controls_are_tenant_scoped_and_concurrency_safe()
+    {
+        using CoreLedgerDbContext context = CreateContext();
+        IEntityType version = context.Model.FindEntityType(typeof(CalendarVersionRecord))!;
+        IEntityType day = context.Model.FindEntityType(typeof(CalendarDayRecord))!;
+        IEntityType control = context.Model.FindEntityType(typeof(BusinessDateControlRecord))!;
+        IEntityType request = context.Model.FindEntityType(typeof(BusinessDateAdvanceRequestRecord))!;
+        IEntityType history = context.Model.FindEntityType(typeof(BusinessDateHistoryRecord))!;
+        IEntityType calendar = context.Model.FindEntityType(typeof(BusinessCalendarRecord))!;
+
+        Assert.Equal(["InstitutionId", "VersionId"], version.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Contains(version.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "CalendarId", "VersionNumber"]));
+        Assert.Equal(["InstitutionId", "VersionId", "Date"], day.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.True(version.FindProperty(nameof(CalendarVersionRecord.Version))!.IsConcurrencyToken);
+        Assert.True(calendar.FindProperty(nameof(BusinessCalendarRecord.Version))!.IsConcurrencyToken);
+        Assert.True(control.FindProperty(nameof(BusinessDateControlRecord.Version))!.IsConcurrencyToken);
+        Assert.True(request.FindProperty(nameof(BusinessDateAdvanceRequestRecord.Version))!.IsConcurrencyToken);
+        Assert.Contains(history.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "RequestId"]));
+    }
+
     private static CoreLedgerDbContext CreateContext()
     {
         DbContextOptions<CoreLedgerDbContext> options = new DbContextOptionsBuilder<CoreLedgerDbContext>()

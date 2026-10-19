@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\src\CoreBanking.CoreLedger.Domain\CoreBanking.CoreLedger.Domain.csproj" />
     <ProjectReference Include="..\..\src\CoreBanking.CoreLedger.Contracts\CoreBanking.CoreLedger.Contracts.csproj" />
     <ProjectReference Include="..\..\src\CoreBanking.CoreLedger.Infrastructure\CoreBanking.CoreLedger.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CoreBanking.CoreLedger.Api\CoreBanking.CoreLedger.Api.csproj" />
   </ItemGroup>
 
 </Project>

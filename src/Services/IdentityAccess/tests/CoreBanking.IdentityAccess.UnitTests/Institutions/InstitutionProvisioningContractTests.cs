@@ -10,6 +10,14 @@ namespace CoreBanking.IdentityAccess.UnitTests.Institutions;
 public sealed class InstitutionProvisioningContractTests
 {
     [Fact]
+    public void Consumer_supports_the_activation_event_on_the_institution_topic() =>
+        Assert.Equal("institution_activated", InstitutionProvisioningConsumer.ActivationEventType);
+
+    [Fact]
+    public void Consumer_supports_the_suspension_event_on_the_institution_topic() =>
+        Assert.Equal("institution_suspended", InstitutionProvisioningConsumer.SuspensionEventType);
+
+    [Fact]
     public void Consumer_subscribes_to_the_versioned_core_ledger_institution_topic()
     {
         Assert.Equal(

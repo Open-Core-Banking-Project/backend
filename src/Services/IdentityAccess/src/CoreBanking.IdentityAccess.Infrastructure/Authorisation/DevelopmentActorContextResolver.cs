@@ -1,4 +1,5 @@
 using System;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CoreBanking.BuildingBlocks.Application.Security;
@@ -30,9 +31,13 @@ public sealed class DevelopmentActorContextResolver : IActorContextResolver
         Converters = { new JsonStringEnumConverter() },
     };
 
-    public AuthenticatedActor? Resolve(string? authenticationMaterial)
+    public AuthenticatedActor? Resolve(
+        ClaimsPrincipal authenticatedPrincipal,
+        string? developmentAuthenticationMaterial)
     {
-        if (string.IsNullOrWhiteSpace(authenticationMaterial))
+        ArgumentNullException.ThrowIfNull(authenticatedPrincipal);
+
+        if (string.IsNullOrWhiteSpace(developmentAuthenticationMaterial))
         {
             return null;
         }
@@ -40,7 +45,7 @@ public sealed class DevelopmentActorContextResolver : IActorContextResolver
         DevelopmentActorClaims? claims;
         try
         {
-            byte[] payload = Convert.FromBase64String(authenticationMaterial);
+            byte[] payload = Convert.FromBase64String(developmentAuthenticationMaterial);
             claims = JsonSerializer.Deserialize<DevelopmentActorClaims>(payload, SerializerOptions);
         }
         catch (JsonException)

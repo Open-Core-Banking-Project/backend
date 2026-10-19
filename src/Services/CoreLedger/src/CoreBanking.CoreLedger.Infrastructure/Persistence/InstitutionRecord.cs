@@ -18,6 +18,20 @@ public sealed class InstitutionRecord : ITenantOwnedEntity
 
     public required string Status { get; set; }
 
+    public string? CreatedByActorId { get; set; }
+
+    public string? ActivatedByActorId { get; set; }
+
+    public string? ActivationCorrelationId { get; set; }
+
+    public string? SuspendedByActorId { get; set; }
+
+    public string? SuspensionReason { get; set; }
+
+    public string? SuspensionCorrelationId { get; set; }
+
+    public long Version { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }

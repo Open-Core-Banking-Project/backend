@@ -51,7 +51,7 @@ public sealed class ProtectedOperationFilter : IEndpointFilter
 
         string correlationId = ReadHeader(http, CorrelationHeaderName) ?? Guid.NewGuid().ToString("N");
         AuthenticatedActor? actor = services.GetRequiredService<IActorContextResolver>()
-            .Resolve(ReadHeader(http, AuthenticationHeaderName));
+            .Resolve(http.User, ReadHeader(http, AuthenticationHeaderName));
 
         try
         {
@@ -74,6 +74,11 @@ public sealed class ProtectedOperationFilter : IEndpointFilter
 
             if (!decision.IsAllowed)
             {
+                if (actor is null)
+                {
+                    http.Response.Headers.WWWAuthenticate = "Bearer";
+                }
+
                 AuthorisationProblem problem = AuthorisationProblem.From(decision, correlationId);
                 System.Collections.Generic.Dictionary<string, object?> extensions = new(StringComparer.Ordinal)
                 {

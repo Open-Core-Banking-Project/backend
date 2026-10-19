@@ -23,6 +23,8 @@ public sealed class InstitutionProvisioningConsumer : IIntegrationEventConsumer
     public const string SourceProducer = "core-ledger";
     public const string EventFamily = "institution";
     public const string SourceEventType = "institution_provisioning_started";
+    public const string ActivationEventType = "institution_activated";
+    public const string SuspensionEventType = "institution_suspended";
     public const string AcknowledgementEventType = "institution_boundary_initialised";
     public const string FailureEventType = "institution_boundary_initialisation_failed";
     public const string ServiceId = "identity-access";
@@ -77,6 +79,18 @@ public sealed class InstitutionProvisioningConsumer : IIntegrationEventConsumer
         IntegrationEventEnvelope envelope,
         CancellationToken cancellationToken)
     {
+        if (string.Equals(envelope.EventType, ActivationEventType, StringComparison.Ordinal))
+        {
+            ValidateSourceProducer(envelope);
+            return await ActivateAsync(envelope, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (string.Equals(envelope.EventType, SuspensionEventType, StringComparison.Ordinal))
+        {
+            ValidateSourceProducer(envelope);
+            return await SuspendAsync(envelope, cancellationToken).ConfigureAwait(false);
+        }
+
         ValidateEnvelope(envelope);
         InstitutionProvisioningStartedV1 payload =
             EventContract.Deserialize<InstitutionProvisioningStartedV1>(envelope.Payload)
@@ -156,6 +170,71 @@ public sealed class InstitutionProvisioningConsumer : IIntegrationEventConsumer
         return "initialised:" + payload.InstitutionId;
     }
 
+    private async Task<string?> ActivateAsync(IntegrationEventEnvelope envelope, CancellationToken cancellationToken)
+    {
+        InstitutionActivatedV1 payload = EventContract.Deserialize<InstitutionActivatedV1>(envelope.Payload)
+            ?? throw new InvalidOperationException("The activation event payload is missing.");
+        if (string.IsNullOrWhiteSpace(payload.InstitutionId)
+            || !string.Equals(payload.InstitutionId, envelope.InstitutionId, StringComparison.Ordinal)
+            || payload.ProvisioningPlanVersion < 1
+            || string.IsNullOrWhiteSpace(payload.ProvisioningRunId)
+            || string.IsNullOrWhiteSpace(payload.ActivatedByActorId))
+        {
+            throw new InvalidOperationException("The activation payload does not match the trusted envelope.");
+        }
+
+        InstitutionBoundaryRecord boundary = await _context.InstitutionBoundaries.SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException("The institution boundary must exist before activation.");
+        if (boundary.ProvisioningPlanVersion != payload.ProvisioningPlanVersion)
+        {
+            throw new InvalidOperationException("The activation event does not match the local provisioning plan.");
+        }
+
+        if (string.Equals(boundary.Status, "active", StringComparison.Ordinal))
+        {
+            return "already_active:" + boundary.InstitutionId;
+        }
+
+        if (!(string.Equals(boundary.Status, "provisioning", StringComparison.Ordinal)
+                || string.Equals(boundary.Status, "suspended", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("The institution boundary cannot transition to active from its current state.");
+        }
+
+        boundary.Status = "active";
+        return "activated:" + boundary.InstitutionId;
+    }
+
+    private async Task<string?> SuspendAsync(IntegrationEventEnvelope envelope, CancellationToken cancellationToken)
+    {
+        InstitutionSuspendedV1 payload = EventContract.Deserialize<InstitutionSuspendedV1>(envelope.Payload)
+            ?? throw new InvalidOperationException("The suspension event payload is missing.");
+        if (string.IsNullOrWhiteSpace(payload.InstitutionId)
+            || !string.Equals(payload.InstitutionId, envelope.InstitutionId, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(payload.SuspendedByActorId)
+            || string.IsNullOrWhiteSpace(payload.Reason))
+        {
+            throw new InvalidOperationException("The suspension payload does not match the trusted envelope.");
+        }
+
+        InstitutionBoundaryRecord boundary = await _context.InstitutionBoundaries.SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException("The institution boundary must exist before suspension.");
+        if (string.Equals(boundary.Status, "suspended", StringComparison.Ordinal))
+        {
+            return "already_suspended:" + boundary.InstitutionId;
+        }
+
+        if (!string.Equals(boundary.Status, "active", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The institution boundary cannot transition to suspended from its current state.");
+        }
+
+        boundary.Status = "suspended";
+        return "suspended:" + boundary.InstitutionId;
+    }
+
     private void AddFailureAcknowledgement(
         IntegrationEventEnvelope source,
         InstitutionProvisioningStartedV1 payload,
@@ -206,8 +285,16 @@ public sealed class InstitutionProvisioningConsumer : IIntegrationEventConsumer
 
     private static void ValidateEnvelope(IntegrationEventEnvelope envelope)
     {
-        if (!string.Equals(envelope.Producer, SourceProducer, StringComparison.Ordinal)
-            || !string.Equals(envelope.EventType, SourceEventType, StringComparison.Ordinal))
+        ValidateSourceProducer(envelope);
+        if (!string.Equals(envelope.EventType, SourceEventType, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The institution topic contained an unexpected producer or event type.");
+        }
+    }
+
+    private static void ValidateSourceProducer(IntegrationEventEnvelope envelope)
+    {
+        if (!string.Equals(envelope.Producer, SourceProducer, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The institution topic contained an unexpected producer or event type.");
         }

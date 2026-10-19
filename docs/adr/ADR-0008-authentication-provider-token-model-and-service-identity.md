@@ -13,13 +13,15 @@ referenced_by:
 supersedes: []
 approved_by: [Architecture, Security, Identity and Access]
 approved_on: 2026-10-16
+identity_provider: Keycloak
+identity_provider_selected_on: 2026-10-19
 ---
 
 # ADR-0008: Authentication provider, token model and service identity
 
 ## Status
 
-`Proposed` - decision drafted and ready for owner approval. Effective only when the owners listed below record `Accepted`. Until then no production authentication, token issuance, device enrolment or service credential handling may be implemented; abstractions, ports and tests may be built against a replaceable local implementation.
+`Accepted` - the protocol and token model were accepted on 2026-10-16. Keycloak was selected as the OIDC provider on 2026-10-19. Production hosting, operational ownership and the remaining approval-gate items below still require explicit decisions before production enrolment.
 
 ## Context
 
@@ -31,7 +33,7 @@ approved_on: 2026-10-16
 
 ## Decision
 
-1. **Protocol.** The platform is an OAuth 2.1 and OpenID Connect resource server. A hosted or self-hosted OIDC-compliant identity provider issues tokens; the platform does not invent its own token format, signing scheme or password store. The provider product and licensing are an owner decision recorded below; a replaceable local implementation is permitted for Phase 0.
+1. **Protocol and provider.** The platform is an OAuth 2.1 and OpenID Connect resource server. Keycloak issues tokens; the platform does not invent its own token format, signing scheme or password store. Services use standards-based framework middleware rather than a provider-specific adapter, preserving the OIDC boundary. A replaceable local implementation remains permitted for Development only.
 2. **Token type and validation.** Access tokens are signed JWTs using asymmetric keys published through the provider's discovery document. Services validate issuer, audience, signature, expiry and not-before on every request, and reject tokens from another environment or audience.
 3. **Token lifetime.** Access tokens are short-lived: default 15 minutes, configurable per environment, and never longer than 60 minutes. Refresh tokens rotate on use with reuse detection; a reused refresh token revokes the session family and raises a security event.
 4. **Claims.** Required claims: subject (actor identifier), actor type (`human`, `service`, `partner`), institution, session identifier, device identifier where applicable, entitlement version, authentication method and strength, and audience. Claims carry no permission list and no personal data beyond identifiers, in line with [ADR-0009](ADR-0009-roles-permissions-contextual-scopes-and-invalidation.md).
@@ -71,14 +73,14 @@ approved_on: 2026-10-16
 
 ## Open questions
 
-- Identity provider product, hosting model and licensing, including whether a hosted provider is acceptable for a regulated deployment.
+- Keycloak hosting model, operational ownership, support arrangement and production topology.
 - Second-factor method: authenticator application, passkey or short message service, and whether customer-facing authentication uses the same provider as staff.
 - Whether refresh tokens are stored server-side for introspection or validated statelessly with reuse detection only.
 - Whether partner and corporate clients authenticate through the same provider or a separate delegated surface.
 
 ## Approval gate
 
-Satisfied 2026-10-16 for the protocol, token model, session, device, step-up and service identity design. Still outstanding: the identity provider product, hosting model and licensing; the second-factor method; and whether partner and corporate clients use a separate delegated surface. Until the provider is selected, the implementation stays replaceable behind the documented abstraction and no production enrolment may be claimed.
+Satisfied 2026-10-16 for the protocol, token model, session, device, step-up and service identity design. Keycloak was selected on 2026-10-19. Still outstanding: Keycloak hosting and operational ownership; the second-factor method; and whether partner and corporate clients use a separate delegated surface. No production enrolment may be claimed until those decisions, the realm configuration, entitlement projection and operational controls are approved and verified.
 
 ## Related documents
 

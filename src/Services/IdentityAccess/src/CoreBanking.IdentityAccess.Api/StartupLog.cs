@@ -44,4 +44,10 @@ internal static partial class StartupLog
         Level = LogLevel.Warning,
         Message = "Readiness check failed for the required Identity Access database.")]
     public static partial void IdentityAccessDatabaseReadinessFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        EventId = 1006,
+        Level = LogLevel.Information,
+        Message = "Keycloak JWT authentication is enabled for authority {Authority} and audience {Audience}.")]
+    public static partial void KeycloakAuthenticationEnabled(ILogger logger, string authority, string audience);
 }

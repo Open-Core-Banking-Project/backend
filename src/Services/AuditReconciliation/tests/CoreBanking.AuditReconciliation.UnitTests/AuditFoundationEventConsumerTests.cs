@@ -20,6 +20,14 @@ namespace CoreBanking.AuditReconciliation.UnitTests;
 public sealed class AuditFoundationEventConsumerTests
 {
     [Fact]
+    public void Provisioning_consumer_supports_the_activation_event_on_the_institution_topic() =>
+        Assert.Equal("institution_activated", InstitutionProvisioningConsumer.ActivationEventType);
+
+    [Fact]
+    public void Consumer_supports_the_suspension_event_on_the_institution_topic() =>
+        Assert.Equal("institution_suspended", InstitutionProvisioningConsumer.SuspensionEventType);
+
+    [Fact]
     public void Consumer_subscribes_to_the_versioned_identity_access_foundation_topic()
     {
         Assert.Equal("corebanking.identity-access.foundation.v1", AuditFoundationEventConsumer.TopicName);
