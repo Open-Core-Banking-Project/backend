@@ -88,6 +88,9 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Restore
+        run: dotnet restore
+
       - name: Start local infrastructure
         shell: pwsh
         run: ./scripts/infra.ps1 -Action up
