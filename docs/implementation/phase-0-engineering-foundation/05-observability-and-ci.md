@@ -3,12 +3,12 @@ phase: "Phase 0 - Engineering Foundation"
 epic: "Observability, Audit and Continuous Integration"
 owning_service: "Platform-wide"
 modules: [OpenTelemetry, Audit Foundation, Health, CI, Security Checks]
-status: In progress
+status: Implemented
 requirements: [NFR-OBS-001, NFR-OBS-002, NFR-MNT-001, SEC-016, SEC-017, AUD-001, AUD-002, AUD-003, AUD-004]
 stories: [US-070, US-071, US-079, US-080]
 dependencies: [Repository and Build Foundation, Local Infrastructure, Identity and Permission Foundation, Messaging and Outbox]
 adrs: [ADR-0010, ADR-0011]
-last_updated: 2026-10-18
+last_updated: 2026-10-20
 ---
 
 # Epic: Observability, Audit and Continuous Integration
@@ -44,8 +44,12 @@ Implementation evidence, 2026-10-18:
   evidence, consumer audit evidence and absence of a sensitive canary and raw URL/SQL tags in
   exported telemetry, host logs and the response. A separate exporter-level unit test proves the
   redaction processor runs before export.
-- Automated secret scanning and protected-branch enforcement await the approved tool and repository
-  settings; no container artifact is currently produced for a container scan.
+- GitHub CodeQL analyses C# with `security-extended`; Gitleaks scans complete Git history using the
+  official container pinned by digest. Pull request #2 passed both gates before merge.
+- `main` requires pull requests, current branches and the build/test, infrastructure integration,
+  secret scan and CodeQL checks. Administrator bypass, force pushes and deletion are disabled.
+- No container artifact is currently produced, so container scanning remains deferred until an
+  artifact exists.
 
 ## Objective
 
@@ -144,16 +148,14 @@ The reference flow must show:
 - [x] Logs and traces contain no prohibited sensitive data.
 - [x] Health endpoints distinguish liveness and readiness.
 - [x] CI verifies build, formatting, analysis and required tests.
-- [ ] Security and secret checks run automatically.
+- [x] Security and secret checks run automatically.
 - [x] Failed outbox, inbox and permission states are observable.
-- [ ] A clean pull request cannot merge when a required check fails.
+- [x] A clean pull request cannot merge when a required check fails.
 
 ## Open decisions
 
-- CI provider and protected-branch settings.
 - Telemetry storage and dashboard products.
 - Audit retention and tamper-evidence mechanism.
-- Security scanning tools and exception process.
 - Coverage policy and performance baselines.
 
 ## Agent instructions

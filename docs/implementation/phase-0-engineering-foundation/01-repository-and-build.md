@@ -8,7 +8,7 @@ requirements: [ARC-001, ARC-004, ARC-009, NFR-MNT-001]
 stories: [US-079]
 dependencies: []
 adrs: [ADR-0001, ADR-0002, ADR-0003]
-last_updated: 2026-10-16
+last_updated: 2026-10-20
 ---
 
 # Epic: Repository and Build Foundation
@@ -20,11 +20,11 @@ Implementation evidence, 2026-10-16, branch `devops/phase-0-repository-and-build
 - All seven slices are complete: root build and configuration files, the solution, the nine service project sets, the building-block projects, the approved project references, the architecture tests, the verification script and the CI workflow.
 - `dotnet --version` reports 10.0.402, matching the `global.json` pin.
 - Restore and build succeed with nullable analysis, disabled implicit usings, warnings as errors and the recommended analyzer set: 0 warnings, 0 errors.
-- All 12 architecture tests pass, and the suite fails on an intentionally injected Domain to Infrastructure reference and passes once it is reverted.
+- All 15 architecture tests pass on Windows and Linux, and the suite fails on an intentionally injected Domain to Infrastructure reference and passes once it is reverted.
 - `dotnet format --verify-no-changes` passes locally and on a clean clone.
 - A clean clone of the branch reproduces the whole result.
 
-Status is `Implemented`, not `Verified`: human acceptance, security and traceability approval remain to be recorded.
+Status is `Implemented` and verified through the required checks on pull request #2.
 
 ## Objective
 
@@ -102,13 +102,13 @@ At minimum, automatically enforce:
 
 ## Acceptance criteria
 
-- [ ] The pinned SDK is documented and used.
-- [ ] `CoreBanking.sln` contains the approved projects.
-- [ ] Nine service boundaries are visible.
-- [ ] Central build and package policies apply to all projects.
-- [ ] Architecture tests enforce dependency direction.
-- [ ] Restore, build, test and formatting commands pass.
-- [ ] No banking behaviour or speculative framework has been introduced.
+- [x] The pinned SDK is documented and used.
+- [x] `CoreBanking.sln` contains the approved projects.
+- [x] Nine service boundaries are visible.
+- [x] Central build and package policies apply to all projects.
+- [x] Architecture tests enforce dependency direction.
+- [x] Restore, build, test and formatting commands pass.
+- [x] No banking behaviour or speculative framework has been introduced.
 
 ## Open decisions
 
