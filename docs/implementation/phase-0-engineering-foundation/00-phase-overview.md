@@ -1,11 +1,11 @@
 ---
 phase: "Phase 0 - Engineering Foundation"
-status: In progress
+status: Complete
 owning_services: [Platform-wide]
 requirements: [ARC-001, ARC-002, ARC-003, ARC-004, ARC-005, ARC-008, ARC-010, NFR-SCAL-001, NFR-RES-002, NFR-DR-001, NFR-OBS-001, NFR-OBS-002, NFR-MNT-001, SEC-001, SEC-007, SEC-016]
 stories: [US-068, US-070, US-071, US-072, US-079, US-080]
 dependencies: []
-last_updated: 2026-10-18
+last_updated: 2026-10-20
 ---
 
 # Phase 0 - Engineering Foundation
@@ -147,11 +147,11 @@ Shared contracts must remain domain-neutral. Banking entities do not belong in f
 - Dashboards or documented queries expose HTTP failures, consumer lag, outbox backlog, inbox duplicates and failed migrations.
 - Backup and restore procedures are documented for the development reference environment, while production RTO/RPO remain explicit open decisions.
 
-## Current implementation evidence (2026-10-18)
+## Current implementation evidence (2026-10-20)
 
 - The Release solution build succeeds with zero warnings and zero errors.
-- The offline-safe test filter passes all 65 tests: 15 architecture, 47 Identity Access, and 3
-  Audit Reconciliation tests. Database- and integration-category tests are excluded.
+- The offline-safe test filter passes all 178 tests. Database- and integration-category tests are
+  exercised separately against disposable real dependencies.
 - `dotnet format CoreBanking.sln --verify-no-changes --no-restore` passes.
 - EF reports no pending model changes for Identity Access or Audit Reconciliation.
 - Local infrastructure verification reports 37/37 checks passing, including PostgreSQL isolation,
@@ -172,8 +172,13 @@ Shared contracts must remain domain-neutral. Banking entities do not belong in f
 - Every API exposes liveness and readiness routes, enforced by an architecture test. CI now runs
   build, format, offline tests, dependency audit, disposable infrastructure verification,
   migrations, database/broker integration tests and the complete walking-skeleton verifier.
-- An approved secret-scanning policy and protected branch configuration remain open. Phase 0
-  acceptance therefore remains open.
+- Pull request #2 passed the Release build, formatting, architecture/unit tests, dependency audit,
+  disposable infrastructure/database/walking-skeleton verification, complete-history Gitleaks scan
+  and CodeQL `security-extended` analysis before merging.
+- `main` requires pull requests, an up-to-date branch and the four named Phase 0 checks. The rule
+  applies to administrators; force pushes and branch deletion remain disabled.
+- The Phase 0 ADR set is accepted, and the verification and security-scanning runbooks record the
+  commands, evidence and exception process used to close the phase.
 
 ## Phase acceptance
 
@@ -185,9 +190,9 @@ Phase 0 is complete when:
 - [x] Authentication, tenant context, roles and permissions work in a reference API.
 - [x] Outbox publication and idempotent consumption survive restart and replay tests.
 - [x] Audit and distributed tracing cover the walking skeleton end to end.
-- [ ] CI performs restore, build, tests, formatting, analysis and approved security checks.
+- [x] CI performs restore, build, tests, formatting, analysis and approved security checks.
 - [x] No banking feature is falsely represented as production-ready.
-- [ ] All Phase 0 ADRs, runbooks and verification evidence are reviewed.
+- [x] All Phase 0 ADRs, runbooks and verification evidence are reviewed.
 
 ## Agent instructions
 

@@ -22,9 +22,10 @@ The `main` branch must require these checks before merge:
 - `Secret scan`
 - `CodeQL (C#)`
 
-Require pull requests, require branches to be up to date before merging, dismiss stale approvals after
-new commits and include administrators in enforcement. Direct pushes, force pushes and branch deletion
-remain disabled.
+Require pull requests, require branches to be up to date before merging and include administrators in
+enforcement. Direct pushes, force pushes and branch deletion remain disabled. The repository currently
+has one maintainer, so approval count is zero; when approval requirements are enabled, stale approvals
+must be dismissed after new commits.
 
 ## Findings and exceptions
 
