@@ -2,8 +2,8 @@
 #
 # Scope note: ADR-0010 and ADR-0011 are accepted. This workflow provides restore,
 # build, formatting, architecture/unit tests, dependency audit and evidence upload.
-# Integration tests run against the local container stack. Secret/container scanner tooling and
-# protected-branch settings remain explicit open decisions.
+# Integration tests run against the local container stack. CodeQL and complete-history secret
+# scanning are defined in security.yml and enforced with this workflow through branch protection.
 
 name: backend-ci
 
@@ -28,10 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install the pinned SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
 
@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload test evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: test-results
           path: artifacts/test-results
@@ -79,10 +79,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install the pinned SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
 
