@@ -408,7 +408,10 @@ public sealed class RepositoryLayoutTests
             string include = element.Attribute("Include")?.Value ?? string.Empty;
             if (include.Length > 0)
             {
-                references.Add(Path.GetFullPath(Path.Combine(directory, include)));
+                string platformPath = include
+                    .Replace('\\', Path.DirectorySeparatorChar)
+                    .Replace('/', Path.DirectorySeparatorChar);
+                references.Add(Path.GetFullPath(Path.Combine(directory, platformPath)));
             }
         }
 

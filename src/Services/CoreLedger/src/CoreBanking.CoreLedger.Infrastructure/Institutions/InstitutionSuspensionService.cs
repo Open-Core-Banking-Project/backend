@@ -1,9 +1,9 @@
 using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
 using CoreBanking.BuildingBlocks.Application.Messaging;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
@@ -87,20 +87,34 @@ public sealed class InstitutionSuspensionService : IInstitutionSuspensionService
         InstitutionSuspendedV1 payload = new(institution.InstitutionId, command.ActorId.Value, reason, now);
         IntegrationEventEnvelope envelope = new()
         {
-            EventId = eventId, EventType = EventType, SchemaVersion = InstitutionCreationService.SchemaVersion,
-            OccurredAt = now, InstitutionId = institution.InstitutionId, CorrelationId = command.CorrelationId,
-            Producer = InstitutionCreationService.Producer, BusinessReference = institution.InstitutionId,
+            EventId = eventId,
+            EventType = EventType,
+            SchemaVersion = InstitutionCreationService.SchemaVersion,
+            OccurredAt = now,
+            InstitutionId = institution.InstitutionId,
+            CorrelationId = command.CorrelationId,
+            Producer = InstitutionCreationService.Producer,
+            BusinessReference = institution.InstitutionId,
             Payload = EventContract.Serialize(payload),
         };
         _context.OutboxMessages.Add(new OutboxRecord
         {
-            InstitutionId = institution.InstitutionId, MessageId = Guid.NewGuid().ToString("N"), EventId = eventId,
-            EventType = EventType, SchemaVersion = InstitutionCreationService.SchemaVersion,
+            InstitutionId = institution.InstitutionId,
+            MessageId = Guid.NewGuid().ToString("N"),
+            EventId = eventId,
+            EventType = EventType,
+            SchemaVersion = InstitutionCreationService.SchemaVersion,
             Topic = EventContract.TopicFor(InstitutionCreationService.Producer, InstitutionCreationService.EventFamily, InstitutionCreationService.SchemaVersion),
-            BusinessReference = institution.InstitutionId, CorrelationId = command.CorrelationId,
-            TraceParent = Activity.Current?.Id, TraceState = Activity.Current?.TraceStateString,
-            Producer = InstitutionCreationService.Producer, Envelope = EventContract.Serialize(envelope),
-            Status = OutboxStatus.Pending, Attempts = 0, NextAttemptAt = now, CreatedAt = now,
+            BusinessReference = institution.InstitutionId,
+            CorrelationId = command.CorrelationId,
+            TraceParent = Activity.Current?.Id,
+            TraceState = Activity.Current?.TraceStateString,
+            Producer = InstitutionCreationService.Producer,
+            Envelope = EventContract.Serialize(envelope),
+            Status = OutboxStatus.Pending,
+            Attempts = 0,
+            NextAttemptAt = now,
+            CreatedAt = now,
         });
 
         await using var transaction = await _context.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);

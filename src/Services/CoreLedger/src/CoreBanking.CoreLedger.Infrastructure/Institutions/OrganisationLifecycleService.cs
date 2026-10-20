@@ -81,8 +81,15 @@ public sealed class OrganisationLifecycleService : IOrganisationLifecycleService
         DateTimeOffset now = _timeProvider.GetUtcNow();
         RegionRecord region = new()
         {
-            InstitutionId = command.InstitutionId.Value, RegionId = command.RegionId.Trim(), Code = command.Code.Trim().ToLowerInvariant(),
-            Name = command.Name.Trim(), Status = "draft", CreatedByActorId = command.ActorId.Value, Version = 1, CreatedAt = now, UpdatedAt = now,
+            InstitutionId = command.InstitutionId.Value,
+            RegionId = command.RegionId.Trim(),
+            Code = command.Code.Trim().ToLowerInvariant(),
+            Name = command.Name.Trim(),
+            Status = "draft",
+            CreatedByActorId = command.ActorId.Value,
+            Version = 1,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
         _context.Regions.Add(region);
         AddHistory(command.InstitutionId.Value, "region", region.RegionId, null, "draft", command.ActorId.Value, null, command.CorrelationId, now);
@@ -105,9 +112,16 @@ public sealed class OrganisationLifecycleService : IOrganisationLifecycleService
         DateTimeOffset now = _timeProvider.GetUtcNow();
         BranchRecord branch = new()
         {
-            InstitutionId = command.InstitutionId.Value, BranchId = command.BranchId.Trim(), RegionId = region.RegionId,
-            Code = command.Code.Trim().ToLowerInvariant(), Name = command.Name.Trim(), Status = "draft",
-            CreatedByActorId = command.ActorId.Value, Version = 1, CreatedAt = now, UpdatedAt = now,
+            InstitutionId = command.InstitutionId.Value,
+            BranchId = command.BranchId.Trim(),
+            RegionId = region.RegionId,
+            Code = command.Code.Trim().ToLowerInvariant(),
+            Name = command.Name.Trim(),
+            Status = "draft",
+            CreatedByActorId = command.ActorId.Value,
+            Version = 1,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
         _context.Branches.Add(branch);
         AddHistory(command.InstitutionId.Value, "branch", branch.BranchId, null, "draft", command.ActorId.Value, null, command.CorrelationId, now);
@@ -242,8 +256,16 @@ public sealed class OrganisationLifecycleService : IOrganisationLifecycleService
     private void AddHistory(string institutionId, string type, string resourceId, string? previous, string next, string actor, string? reason, string correlationId, DateTimeOffset at) =>
         _context.OrganisationStatusHistory.Add(new OrganisationStatusHistoryRecord
         {
-            InstitutionId = institutionId, HistoryId = Guid.NewGuid().ToString("N"), ResourceType = type, ResourceId = resourceId,
-            PreviousStatus = previous, NewStatus = next, ChangedByActorId = actor, Reason = reason, CorrelationId = correlationId, ChangedAt = at,
+            InstitutionId = institutionId,
+            HistoryId = Guid.NewGuid().ToString("N"),
+            ResourceType = type,
+            ResourceId = resourceId,
+            PreviousStatus = previous,
+            NewStatus = next,
+            ChangedByActorId = actor,
+            Reason = reason,
+            CorrelationId = correlationId,
+            ChangedAt = at,
         });
 
     private string AddOutbox<T>(string institutionId, string eventType, string reference, string correlationId, T payload, DateTimeOffset at)
@@ -251,17 +273,34 @@ public sealed class OrganisationLifecycleService : IOrganisationLifecycleService
         string eventId = Guid.NewGuid().ToString("N");
         IntegrationEventEnvelope envelope = new()
         {
-            EventId = eventId, EventType = eventType, SchemaVersion = 1, OccurredAt = at, InstitutionId = institutionId,
-            CorrelationId = correlationId, Producer = InstitutionCreationService.Producer, BusinessReference = reference,
+            EventId = eventId,
+            EventType = eventType,
+            SchemaVersion = 1,
+            OccurredAt = at,
+            InstitutionId = institutionId,
+            CorrelationId = correlationId,
+            Producer = InstitutionCreationService.Producer,
+            BusinessReference = reference,
             Payload = EventContract.Serialize(payload),
         };
         _context.OutboxMessages.Add(new OutboxRecord
         {
-            InstitutionId = institutionId, MessageId = Guid.NewGuid().ToString("N"), EventId = eventId, EventType = eventType,
-            SchemaVersion = 1, Topic = EventContract.TopicFor(InstitutionCreationService.Producer, InstitutionCreationService.EventFamily, 1),
-            BusinessReference = reference, CorrelationId = correlationId, TraceParent = Activity.Current?.Id,
-            TraceState = Activity.Current?.TraceStateString, Producer = InstitutionCreationService.Producer,
-            Envelope = EventContract.Serialize(envelope), Status = OutboxStatus.Pending, Attempts = 0, NextAttemptAt = at, CreatedAt = at,
+            InstitutionId = institutionId,
+            MessageId = Guid.NewGuid().ToString("N"),
+            EventId = eventId,
+            EventType = eventType,
+            SchemaVersion = 1,
+            Topic = EventContract.TopicFor(InstitutionCreationService.Producer, InstitutionCreationService.EventFamily, 1),
+            BusinessReference = reference,
+            CorrelationId = correlationId,
+            TraceParent = Activity.Current?.Id,
+            TraceState = Activity.Current?.TraceStateString,
+            Producer = InstitutionCreationService.Producer,
+            Envelope = EventContract.Serialize(envelope),
+            Status = OutboxStatus.Pending,
+            Attempts = 0,
+            NextAttemptAt = at,
+            CreatedAt = at,
         });
         return eventId;
     }
