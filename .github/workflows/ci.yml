@@ -51,7 +51,9 @@ jobs:
         run: dotnet format --verify-no-changes
 
       - name: Architecture tests
-        run: dotnet test --no-build --configuration Release --filter Category=Architecture
+        run: >-
+          dotnet test tests/CoreBanking.ArchitectureTests/CoreBanking.ArchitectureTests.csproj
+          --no-build --configuration Release --filter Category=Architecture
 
       # Database tests need the local infrastructure stack, so they are excluded here and run by
       # scripts/db-verify.ps1 wherever a PostgreSQL instance is available.

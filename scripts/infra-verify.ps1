@@ -270,7 +270,7 @@ Write-Host ''
 Write-Host '8. Backup and restore round trip' -ForegroundColor Cyan
 $scratchDatabase = 'smoke_restore_check'
 $dumpInContainer = '/tmp/infra-verify.dump'
-$dumpOnHost = Join-Path $env:TEMP 'infra-verify.dump'
+$dumpOnHost = Join-Path ([System.IO.Path]::GetTempPath()) 'infra-verify.dump'
 
 Invoke-External { docker exec -e "PGPASSWORD=$adminPassword" corebanking-postgres pg_dump --format=custom --file=$dumpInContainer --username cb_admin --dbname core_ledger_db } | Out-Null
 $copyOut = Invoke-External { docker cp "corebanking-postgres:$dumpInContainer" $dumpOnHost }
