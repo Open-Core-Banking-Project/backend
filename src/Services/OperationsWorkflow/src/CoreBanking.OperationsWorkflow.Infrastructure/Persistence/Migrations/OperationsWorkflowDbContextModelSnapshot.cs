@@ -265,6 +265,213 @@ namespace CoreBanking.OperationsWorkflow.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "integration");
                 });
 
+            modelBuilder.Entity("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.ApprovalDecisionRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("DecisionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("decision_id");
+
+                    b.Property<string>("ApproverActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("approver_actor_id");
+
+                    b.Property<DateTimeOffset>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("decision");
+
+                    b.Property<DateTimeOffset>("EntitlementValidFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("entitlement_valid_from");
+
+                    b.Property<DateTimeOffset>("EntitlementValidUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("entitlement_valid_until");
+
+                    b.Property<string>("EntitlementVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("entitlement_version");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("permission");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("SubjectHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subject_hash");
+
+                    b.Property<string>("SubjectVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("subject_version");
+
+                    b.HasKey("InstitutionId", "DecisionId");
+
+                    b.HasIndex("InstitutionId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "RequestId", "SubjectVersion", "SubjectHash")
+                        .IsUnique();
+
+                    b.ToTable("approval_decisions", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_approval_decisions_decision", "decision IN ('approved', 'rejected')");
+
+                            t.HasCheckConstraint("ck_approval_decisions_entitlement_current", "decided_at >= entitlement_valid_from AND decided_at < entitlement_valid_until");
+
+                            t.HasCheckConstraint("ck_approval_decisions_entitlement_period", "entitlement_valid_until > entitlement_valid_from");
+
+                            t.HasCheckConstraint("ck_approval_decisions_rejection_reason", "decision <> 'rejected' OR reason IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.ApprovalRequestRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("RequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("MakerActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("maker_actor_id");
+
+                    b.Property<string>("RequiredPermission")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("required_permission");
+
+                    b.Property<string>("SourceRequestKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_request_key");
+
+                    b.Property<string>("SourceService")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_service");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("SubjectHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subject_hash");
+
+                    b.Property<string>("SubjectId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("SubjectType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("subject_type");
+
+                    b.Property<string>("SubjectVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("subject_version");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.Property<string>("WorkflowDefinitionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("workflow_definition_hash");
+
+                    b.Property<string>("WorkflowKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("workflow_key");
+
+                    b.Property<string>("WorkflowVersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("workflow_version_id");
+
+                    b.HasKey("InstitutionId", "RequestId");
+
+                    b.HasIndex("InstitutionId", "SourceService", "SourceRequestKey")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "SubjectType", "SubjectId", "SubjectVersion", "SubjectHash");
+
+                    b.ToTable("approval_requests", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_approval_requests_status", "status IN ('submitted', 'approved', 'rejected')");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.InstitutionBoundaryRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -303,6 +510,16 @@ namespace CoreBanking.OperationsWorkflow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_institution_boundaries_status", "status IN ('provisioning', 'active', 'suspended')");
                         });
+                });
+
+            modelBuilder.Entity("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.ApprovalDecisionRecord", b =>
+                {
+                    b.HasOne("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.ApprovalRequestRecord", null)
+                        .WithOne()
+                        .HasForeignKey("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.ApprovalDecisionRecord", "InstitutionId", "RequestId", "SubjectVersion", "SubjectHash")
+                        .HasPrincipalKey("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.ApprovalRequestRecord", "InstitutionId", "RequestId", "SubjectVersion", "SubjectHash")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

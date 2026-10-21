@@ -721,6 +721,291 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationPublicationRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("PublicationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("publication_id");
+
+                    b.Property<string>("ApprovalReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("approval_reference");
+
+                    b.Property<string>("ConfigurationSetId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("configuration_set_id");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTimeOffset>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTimeOffset?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_to");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("PublishedByActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("published_by_actor_id");
+
+                    b.Property<string>("VersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("InstitutionId", "PublicationId");
+
+                    b.HasIndex("InstitutionId", "VersionId")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "ConfigurationSetId", "EffectiveFrom")
+                        .IsUnique();
+
+                    b.ToTable("configuration_publications", "institution", t =>
+                        {
+                            t.HasCheckConstraint("ck_configuration_publications_effective_period", "effective_to IS NULL OR effective_to > effective_from");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationSetRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("ConfigurationSetId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("configuration_set_id");
+
+                    b.Property<string>("Area")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("area");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("scope");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "ConfigurationSetId");
+
+                    b.HasIndex("InstitutionId", "Area", "Scope")
+                        .IsUnique();
+
+                    b.ToTable("configuration_sets", "institution");
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationSimulationRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("SimulationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("simulation_id");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("DatasetVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("dataset_version");
+
+                    b.Property<string>("Engine")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("engine");
+
+                    b.Property<string>("InputHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_hash");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("OutputHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("output_hash");
+
+                    b.Property<DateTimeOffset>("SimulatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("simulated_at");
+
+                    b.Property<string>("VersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("InstitutionId", "SimulationId");
+
+                    b.HasIndex("InstitutionId", "VersionId", "InputHash")
+                        .IsUnique();
+
+                    b.ToTable("configuration_simulations", "institution", t =>
+                        {
+                            t.HasCheckConstraint("ck_configuration_simulations_outcome", "outcome IN ('passed', 'failed')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationVersionRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("VersionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("version_id");
+
+                    b.Property<string>("ApprovalReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("approval_reference");
+
+                    b.Property<string>("ApprovedByActorId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("approved_by_actor_id");
+
+                    b.Property<string>("ConfigurationSetId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("configuration_set_id");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("ContentJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("content_json");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedByActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by_actor_id");
+
+                    b.Property<DateTimeOffset?>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTimeOffset?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_to");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("RollbackOfVersionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("rollback_of_version_id");
+
+                    b.Property<string>("Schema")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("schema");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("version_number");
+
+                    b.HasKey("InstitutionId", "VersionId");
+
+                    b.HasIndex("InstitutionId", "RollbackOfVersionId");
+
+                    b.HasIndex("InstitutionId", "ConfigurationSetId", "Status");
+
+                    b.HasIndex("InstitutionId", "ConfigurationSetId", "VersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_configuration_versions_institution_id_configuration_set_id~1");
+
+                    b.ToTable("configuration_versions", "institution", t =>
+                        {
+                            t.HasCheckConstraint("ck_configuration_versions_effective_period", "(effective_to IS NULL OR (effective_from IS NOT NULL AND effective_to > effective_from)) AND (status NOT IN ('published', 'superseded') OR effective_from IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_configuration_versions_number", "version_number > 0");
+
+                            t.HasCheckConstraint("ck_configuration_versions_status", "status IN ('draft', 'submitted', 'approved', 'published', 'superseded')");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.InstitutionRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -907,6 +1192,65 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("organisation_status_history", "institution", t =>
                         {
                             t.HasCheckConstraint("ck_organisation_history_resource", "resource_type IN ('region', 'branch')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ProductRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("ProductId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("ConfigurationSetId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("configuration_set_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedByActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by_actor_id");
+
+                    b.Property<string>("Family")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("family");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "ProductId");
+
+                    b.HasIndex("InstitutionId", "Code")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "ConfigurationSetId")
+                        .IsUnique();
+
+                    b.ToTable("account_products", "product", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_products_family", "family IN ('savings')");
                         });
                 });
 
@@ -1125,6 +1469,53 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                     b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.BusinessCalendarRecord", null)
                         .WithMany()
                         .HasForeignKey("InstitutionId", "CalendarId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationPublicationRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationSetRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "ConfigurationSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationVersionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationSimulationRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationVersionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationVersionRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationSetRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "ConfigurationSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationVersionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "RollbackOfVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ProductRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.ConfigurationSetRecord", null)
+                        .WithOne()
+                        .HasForeignKey("CoreBanking.CoreLedger.Infrastructure.Persistence.ProductRecord", "InstitutionId", "ConfigurationSetId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

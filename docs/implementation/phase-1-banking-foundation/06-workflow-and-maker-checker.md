@@ -27,7 +27,7 @@ dependencies:
   - Phase 1 - Institution and Tenancy
   - Phase 1 - Identity, Roles and Permissions
   - Phase 1 - Core Ledger and Financial Posting
-last_updated: 2026-10-15
+last_updated: 2026-10-21
 ---
 
 # Epic: Workflow and Maker-Checker
@@ -334,6 +334,7 @@ Simulation validates reachability, terminal paths, impossible quorum, contradict
 | GET | `/api/v1/work-items` | Authenticated approver | Bounded eligible/assigned filters | `WorkItemPage` | Yes |
 | POST | `/api/v1/work-items/{id}/claim` | Required step permission | Expected version | `WorkItemResponse` | Yes |
 | POST | `/api/v1/work-items/{id}/decisions` | Required step permission | `CreateDecisionRequest` | `ApprovalDecisionResponse` | By decision ID |
+| POST | `/api/v1/institutions/{institutionId}/approval-requests/{requestId}/decision` | `product.version.approve` plus step-up | `DecideApprovalRequestV1` plus `Idempotency-Key` | `ApprovalDecisionResponseV1` | By idempotency key |
 | POST | `/api/v1/work-items/{id}/release` | Assignee/supervisor permission | Reason/version | `WorkItemResponse` | Yes |
 | POST | `/api/v1/work-items/{id}/assignments` | `workflow.work_item.assign` | Actor/queue/reason/version | `WorkItemResponse` | By request ID |
 | GET | `/api/v1/approval-requests/{id}` | Maker/approver/source-scoped view | Safe fields | `ApprovalRequestResponse` | Yes |
@@ -581,6 +582,8 @@ Missing configuration blocks the affected process/action. Feature flags cannot b
 
 ## 19. Implementation slices
 
+Implementation progress as of 2026-10-21: ADR-0016 approves the first narrow profile, `product.savings.eligibility.publish.v1`, as a single-stage one-level maker-checker flow. The domain pins each request to the immutable profile version and definition hash, exact source subject version/hash, maker and required permission. Decisions fail closed for self-approval, wrong institution or permission, and entitlement evidence whose validity does not contain the decision instant; rejection requires a reason and final decisions are immutable. Versioned request/decision contracts and tenant-scoped persistence records enforce source-request idempotency, optimistic concurrency and one decision per request. The migration is generated. A Kafka inbox consumer now validates and idempotently ingests `ApprovalRequested.v1` only from Core Ledger and only for the approved profile. The decision application service re-resolves the exact permission and current entitlement version at decision time through a fail-closed Identity port, records the immutable decision and entitlement evidence, and commits `ApprovalDecided.v1` to the local outbox atomically. Core Ledger consumes that decision idempotently and refuses any request, version or content-hash mismatch. The authenticated institution-scoped decision API is now implemented: it requires the stable `product.version.approve` capability, step-up authentication, a server-side grant, exact tenant scope and an `Idempotency-Key`; the application layer then independently performs decision-time entitlement revalidation. Development uses an explicit synthetic actor/grant adapter, while non-development remains fail-closed. A production service-authenticated Identity adapter remains deliberately inaccessible until ADR-0008 and ADR-0009 delivery configuration is approved.
+
 1. Approve definition DSL/schema, approval patterns, routing ownership, SLA/calendar, case taxonomy, override and retention decisions.
 2. Define versioned definition, approval, case, action and event contracts plus architecture/security tests.
 3. Implement workflow definition/version simulation and publication lifecycle.
@@ -668,11 +671,11 @@ Use `TimeProvider`/controlled clocks for deterministic SLA tests and real Postgr
 
 | Decision | Impact | Owner | Required by | Status |
 | --- | --- | --- | --- | --- |
-| Definition DSL/schema and supported approval patterns | Engine scope/security | Architecture/Operations | Slice 1 | Open |
-| Initial workflow catalogue and source namespaces | Phase 1 integration scope | Product/Domain owners | Slice 1 | Open |
-| Thresholds, quorum and unique-approver policies | Maker-checker outcomes | Risk/Compliance/Domain owners | Slice 5 | Open |
-| Candidate resolution/cache/freshness policy | Security and availability | Identity/Security | Slice 5 | Open |
-| Delegation and reassignment policy | Approver continuity/SoD | Security/Operations | Slice 5 | Open |
+| Definition DSL/schema and supported approval patterns | Initial typed one-level profile approved; generic schema/patterns remain open | Architecture/Operations | Slice 1 | Partially approved by ADR-0016 |
+| Initial workflow catalogue and source namespaces | Savings eligibility publication from Core Ledger | Product/Domain owners | Slice 1 | Approved by ADR-0016 |
+| Thresholds, quorum and unique-approver policies | Initial profile has one independent approver and no thresholds/quorum; general policy remains open | Risk/Compliance/Domain owners | Slice 5 | Partially approved by ADR-0016 |
+| Candidate resolution/cache/freshness policy | Decision-time current entitlement evidence required; discovery/cache policy remains open | Identity/Security | Slice 5 | Partially approved by ADR-0016 |
+| Delegation and reassignment policy | Disabled for the initial profile; general policy remains open | Security/Operations | Slice 5 | Partially approved by ADR-0016 |
 | Business calendars, SLA pause and escalation rules | Deadlines/compliance | Operations/Compliance | Slice 7 | Open |
 | Definition/instance migration policy | Running process behaviour | Architecture/Operations | Before migration feature | Open |
 | Complaint/service taxonomy and customer communications | US-049 scope | Customer Service/Product | Slice 9 | Open |

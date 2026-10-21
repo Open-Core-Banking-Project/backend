@@ -1,6 +1,7 @@
 using System;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.CoreLedger.Application.Institutions;
+using CoreBanking.CoreLedger.Application.Products;
 
 namespace CoreBanking.CoreLedger.Api.Authorisation;
 
@@ -9,6 +10,8 @@ public static class DevelopmentAuthorisationSeed
     public const string InstitutionValue = "dev-institution";
     public const string MakerActorValue = "dev-platform-maker";
     public const string ApproverActorValue = "dev-platform-approver";
+    public const string ProductPublisherActorValue = "dev-product-publisher";
+    public const string ProductMakerActorValue = "dev-product-maker";
 
     public static void Apply(IServiceProvider services)
     {
@@ -21,5 +24,8 @@ public static class DevelopmentAuthorisationSeed
         store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.Activate);
         store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.CalendarManage);
         store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.BusinessDateAdvance);
+        store.Grant(ActorId.From(ProductPublisherActorValue), institutionId, ProductPermissions.Publish);
+        store.Grant(ActorId.From(ProductMakerActorValue), institutionId, ProductPermissions.Update);
+        store.Grant(ActorId.From(ProductMakerActorValue), institutionId, ProductPermissions.Simulate);
     }
 }

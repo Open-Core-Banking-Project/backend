@@ -6,6 +6,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\CoreBanking.OperationsWorkflow.Api\CoreBanking.OperationsWorkflow.Api.csproj" />
     <ProjectReference Include="..\..\src\CoreBanking.OperationsWorkflow.Infrastructure\CoreBanking.OperationsWorkflow.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

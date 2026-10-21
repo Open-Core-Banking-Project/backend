@@ -25,7 +25,7 @@ dependencies:
   - Phase 1 - Institution and Tenancy
   - Phase 1 - Identity, Roles and Permissions
   - Phase 1 - Customer and Onboarding
-last_updated: 2026-10-15
+last_updated: 2026-10-21
 ---
 
 # Epic: Products and Accounts
@@ -324,11 +324,11 @@ Simulation rules:
 | Method | Route | Permission | Request | Response | Idempotent |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/products` | `product.definition.create` | `CreateProductRequest` | `ProductResponse` | By request ID |
-| POST | `/api/v1/products/{id}/versions` | `product.version.update` | `CreateProductVersionRequest` | `ProductVersionResponse` | By request ID |
+| POST | `/api/v1/institutions/{institutionId}/products/{productId}/savings-eligibility/versions` | `product.version.update` plus step-up | `CreateSavingsEligibilityDraftRequestV1` plus `Idempotency-Key` | `SavingsEligibilityDraftResponseV1` | By idempotency key |
 | PATCH | `/api/v1/product-versions/{id}` | `product.version.update` | Explicit fields plus expected version | `ProductVersionResponse` | By concurrency version |
-| POST | `/api/v1/product-versions/{id}/simulations` | `product.version.simulate` | `ProductSimulationRequest` | `ProductSimulationResponse` | By request/input hash |
-| POST | `/api/v1/product-versions/{id}/submit` | `product.version.update` | Version/hash/reason | `ProductVersionResponse` | Yes |
-| POST | `/api/v1/product-versions/{id}/publish` | `product.version.publish` | Approved version/hash/effective time | `ProductVersionResponse` | Yes |
+| POST | `/api/v1/institutions/{institutionId}/product-versions/{versionId}/simulations` | `product.version.simulate` | `SimulateSavingsEligibilityRequestV1` plus `Idempotency-Key` | `SavingsEligibilitySimulationResponseV1` | By input/hash and idempotency key |
+| POST | `/api/v1/institutions/{institutionId}/product-versions/{versionId}/submit` | `product.version.update` plus step-up | `SubmitSavingsEligibilityRequestV1` plus `Idempotency-Key` | `SavingsEligibilityApprovalSubmissionResponseV1` | By idempotency key |
+| POST | `/api/v1/institutions/{institutionId}/product-versions/{versionId}/publish` | `product.version.publish` plus step-up | `PublishSavingsEligibilityRequestV1` plus `Idempotency-Key` | `SavingsEligibilityPublicationResponseV1` | By idempotency key |
 | GET | `/api/v1/products` | `product.catalogue.view` | Bounded filters/effective date | `ProductPage` | Yes |
 | POST | `/api/v1/account-applications` | `account.open` | `CreateAccountApplicationRequest` | `AccountApplicationResponse` | By request ID |
 | POST | `/api/v1/account-applications/{id}/submit` | `account.open` | Expected version/reason | `AccountApplicationResponse` | Yes |
@@ -544,6 +544,8 @@ Financial behaviour is versioned, simulated, approved, effective-dated and audit
 
 ## 17. Implementation slices
 
+Implementation progress as of 2026-10-21: the first configuration-area engine is implemented for `product_eligibility.v1`. It uses typed explicit criteria for customer type, KYC tier, segment, risk rating, age range, branch, residency and currency. Simulation requires versioned synthetic inputs, returns a deterministic per-rule trace plus stable content/input/output hashes, compares every scenario with its expected outcome and unlocks submission only when the exact content hash passes. Persisted rule content is parsed back through a strict allow-listed schema; unknown fields and executable-style extensions are rejected. ADR-0015 approves Savings as the first live Phase 1 family and requires final account approval to re-fetch and re-evaluate current authoritative customer, branch and currency facts; expired facts fail closed. Institution-defined product codes are stable within each institution. Published versions use non-overlapping half-open effective periods and exact as-of selection; publication is serialized with the configuration-set optimistic-concurrency token. Tenant-scoped product identities, configuration sets, versions, simulations and publication evidence have EF Core mappings and migrations. Authenticated, institution-scoped APIs now expose idempotent draft creation, exact-hash simulation and Workflow submission with separate stable capability permissions; their contracts cannot assign trusted institution, actor, approval or status fields. Submission accepts only the exact successfully simulated content and commits `ApprovalRequested.v1` through the transactional outbox. Core Ledger consumes `ApprovalDecided.v1` idempotently and applies it only to the exact submitted request, version number and content hash; approval moves the version to `approved`, while rejection returns it to `draft` without erasing the decision evidence retained by Workflow and the inbox. The publication endpoint requires `product.version.publish`, step-up authentication and an idempotency key. It binds to the stored Workflow approval and exact content hash, revalidates the typed stored rules, rejects maker self-publication and overlapping half-open periods, serializes concurrent schedules through the configuration-set token, and atomically records publication evidence plus `ProductVersionPublished.v1` in the outbox. Non-development access remains fail-closed pending the production Identity adapter. The Savings configuration journey is now callable end to end in Development. An internal, tenant-scoped eligibility boundary now resolves exactly one effective published Savings version at a requested instant, revalidates its stored hash and typed rules, evaluates authoritative versioned customer/branch/currency facts, and returns exact source-version evidence; missing, ambiguous, stale or corrupt configuration fails closed. It is deliberately not exposed as a public endpoint until the authoritative customer, branch and currency transport contracts in slice 6 are approved, and account opening remains inaccessible.
+
 1. Approve product taxonomy, account-number, rounding/calculation, restriction/lien, dormancy and statement ownership decisions.
 2. Define versioned Product, Account, Control and Statement contracts plus module architecture tests.
 3. Implement product identity/version lifecycle and typed rule persistence with migration tests.
@@ -634,14 +636,14 @@ Performance tests use approved product/account volumes and contention profiles. 
 
 | Decision | Impact | Owner | Required by | Status |
 | --- | --- | --- | --- | --- |
-| Phase 1 live product families | Scope and rule engines | Product/Architecture | Slice 1 | Open |
-| Product/version code and coexistence rules | Uniqueness/effective selection | Product | Slice 3 | Open |
+| Phase 1 live product families | Scope and rule engines | Product/Architecture | Slice 1 | Savings approved by ADR-0015; all other families disabled |
+| Product/version code and coexistence rules | Institution-defined code; half-open non-overlapping periods; exact as-of selection | Product | Slice 3 | Approved by ADR-0015 |
 | Decimal precision, rate scale and rounding points | Financial correctness | Finance/Product | Slice 4 | Open |
 | Interest/day-count/accrual/capitalisation rules | Simulation and later EOD | Finance/Product | Slice 4 | Open |
 | Fee/tax definitions and legal approval | Pricing correctness | Finance/Tax/Compliance | Slice 4 | Open |
 | Account-number format, scope, check digit and exhaustion | Allocation and migration | Institution/Core operations | Slice 8 | Open |
 | Multiple-account-per-product/customer rules | Duplicate opening behaviour | Product/Risk | Slice 7 | Open |
-| Eligibility freshness/final recheck point | Race and customer-state risk | Product/Compliance | Slice 7 | Open |
+| Eligibility freshness/final recheck point | Race and customer-state risk | Product/Compliance | Slice 7 | Recheck current authoritative facts at final approval per ADR-0015 |
 | Account approval/activation sequence | Number exposure and workflow | Operations/Product | Slice 9 | Open |
 | Restriction/freeze/block precedence | Ledger allow/deny outcome | Legal/Risk/Core | Slice 10 | Open |
 | Lien priority, partial use and release authority | Available balance/legal control | Legal/Finance/Core | Slice 11 | Open |

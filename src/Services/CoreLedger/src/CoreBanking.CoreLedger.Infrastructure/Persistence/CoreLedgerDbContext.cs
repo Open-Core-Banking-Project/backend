@@ -46,6 +46,16 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public DbSet<BusinessDateHistoryRecord> BusinessDateHistory => Set<BusinessDateHistoryRecord>();
 
+    public DbSet<ConfigurationSetRecord> ConfigurationSets => Set<ConfigurationSetRecord>();
+
+    public DbSet<ConfigurationVersionRecord> ConfigurationVersions => Set<ConfigurationVersionRecord>();
+
+    public DbSet<ConfigurationSimulationRecord> ConfigurationSimulations => Set<ConfigurationSimulationRecord>();
+
+    public DbSet<ConfigurationPublicationRecord> ConfigurationPublications => Set<ConfigurationPublicationRecord>();
+
+    public DbSet<ProductRecord> Products => Set<ProductRecord>();
+
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
 
     public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
@@ -85,6 +95,11 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<BusinessDateControlRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<BusinessDateAdvanceRequestRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<BusinessDateHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ConfigurationSetRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ConfigurationVersionRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ConfigurationSimulationRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ConfigurationPublicationRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ProductRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InboxRecord>().HasQueryFilter(record =>

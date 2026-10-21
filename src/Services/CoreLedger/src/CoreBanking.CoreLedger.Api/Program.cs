@@ -12,11 +12,14 @@ using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.CoreLedger.Api.Authorisation;
 using CoreBanking.CoreLedger.Application.Institutions;
+using CoreBanking.CoreLedger.Application.Products;
 using CoreBanking.CoreLedger.Application.Provisioning;
 using CoreBanking.CoreLedger.Contracts;
 using CoreBanking.CoreLedger.Domain.Institutions;
+using CoreBanking.CoreLedger.Domain.Products;
 using CoreBanking.CoreLedger.Infrastructure.Institutions;
 using CoreBanking.CoreLedger.Infrastructure.Persistence;
+using CoreBanking.CoreLedger.Infrastructure.Products;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -86,6 +89,8 @@ if (useRelationalStore)
     builder.Services.AddScoped<IInstitutionSuspensionService, InstitutionSuspensionService>();
     builder.Services.AddScoped<IOrganisationLifecycleService, OrganisationLifecycleService>();
     builder.Services.AddScoped<IBusinessCalendarService, BusinessCalendarService>();
+    builder.Services.AddScoped<ISavingsProductConfigurationService, SavingsProductConfigurationService>();
+    builder.Services.AddScoped<ISavingsEligibilityEvaluationService, SavingsEligibilityEvaluationService>();
 }
 
 CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBankingObservability(
@@ -304,6 +309,7 @@ if (useRelationalStore)
 
     MapOrganisationLifecycleEndpoints(app);
     MapBusinessCalendarEndpoints(app);
+    MapSavingsProductEndpoints(app);
 }
 
 app.Run();
@@ -329,6 +335,292 @@ static IResult Problem(string code, string title, string detail, int status) =>
         statusCode: status,
         title: title,
         extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = code });
+
+static void MapSavingsProductEndpoints(WebApplication app)
+{
+    app.MapPost("/api/v1/institutions/{institutionId}/products/{productId}/savings-eligibility/versions", async (
+        HttpContext http,
+        string institutionId,
+        string productId,
+        CreateSavingsEligibilityDraftRequestV1 request,
+        ISavingsProductConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ArgumentNullException.ThrowIfNull(request.Rules);
+            SavingsEligibilityDraftResult result = await service.CreateDraftAsync(
+                new CreateSavingsEligibilityDraftCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    productId,
+                    request.ProductCode,
+                    request.VersionId,
+                    request.VersionNumber,
+                    ToRules(request.Rules),
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new SavingsEligibilityDraftResponseV1(
+                result.InstitutionId,
+                result.ProductId,
+                result.ProductCode,
+                result.VersionId,
+                result.VersionNumber,
+                result.ContentHash,
+                result.Status,
+                result.ChangedAt,
+                result.Replayed));
+        }
+        catch (SavingsProductConfigurationRejectedException exception)
+        {
+            return SavingsProductProblem(exception, "Product draft rejected");
+        }
+        catch (SavingsProductConfigurationInProgressException exception)
+        {
+            return SavingsProductInProgress(exception);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid product draft", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        ProductPermissions.UpdateRequirement,
+        "product.savings.eligibility.draft.create"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/product-versions/{versionId}/simulations", async (
+        HttpContext http,
+        string institutionId,
+        string versionId,
+        SimulateSavingsEligibilityRequestV1 request,
+        ISavingsProductConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ArgumentNullException.ThrowIfNull(request.Scenarios);
+            SavingsEligibilitySimulationCommandResult result = await service.SimulateAsync(
+                new SimulateSavingsEligibilityCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    versionId,
+                    request.ContentHash,
+                    request.SimulationId,
+                    request.Scenarios.Select(ToScenario).ToArray(),
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new SavingsEligibilitySimulationResponseV1(
+                result.InstitutionId,
+                result.VersionId,
+                result.SimulationId,
+                result.ContentHash,
+                result.InputHash,
+                result.OutputHash,
+                result.Outcome,
+                result.SimulatedAt,
+                result.Replayed));
+        }
+        catch (SavingsProductConfigurationRejectedException exception)
+        {
+            return SavingsProductProblem(exception, "Product simulation rejected");
+        }
+        catch (SavingsProductConfigurationInProgressException exception)
+        {
+            return SavingsProductInProgress(exception);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid product simulation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        ProductPermissions.SimulateRequirement,
+        "product.savings.eligibility.simulate"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/product-versions/{versionId}/submit", async (
+        HttpContext http,
+        string institutionId,
+        string versionId,
+        SubmitSavingsEligibilityRequestV1 request,
+        ISavingsProductConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            SavingsEligibilityApprovalSubmissionResult result = await service.SubmitForApprovalAsync(
+                new SubmitSavingsEligibilityForApprovalCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    request.RequestId,
+                    request.SourceRequestKey,
+                    versionId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Accepted(
+                value: new SavingsEligibilityApprovalSubmissionResponseV1(
+                    result.InstitutionId,
+                    result.RequestId,
+                    result.VersionId,
+                    result.ContentHash,
+                    result.EventId,
+                    result.Status,
+                    result.SubmittedAt,
+                    result.Replayed));
+        }
+        catch (SavingsProductConfigurationRejectedException exception)
+        {
+            return SavingsProductProblem(exception, "Product approval submission rejected");
+        }
+        catch (SavingsProductConfigurationInProgressException exception)
+        {
+            return SavingsProductInProgress(exception);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid product approval submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        ProductPermissions.UpdateRequirement,
+        "product.savings.eligibility.approval.submit"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/product-versions/{versionId}/publish", async (
+        HttpContext http,
+        string institutionId,
+        string versionId,
+        PublishSavingsEligibilityRequestV1 request,
+        ISavingsProductConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            SavingsEligibilityPublicationResult result = await service.PublishAsync(
+                new PublishSavingsEligibilityCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    request.PublicationId,
+                    versionId,
+                    request.ContentHash,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new SavingsEligibilityPublicationResponseV1(
+                result.InstitutionId,
+                result.PublicationId,
+                result.ProductId,
+                result.VersionId,
+                result.ContentHash,
+                result.EventId,
+                result.Status,
+                result.EffectiveFrom,
+                result.EffectiveTo,
+                result.PublishedAt,
+                result.Replayed));
+        }
+        catch (SavingsProductConfigurationRejectedException exception)
+        {
+            return SavingsProductProblem(exception, "Product publication rejected");
+        }
+        catch (SavingsProductConfigurationInProgressException exception)
+        {
+            return SavingsProductInProgress(exception);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid product publication", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        ProductPermissions.PublishRequirement,
+        "product.savings.eligibility.publish"));
+}
+
+static ProductEligibilityRules ToRules(SavingsEligibilityRulesV1 rules) => ProductEligibilityRules.Create(
+    rules.RuleSetId,
+    rules.Version,
+    ToCodeCriterion(rules.CustomerTypes, nameof(rules.CustomerTypes)),
+    ToCodeCriterion(rules.KycTiers, nameof(rules.KycTiers)),
+    ToCodeCriterion(rules.Segments, nameof(rules.Segments)),
+    ToCodeCriterion(rules.RiskRatings, nameof(rules.RiskRatings)),
+    ToAgeCriterion(rules.Ages),
+    ToCodeCriterion(rules.Branches, nameof(rules.Branches)),
+    ToCodeCriterion(rules.ResidencyCountries, nameof(rules.ResidencyCountries)),
+    ToCodeCriterion(rules.Currencies, nameof(rules.Currencies)));
+
+static EligibilityCodeCriterion ToCodeCriterion(EligibilityCodeCriterionV1 criterion, string name)
+{
+    ArgumentNullException.ThrowIfNull(criterion, name);
+    ArgumentNullException.ThrowIfNull(criterion.Values, name);
+    return criterion.Mode?.Trim().ToLowerInvariant() switch
+    {
+        "any" when criterion.Values.Count == 0 => EligibilityCodeCriterion.Any(),
+        "allow" => EligibilityCodeCriterion.Only(criterion.Values),
+        _ => throw new ArgumentException($"{name} must use mode 'any' with no values or mode 'allow' with values.", name),
+    };
+}
+
+static EligibilityAgeCriterion ToAgeCriterion(EligibilityAgeCriterionV1 criterion)
+{
+    ArgumentNullException.ThrowIfNull(criterion);
+    return criterion.Mode?.Trim().ToLowerInvariant() switch
+    {
+        "any" when criterion.MinimumYears is null && criterion.MaximumYears is null => EligibilityAgeCriterion.Any(),
+        "range" when criterion.MinimumYears is int minimum && criterion.MaximumYears is int maximum =>
+            EligibilityAgeCriterion.Between(minimum, maximum),
+        _ => throw new ArgumentException("Ages must use mode 'any' with no bounds or mode 'range' with both bounds.", nameof(criterion)),
+    };
+}
+
+static ProductEligibilitySimulationInput ToScenario(ProductEligibilitySimulationScenarioV1 scenario)
+{
+    ArgumentNullException.ThrowIfNull(scenario);
+    return new ProductEligibilitySimulationInput(
+        scenario.ScenarioId,
+        scenario.DatasetVersion,
+        scenario.CustomerFactsVersion,
+        scenario.BranchReferenceVersion,
+        scenario.CurrencyReferenceVersion,
+        scenario.CustomerType,
+        scenario.KycTier,
+        scenario.Segment,
+        scenario.RiskRating,
+        scenario.AgeYears,
+        scenario.BranchCode,
+        scenario.ResidencyCountryCode,
+        scenario.CurrencyCode,
+        scenario.ExpectedEligible);
+}
+
+static IResult SavingsProductProblem(SavingsProductConfigurationRejectedException exception, string title)
+{
+    int status = exception.Code switch
+    {
+        "cross_tenant_access_denied" or "product_self_publication" => StatusCodes.Status403Forbidden,
+        "product_version_not_found" => StatusCodes.Status404NotFound,
+        _ => StatusCodes.Status409Conflict,
+    };
+    return Problem(exception.Code, title, exception.Message, status);
+}
+
+static IResult SavingsProductInProgress(SavingsProductConfigurationInProgressException exception) => Problem(
+    "request.idempotency_in_progress",
+    "Product configuration request in progress",
+    exception.Message,
+    StatusCodes.Status409Conflict);
 
 static void MapOrganisationLifecycleEndpoints(WebApplication app)
 {

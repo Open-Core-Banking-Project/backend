@@ -22,6 +22,10 @@ public sealed class OperationsWorkflowDbContext : DbContext, IIntegrationStore
 
     public DbSet<InstitutionBoundaryRecord> InstitutionBoundaries => Set<InstitutionBoundaryRecord>();
 
+    public DbSet<ApprovalRequestRecord> ApprovalRequests => Set<ApprovalRequestRecord>();
+
+    public DbSet<ApprovalDecisionRecord> ApprovalDecisions => Set<ApprovalDecisionRecord>();
+
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
 
     public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
@@ -36,6 +40,7 @@ public sealed class OperationsWorkflowDbContext : DbContext, IIntegrationStore
     {
         System.ArgumentNullException.ThrowIfNull(modelBuilder);
         base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(OperationsWorkflowDbContext).Assembly);
         modelBuilder.ApplyIntegrationRecords();
         modelBuilder.Entity<InstitutionBoundaryRecord>(entity =>
         {
@@ -53,6 +58,8 @@ public sealed class OperationsWorkflowDbContext : DbContext, IIntegrationStore
             entity.Property(record => record.InitialisedAt).HasColumnName("initialised_at");
         });
         modelBuilder.Entity<InstitutionBoundaryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ApprovalRequestRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ApprovalDecisionRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<IdempotencyRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);

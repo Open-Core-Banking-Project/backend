@@ -49,6 +49,10 @@ ADR-NNNN-kebab-case-title.md
 
 **Scope only, awaiting an owner decision:** ADR-0005, ADR-0006, ADR-0012, ADR-0014.
 
+**Accepted 2026-10-20:** ADR-0015 (Phase 1 Savings eligibility and final-approval freshness).
+
+**Accepted 2026-10-21:** ADR-0016 (initial Workflow profile for Savings eligibility publication).
+
 Each accepted record states the narrow items that remain open, such as the production broker product, identity provider licensing, telemetry backends, retention periods, row-level security adoption and the production secret store. Those are tracked in the record's Approval gate section and must be closed before the corresponding production claim.
 
 | ID | Title | Architecture item | Referenced by |
@@ -67,6 +71,8 @@ Each accepted record states the narrow items that remain open, such as the produ
 | [ADR-0012](ADR-0012-channel-security-boundaries.md) | Channel security boundaries: USSD, WhatsApp, chatbot and CMS | 10 | [09-channels-cms-and-communications](../implementation/phase-1-banking-foundation/09-channels-cms-and-communications.md) (by topic) |
 | [ADR-0013](ADR-0013-deployment-migration-backup-restore-rto-and-rpo.md) | Deployment, migration execution, backup, restore, RTO and RPO | 13 | [12-operations-and-release-readiness](../implementation/phase-1-banking-foundation/12-operations-and-release-readiness.md) (by topic) |
 | [ADR-0014](ADR-0014-reporting-read-models-and-regulatory-lineage.md) | Reporting read models, regulatory lineage and analytical isolation | 14 | [10-regulatory-and-scheduled-reporting](../implementation/phase-2-regulated-operations/10-regulatory-and-scheduled-reporting.md), [01-enterprise-data-governance-lineage-and-ownership](../implementation/phase-5-optimisation/01-enterprise-data-governance-lineage-and-ownership.md) (by topic) |
+| [ADR-0015](ADR-0015-phase-1-savings-eligibility-and-freshness.md) | Phase 1 Savings eligibility and final-approval freshness | N/A | [04-products-and-accounts](../implementation/phase-1-banking-foundation/04-products-and-accounts.md) |
+| [ADR-0016](ADR-0016-initial-workflow-profile-for-savings-eligibility.md) | Initial Workflow profile for Savings eligibility publication | N/A | [04-products-and-accounts](../implementation/phase-1-banking-foundation/04-products-and-accounts.md), [06-workflow-and-maker-checker](../implementation/phase-1-banking-foundation/06-workflow-and-maker-checker.md) |
 
 ## Required by `BACKEND_ARCHITECTURE.md`
 
