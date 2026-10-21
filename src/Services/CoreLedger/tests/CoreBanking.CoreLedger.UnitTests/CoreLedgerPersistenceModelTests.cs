@@ -138,6 +138,52 @@ public sealed class CoreLedgerPersistenceModelTests
             && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "RequestId"]));
     }
 
+    [Fact]
+    public void Configuration_lifecycle_is_tenant_scoped_versioned_and_hash_bound()
+    {
+        using CoreLedgerDbContext context = CreateContext();
+        IEntityType set = context.Model.FindEntityType(typeof(ConfigurationSetRecord))!;
+        IEntityType version = context.Model.FindEntityType(typeof(ConfigurationVersionRecord))!;
+        IEntityType simulation = context.Model.FindEntityType(typeof(ConfigurationSimulationRecord))!;
+        IEntityType publication = context.Model.FindEntityType(typeof(ConfigurationPublicationRecord))!;
+
+        Assert.Equal(["InstitutionId", "ConfigurationSetId"], set.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Contains(set.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "Area", "Scope"]));
+        Assert.True(set.FindProperty(nameof(ConfigurationSetRecord.Version))!.IsConcurrencyToken);
+        Assert.Equal(["InstitutionId", "VersionId"], version.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.True(version.FindProperty(nameof(ConfigurationVersionRecord.Version))!.IsConcurrencyToken);
+        Assert.Equal("jsonb", version.FindProperty(nameof(ConfigurationVersionRecord.ContentJson))!.GetColumnType());
+        Assert.Contains(version.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "ConfigurationSetId", "VersionNumber"]));
+        Assert.Contains(simulation.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "VersionId", "InputHash"]));
+        Assert.Contains(publication.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "ConfigurationSetId", "EffectiveFrom"]));
+        Assert.NotNull(version.FindProperty(nameof(ConfigurationVersionRecord.EffectiveTo)));
+        Assert.NotNull(publication.FindProperty(nameof(ConfigurationPublicationRecord.EffectiveTo)));
+        Assert.DoesNotContain(version.GetProperties(), property =>
+            property.Name.Contains("Secret", StringComparison.OrdinalIgnoreCase)
+            || property.Name.Contains("Password", StringComparison.OrdinalIgnoreCase)
+            || property.Name.Contains("PrivateKey", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Savings_products_have_stable_tenant_scoped_identity_and_configuration_ownership()
+    {
+        using CoreLedgerDbContext context = CreateContext();
+        IEntityType product = context.Model.FindEntityType(typeof(ProductRecord))!;
+
+        Assert.Equal("product", product.GetSchema());
+        Assert.Equal("account_products", product.GetTableName());
+        Assert.Equal(["InstitutionId", "ProductId"], product.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Contains(product.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "Code"]));
+        Assert.Contains(product.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(x => x.Name).SequenceEqual(["InstitutionId", "ConfigurationSetId"]));
+        Assert.True(product.FindProperty(nameof(ProductRecord.Version))!.IsConcurrencyToken);
+    }
+
     private static CoreLedgerDbContext CreateContext()
     {
         DbContextOptions<CoreLedgerDbContext> options = new DbContextOptionsBuilder<CoreLedgerDbContext>()

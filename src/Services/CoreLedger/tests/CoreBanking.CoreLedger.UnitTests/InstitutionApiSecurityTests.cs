@@ -4,6 +4,7 @@ using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.CoreLedger.Api.Authorisation;
 using CoreBanking.CoreLedger.Application.Institutions;
+using CoreBanking.CoreLedger.Application.Products;
 using Xunit;
 
 namespace CoreBanking.CoreLedger.UnitTests;
@@ -33,6 +34,13 @@ public sealed class InstitutionApiSecurityTests
         Assert.True(InstitutionPermissions.CalendarPublishRequirement.IsRestrictedApproval);
         Assert.True(InstitutionPermissions.BusinessDateAdvanceRequirement.RequiresStepUp);
         Assert.True(InstitutionPermissions.BusinessDateAdvanceRequirement.IsRestrictedApproval);
+        Assert.Equal("product.version.publish", ProductPermissions.Publish.Value);
+        Assert.Equal("product.version.update", ProductPermissions.Update.Value);
+        Assert.Equal("product.version.simulate", ProductPermissions.Simulate.Value);
+        Assert.True(ProductPermissions.UpdateRequirement.RequiresStepUp);
+        Assert.False(ProductPermissions.SimulateRequirement.RequiresStepUp);
+        Assert.True(ProductPermissions.PublishRequirement.RequiresStepUp);
+        Assert.True(ProductPermissions.PublishRequirement.IsRestrictedApproval);
     }
 
     [Fact]

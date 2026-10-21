@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Domain\CoreBanking.BuildingBlocks.Domain.csproj" />
+  </ItemGroup>
+
   <PropertyGroup>
   </PropertyGroup>
 

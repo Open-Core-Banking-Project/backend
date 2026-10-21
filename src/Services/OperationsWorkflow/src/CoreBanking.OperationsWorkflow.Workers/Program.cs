@@ -4,6 +4,8 @@ using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
+using CoreBanking.OperationsWorkflow.Infrastructure;
+using CoreBanking.OperationsWorkflow.Infrastructure.Approvals;
 using CoreBanking.OperationsWorkflow.Infrastructure.Institutions;
 using CoreBanking.OperationsWorkflow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -41,7 +43,8 @@ public static partial class Program
         builder.Services.AddScoped(provider => new InboxProcessor(
             provider.GetRequiredService<IIntegrationStore>(), provider.GetRequiredService<TimeProvider>()));
         builder.Services.AddScoped<InstitutionProvisioningConsumer>();
-        builder.Services.AddScoped<IIntegrationEventConsumer>(provider => provider.GetRequiredService<InstitutionProvisioningConsumer>());
+        builder.Services.AddScoped<SavingsEligibilityApprovalRequestedConsumer>();
+        builder.Services.AddScoped<IIntegrationEventConsumer, OperationsWorkflowIntegrationEventConsumer>();
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
         builder.Services.AddKafkaEventPublisher(new KafkaMessagingOptions
@@ -52,8 +55,8 @@ public static partial class Program
         builder.Services.AddSingleton(new KafkaConsumerOptions
         {
             BootstrapServers = bootstrapServers,
-            GroupId = InstitutionProvisioningConsumer.ConsumerName,
-            Topics = [InstitutionProvisioningConsumer.TopicName],
+            GroupId = "operations-workflow.integration-events",
+            Topics = [InstitutionProvisioningConsumer.TopicName, SavingsEligibilityApprovalRequestedConsumer.TopicName],
         });
         builder.Services.AddHostedService<OutboxRelayWorker>();
         builder.Services.AddHostedService<KafkaInboxConsumerWorker>();

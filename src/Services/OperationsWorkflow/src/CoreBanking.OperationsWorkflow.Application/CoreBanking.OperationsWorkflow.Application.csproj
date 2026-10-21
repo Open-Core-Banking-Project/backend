@@ -2,6 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CoreBanking.OperationsWorkflow.Domain\CoreBanking.OperationsWorkflow.Domain.csproj" />
+    <ProjectReference Include="..\CoreBanking.OperationsWorkflow.Contracts\CoreBanking.OperationsWorkflow.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Application\CoreBanking.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Domain\CoreBanking.BuildingBlocks.Domain.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

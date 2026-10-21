@@ -5,8 +5,10 @@ using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
+using CoreBanking.CoreLedger.Infrastructure;
 using CoreBanking.CoreLedger.Infrastructure.Institutions;
 using CoreBanking.CoreLedger.Infrastructure.Persistence;
+using CoreBanking.CoreLedger.Infrastructure.Products;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,8 +64,8 @@ public static partial class Program
             provider.GetRequiredService<IIntegrationStore>(),
             provider.GetRequiredService<TimeProvider>()));
         builder.Services.AddScoped<InstitutionBoundaryAcknowledgementConsumer>();
-        builder.Services.AddScoped<IIntegrationEventConsumer>(provider =>
-            provider.GetRequiredService<InstitutionBoundaryAcknowledgementConsumer>());
+        builder.Services.AddScoped<SavingsEligibilityApprovalDecidedConsumer>();
+        builder.Services.AddScoped<IIntegrationEventConsumer, CoreLedgerIntegrationEventConsumer>();
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
         builder.Services.AddKafkaEventPublisher(new KafkaMessagingOptions
@@ -74,9 +76,10 @@ public static partial class Program
         builder.Services.AddSingleton(new KafkaConsumerOptions
         {
             BootstrapServers = bootstrapServers,
-            GroupId = InstitutionBoundaryAcknowledgementConsumer.ConsumerName,
+            GroupId = "core-ledger.integration-events",
             Topics = acknowledgementServices
                 .Select(InstitutionBoundaryAcknowledgementConsumer.TopicForService)
+                .Append(SavingsEligibilityApprovalDecidedConsumer.TopicName)
                 .ToArray(),
         });
 
