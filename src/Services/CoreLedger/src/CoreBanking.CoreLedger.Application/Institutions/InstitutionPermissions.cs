@@ -22,6 +22,8 @@ public static class InstitutionPermissions
 
     public static PermissionIdentifier BusinessDateAdvance { get; } = PermissionIdentifier.Parse("institution.business_date.advance");
 
+    public static PermissionIdentifier ProvisioningRepair { get; } = PermissionIdentifier.Parse("platform.provisioning.repair");
+
     public static PermissionRequirement CreateRequirement { get; } = new()
     {
         Permission = Create,
@@ -49,4 +51,5 @@ public static class InstitutionPermissions
     public static PermissionRequirement CalendarManageRequirement { get; } = new() { Permission = CalendarManage };
     public static PermissionRequirement CalendarPublishRequirement { get; } = new() { Permission = CalendarManage, RequiresStepUp = true, IsRestrictedApproval = true };
     public static PermissionRequirement BusinessDateAdvanceRequirement { get; } = new() { Permission = BusinessDateAdvance, RequiresStepUp = true, IsRestrictedApproval = true };
+    public static PermissionRequirement ProvisioningRepairRequirement { get; } = new() { Permission = ProvisioningRepair, RequiresStepUp = true };
 }

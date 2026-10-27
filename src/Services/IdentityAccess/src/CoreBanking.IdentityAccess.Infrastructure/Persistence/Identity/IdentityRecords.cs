@@ -1,6 +1,7 @@
 using System;
 using CoreBanking.BuildingBlocks.Application.Persistence;
 using CoreBanking.BuildingBlocks.Application.Security;
+using CoreBanking.IdentityAccess.Domain.Identities;
 
 namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Identity;
 
@@ -17,13 +18,61 @@ public sealed class IdentityRecord : ITenantOwnedEntity
 
     public ActorType ActorType { get; set; }
 
+    public IdentityKind IdentityType { get; set; }
+
     public required string DisplayName { get; set; }
 
-    public RecordStatus Status { get; set; }
+    public IdentityState Status { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
+
+    public long ConcurrencyVersion { get; set; }
+}
+
+/// <summary>
+/// Institution-scoped access relationship for a platform identity. All tenant access paths resolve
+/// this membership before returning identity data. Table: <c>identity.institution_memberships</c>.
+/// </summary>
+public sealed class InstitutionMembershipRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+
+    public required string MembershipId { get; set; }
+
+    public required string IdentityId { get; set; }
+
+    public IdentityState Status { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public long ConcurrencyVersion { get; set; }
+}
+
+/// <summary>
+/// Provider/realm subject mapping. Only a one-way subject fingerprint is persisted; the raw
+/// provider subject is used transiently during registration. Table: <c>identity.identity_links</c>.
+/// </summary>
+public sealed class ProviderIdentityLinkRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+
+    public required string IdentityLinkId { get; set; }
+
+    public required string IdentityId { get; set; }
+
+    public required string Provider { get; set; }
+
+    public required string Realm { get; set; }
+
+    public required string SubjectFingerprint { get; set; }
+
+    public RecordStatus Status { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 /// <summary>
@@ -61,11 +110,24 @@ public sealed class SessionRecord : ITenantOwnedEntity
 
     public string? DeviceId { get; set; }
 
+    /// <summary>SHA-256 fingerprint of the provider session/family reference; never a token.</summary>
+    public required string ProviderSessionFingerprint { get; set; }
+
     public AuthenticationStrength AuthenticationStrength { get; set; }
 
     public DateTimeOffset IssuedAt { get; set; }
 
     public DateTimeOffset ExpiresAt { get; set; }
 
+    public DateTimeOffset LastActivityAt { get; set; }
+
+    public CoreBanking.IdentityAccess.Domain.Authentication.SessionLifecycleState Status { get; set; }
+
     public DateTimeOffset? RevokedAt { get; set; }
+
+    public DateTimeOffset? ProviderRevocationRequestedAt { get; set; }
+
+    public string? RevocationEventId { get; set; }
+
+    public long ConcurrencyVersion { get; set; }
 }

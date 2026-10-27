@@ -1,13 +1,14 @@
 # Database verification for the backend.
-# Applies the Identity and Access migrations with the migration principal, then runs the
-# database tests as the application principal. Requires the local infrastructure stack:
+# Applies every service's migrations with its migration principal, then runs the database and
+# integration tests as the application principal. Requires the local infrastructure stack:
 #   powershell -File scripts/infra.ps1 -Action up
 #
 # Usage:
 #   powershell -File scripts/db-verify.ps1
 #
-# Credentials are read from deploy/compose/.env, which is git-ignored, and are passed to the
-# tools only through environment variables. They are never printed.
+# Credentials are read from deploy/compose/.env, which is git-ignored, and are passed to the tools
+# only through environment variables. They are never printed. No database outside the local stack
+# is touched: every endpoint is 127.0.0.1 and the port comes from that file.
 
 [CmdletBinding()]
 param(
@@ -18,10 +19,19 @@ param(
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $environmentFile = Join-Path $repositoryRoot 'deploy/compose/.env'
-$infrastructureProject = Join-Path $repositoryRoot 'src/Services/IdentityAccess/src/CoreBanking.IdentityAccess.Infrastructure'
-$testProject = Join-Path $repositoryRoot 'src/Services/IdentityAccess/tests/CoreBanking.IdentityAccess.UnitTests'
-$auditInfrastructureProject = Join-Path $repositoryRoot 'src/Services/AuditReconciliation/src/CoreBanking.AuditReconciliation.Infrastructure'
-$auditTestProject = Join-Path $repositoryRoot 'src/Services/AuditReconciliation/tests/CoreBanking.AuditReconciliation.UnitTests'
+
+# One entry per service: the migration project, the context and the database the migrations own.
+$services = @(
+    [pscustomobject]@{ Service = 'CoreLedger'; Database = 'core_ledger_db'; Project = 'src/Services/CoreLedger/src/CoreBanking.CoreLedger.Infrastructure'; Context = 'CoreLedgerDbContext' },
+    [pscustomobject]@{ Service = 'CustomerOnboarding'; Database = 'customer_onboarding_db'; Project = 'src/Services/CustomerOnboarding/src/CoreBanking.CustomerOnboarding.Infrastructure'; Context = 'CustomerOnboardingDbContext' },
+    [pscustomobject]@{ Service = 'IdentityAccess'; Database = 'identity_access_db'; Project = 'src/Services/IdentityAccess/src/CoreBanking.IdentityAccess.Infrastructure'; Context = 'IdentityAccessDbContext' },
+    [pscustomobject]@{ Service = 'PaymentsVtu'; Database = 'payments_vtu_db'; Project = 'src/Services/PaymentsVtu/src/CoreBanking.PaymentsVtu.Infrastructure'; Context = 'PaymentsVtuDbContext' },
+    [pscustomobject]@{ Service = 'ChannelsEngagement'; Database = 'channels_engagement_db'; Project = 'src/Services/ChannelsEngagement/src/CoreBanking.ChannelsEngagement.Infrastructure'; Context = 'ChannelsEngagementDbContext' },
+    [pscustomobject]@{ Service = 'OperationsWorkflow'; Database = 'operations_workflow_db'; Project = 'src/Services/OperationsWorkflow/src/CoreBanking.OperationsWorkflow.Infrastructure'; Context = 'OperationsWorkflowDbContext' },
+    [pscustomobject]@{ Service = 'RiskReporting'; Database = 'risk_reporting_db'; Project = 'src/Services/RiskReporting/src/CoreBanking.RiskReporting.Infrastructure'; Context = 'RiskReportingDbContext' },
+    [pscustomobject]@{ Service = 'IntegrationHub'; Database = 'integration_hub_db'; Project = 'src/Services/IntegrationHub/src/CoreBanking.IntegrationHub.Infrastructure'; Context = 'IntegrationHubDbContext' },
+    [pscustomobject]@{ Service = 'AuditReconciliation'; Database = 'audit_reconciliation_db'; Project = 'src/Services/AuditReconciliation/src/CoreBanking.AuditReconciliation.Infrastructure'; Context = 'AuditReconciliationDbContext' }
+)
 
 function Read-EnvironmentFile {
     param([string]$Path)
@@ -50,14 +60,10 @@ function New-ServiceConnectionString {
     return "Host=127.0.0.1;Port=$Port;Database=$Database;Username=$Username;Password=$Password"
 }
 
-function New-ConnectionString {
-    param([string]$Port, [string]$Username, [string]$Password)
+function Set-ServiceConnectionString {
+    param([string]$Name, [string]$Value)
 
-    if ([string]::IsNullOrWhiteSpace($Password)) {
-        throw "No password is configured for '$Username' in deploy/compose/.env."
-    }
-
-    return "Host=127.0.0.1;Port=$Port;Database=identity_access_db;Username=$Username;Password=$Password"
+    Set-Item -Path "Env:ConnectionStrings__$Name" -Value $Value
 }
 
 Push-Location $repositoryRoot
@@ -69,21 +75,33 @@ try {
         throw 'CB_POSTGRES_PORT is not set in deploy/compose/.env.'
     }
 
-    $auditMigratorConnection = New-ServiceConnectionString -Port $environment['CB_POSTGRES_PORT'] -Database 'audit_reconciliation_db' -Username 'auditreconciliation_migrator' -Password $environment['AUDITRECONCILIATION_MIGRATOR_PASSWORD']
-    $auditApplicationConnection = New-ServiceConnectionString -Port $environment['CB_POSTGRES_PORT'] -Database 'audit_reconciliation_db' -Username 'auditreconciliation_app' -Password $environment['AUDITRECONCILIATION_APP_PASSWORD']
-
-    $migratorConnection = New-ConnectionString -Port $environment['CB_POSTGRES_PORT'] -Username 'identityaccess_migrator' -Password $environment['IDENTITYACCESS_MIGRATOR_PASSWORD']
-    $applicationConnection = New-ConnectionString -Port $environment['CB_POSTGRES_PORT'] -Username 'identityaccess_app' -Password $environment['IDENTITYACCESS_APP_PASSWORD']
+    $port = $environment['CB_POSTGRES_PORT']
 
     $probe = New-Object System.Net.Sockets.TcpClient
     try {
-        $probe.Connect('127.0.0.1', [int]$environment['CB_POSTGRES_PORT'])
+        $probe.Connect('127.0.0.1', [int]$port)
     }
     catch {
-        throw "PostgreSQL is not reachable on 127.0.0.1:$($environment['CB_POSTGRES_PORT']). Run scripts/infra.ps1 -Action up first."
+        throw "PostgreSQL is not reachable on 127.0.0.1:$port. Run scripts/infra.ps1 -Action up first."
     }
     finally {
         $probe.Dispose()
+    }
+
+    $passwords = @{}
+    foreach ($service in $services) {
+        $prefix = $service.Service.ToUpperInvariant()
+        $applicationPassword = $environment["${prefix}_APP_PASSWORD"]
+        $migrationPassword = $environment["${prefix}_MIGRATOR_PASSWORD"]
+
+        if ([string]::IsNullOrWhiteSpace($applicationPassword) -or [string]::IsNullOrWhiteSpace($migrationPassword)) {
+            throw "${prefix}_APP_PASSWORD or ${prefix}_MIGRATOR_PASSWORD is not set in deploy/compose/.env."
+        }
+
+        $passwords[$service.Service] = [pscustomobject]@{
+            Application = $applicationPassword
+            Migration   = $migrationPassword
+        }
     }
 
     Write-Host '==> restore tools' -ForegroundColor Cyan
@@ -91,58 +109,72 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "dotnet tool restore failed with exit code $LASTEXITCODE." }
 
     # Vulnerability metadata is fetched from nuget.org; local verification must also work offline.
-    Write-Host '==> restore Identity Access migration project from available package sources' -ForegroundColor Cyan
-    dotnet restore $infrastructureProject --ignore-failed-sources -p:NuGetAudit=false
-    if ($LASTEXITCODE -ne 0) { throw "Identity Access infrastructure restore failed with exit code $LASTEXITCODE." }
+    Write-Host '==> restore from available package sources' -ForegroundColor Cyan
+    dotnet restore --ignore-failed-sources -p:NuGetAudit=false
+    if ($LASTEXITCODE -ne 0) { throw "Solution restore failed with exit code $LASTEXITCODE." }
 
-    Write-Host '==> restore Audit Reconciliation migration project from available package sources' -ForegroundColor Cyan
-    dotnet restore $auditInfrastructureProject --ignore-failed-sources -p:NuGetAudit=false
-    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation infrastructure restore failed with exit code $LASTEXITCODE." }
+    Write-Host "==> build ($Configuration)" -ForegroundColor Cyan
+    dotnet build --no-restore --configuration $Configuration
+    if ($LASTEXITCODE -ne 0) { throw "Solution build failed with exit code $LASTEXITCODE." }
 
-    Write-Host '==> build Identity Access migrations from restored assets' -ForegroundColor Cyan
-    dotnet build $infrastructureProject --no-restore --configuration $Configuration
-    if ($LASTEXITCODE -ne 0) { throw "Identity Access infrastructure build failed with exit code $LASTEXITCODE." }
+    foreach ($service in $services) {
+        $migrationConnection = New-ServiceConnectionString -Port $port -Database $service.Database `
+            -Username ($service.Service.ToLowerInvariant() + '_migrator') -Password $passwords[$service.Service].Migration
+        Set-ServiceConnectionString -Name $service.Service -Value $migrationConnection
 
-    Write-Host '==> build Audit Reconciliation migrations from restored assets' -ForegroundColor Cyan
-    dotnet build $auditInfrastructureProject --no-restore --configuration $Configuration
-    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation infrastructure build failed with exit code $LASTEXITCODE." }
+        Write-Host "==> apply $($service.Service) migrations as $($service.Service.ToLowerInvariant())_migrator" -ForegroundColor Cyan
+        dotnet tool run dotnet-ef database update --project $service.Project --startup-project $service.Project `
+            --context $service.Context --configuration $Configuration --no-build
+        if ($LASTEXITCODE -ne 0) { throw "$($service.Service) database migration failed with exit code $LASTEXITCODE." }
 
-    Write-Host '==> apply migrations as identityaccess_migrator' -ForegroundColor Cyan
-    $env:ConnectionStrings__IdentityAccess = $migratorConnection
-    dotnet tool run dotnet-ef database update --project $infrastructureProject --startup-project $infrastructureProject --configuration $Configuration --no-build
-    if ($LASTEXITCODE -ne 0) { throw "dotnet ef database update failed with exit code $LASTEXITCODE." }
+        Write-Host "==> $($service.Service) applied migrations" -ForegroundColor Cyan
+        dotnet tool run dotnet-ef migrations list --project $service.Project --startup-project $service.Project `
+            --context $service.Context --configuration $Configuration --no-build
+        if ($LASTEXITCODE -ne 0) { throw "$($service.Service) migrations list failed with exit code $LASTEXITCODE." }
+    }
 
-    Write-Host '==> applied migrations' -ForegroundColor Cyan
-    dotnet tool run dotnet-ef migrations list --project $infrastructureProject --startup-project $infrastructureProject --configuration $Configuration --no-build
-    if ($LASTEXITCODE -ne 0) { throw "dotnet ef migrations list failed with exit code $LASTEXITCODE." }
+    if (-not [string]::IsNullOrWhiteSpace($environment['CB_BROKER_PORT'])) {
+        $env:CB_BROKER_BOOTSTRAP_SERVERS = '127.0.0.1:' + $environment['CB_BROKER_PORT']
+    }
 
-    Write-Host '==> apply Audit Reconciliation migrations as auditreconciliation_migrator' -ForegroundColor Cyan
-    $env:ConnectionStrings__AuditReconciliation = $auditMigratorConnection
-    dotnet tool run dotnet-ef database update --project $auditInfrastructureProject --startup-project $auditInfrastructureProject --configuration $Configuration --no-build
-    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation database migration failed with exit code $LASTEXITCODE." }
+    # The tests run as the application principal, so a missing grant fails here rather than in
+    # production. Each service database is verified separately; a service without database tests
+    # reports that no test matched and still succeeds.
+    foreach ($service in $services) {
+        $testProject = "src/Services/$($service.Service)/tests/CoreBanking.$($service.Service).UnitTests"
+        if (-not (Test-Path (Join-Path $repositoryRoot $testProject))) {
+            Write-Host "==> $($service.Service) has no test project; skipping database tests" -ForegroundColor Yellow
+            continue
+        }
 
-    Write-Host '==> database tests as identityaccess_app' -ForegroundColor Cyan
-    dotnet restore $testProject --ignore-failed-sources -p:NuGetAudit=false
-    if ($LASTEXITCODE -ne 0) { throw "Identity Access test restore failed with exit code $LASTEXITCODE." }
+        $applicationConnection = New-ServiceConnectionString -Port $port -Database $service.Database `
+            -Username ($service.Service.ToLowerInvariant() + '_app') -Password $passwords[$service.Service].Application
+        Set-ServiceConnectionString -Name $service.Service -Value $applicationConnection
 
-    $env:ConnectionStrings__IdentityAccess = $applicationConnection
-    $env:CB_BROKER_BOOTSTRAP_SERVERS = '127.0.0.1:' + $environment['CB_BROKER_PORT']
-    dotnet test $testProject --no-restore --configuration $Configuration --filter 'Category=Database|Category=Integration'
-    if ($LASTEXITCODE -ne 0) { throw "Database tests failed with exit code $LASTEXITCODE." }
+        Write-Host "==> $($service.Service) database tests as $($service.Service.ToLowerInvariant())_app" -ForegroundColor Cyan
+        dotnet test $testProject --no-build --configuration $Configuration --filter 'Category=Database|Category=Integration'
+        if ($LASTEXITCODE -ne 0) { throw "$($service.Service) database tests failed with exit code $LASTEXITCODE." }
+    }
 
-    Write-Host '==> Audit Reconciliation model tests as auditreconciliation_app' -ForegroundColor Cyan
-    dotnet restore $auditTestProject --ignore-failed-sources -p:NuGetAudit=false
-    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation test restore failed with exit code $LASTEXITCODE." }
+    # Every principal is connected as itself, so the assertions cover role membership, ownership and
+    # PUBLIC grants rather than the GRANT statements alone.
+    Write-Host '==> effective privilege tests for every application principal' -ForegroundColor Cyan
+    foreach ($service in $services) {
+        $applicationConnection = New-ServiceConnectionString -Port $port -Database $service.Database `
+            -Username ($service.Service.ToLowerInvariant() + '_app') -Password $passwords[$service.Service].Application
+        Set-ServiceConnectionString -Name $service.Service -Value $applicationConnection
+    }
 
-    $env:ConnectionStrings__AuditReconciliation = $auditApplicationConnection
-    dotnet test $auditTestProject --no-restore --configuration $Configuration
-    if ($LASTEXITCODE -ne 0) { throw "Audit Reconciliation tests failed with exit code $LASTEXITCODE." }
+    dotnet test 'tests/CoreBanking.SecurityTests' --no-build --configuration $Configuration
+    if ($LASTEXITCODE -ne 0) { throw "Effective privilege tests failed with exit code $LASTEXITCODE." }
 
     Write-Host 'Database verification passed.' -ForegroundColor Green
 }
 finally {
-    Remove-Item Env:\ConnectionStrings__IdentityAccess -ErrorAction SilentlyContinue
-    Remove-Item Env:\ConnectionStrings__AuditReconciliation -ErrorAction SilentlyContinue
+    foreach ($service in $services) {
+        Remove-Item -Path "Env:ConnectionStrings__$($service.Service)" -ErrorAction SilentlyContinue
+    }
+
     Remove-Item Env:\CB_BROKER_BOOTSTRAP_SERVERS -ErrorAction SilentlyContinue
     Pop-Location
 }

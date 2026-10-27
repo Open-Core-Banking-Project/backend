@@ -1,5 +1,5 @@
 # Repository verification gate for the backend.
-# Mirrors the sequence documented in AGENTS.md: restore, build, test, format.
+# Mirrors the sequence documented in AGENTS.md: restore, build, migration drift, test, format.
 # Database tests need the local infrastructure stack and are excluded here; run
 # scripts/db-verify.ps1 to apply migrations and execute them.
 #
@@ -17,12 +17,29 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $repositoryRoot
 
+# scripts/migrations-verify.ps1 reports drift through its process exit code, so it is invoked in a
+# child host. Running it in this process would end this gate before the remaining steps.
+function Invoke-MigrationVerification {
+    param([string]$Configuration)
+
+    if (Get-Command -Name 'pwsh' -ErrorAction SilentlyContinue) {
+        $hostExecutable = 'pwsh'
+    }
+    else {
+        $hostExecutable = Join-Path $PSHOME 'powershell.exe'
+    }
+
+    & $hostExecutable -NoProfile -NonInteractive -File (Join-Path $PSScriptRoot 'migrations-verify.ps1') -Configuration $Configuration -NoBuild
+    return $LASTEXITCODE
+}
+
 try {
     $steps = [ordered]@{
-        'restore' = { dotnet restore }
-        'build'   = { dotnet build --no-restore --configuration $Configuration }
-        'test'    = { dotnet test --no-build --configuration $Configuration --filter 'Category!=Database&Category!=Integration' }
-        'format'  = { dotnet format --verify-no-changes }
+        'restore'    = { dotnet restore }
+        'build'      = { dotnet build --no-restore --configuration $Configuration }
+        'migrations' = { Invoke-MigrationVerification -Configuration $Configuration }
+        'test'       = { dotnet test --no-build --configuration $Configuration --filter 'Category!=Database&Category!=Integration' }
+        'format'     = { dotnet format --verify-no-changes }
     }
 
     foreach ($step in $steps.GetEnumerator()) {

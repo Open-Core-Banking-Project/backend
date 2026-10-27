@@ -21,6 +21,12 @@ public static class IdentityPermissions
 
     public static PermissionIdentifier IdentityAccessReview { get; } = PermissionIdentifier.Parse("identity.access.review");
 
+    public static PermissionIdentifier IdentityCreate { get; } = PermissionIdentifier.Parse("identity.identity.create");
+
+    public static PermissionIdentifier IdentityView { get; } = PermissionIdentifier.Parse("identity.identity.view");
+
+    public static PermissionIdentifier IdentityUpdate { get; } = PermissionIdentifier.Parse("identity.identity.update");
+
     public static PermissionIdentifier AuditEventView { get; } = PermissionIdentifier.Parse("audit.event.view");
 
     public static IReadOnlySet<PermissionIdentifier> All { get; } = new HashSet<PermissionIdentifier>
@@ -30,6 +36,9 @@ public static class IdentityPermissions
         IdentityRoleCreate,
         IdentityPermissionAssign,
         IdentityAccessReview,
+        IdentityCreate,
+        IdentityView,
+        IdentityUpdate,
         AuditEventView,
     };
 }

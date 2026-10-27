@@ -222,11 +222,22 @@ try {
     $institutionId = 'phase0-walking-skeleton'
     $actorId = 'phase0-admin'
     $roleId = 'phase0-admin-role'
+    # The Phase 0 fixture predates the identity model that adds identity_type, concurrency_version
+    # and institution membership. Its kind is Administrator by construction: the fixture exists only
+    # to hold the platform foundation permission. See
+    # docs/operations/identity-access-legacy-identity-kind-mapping.md.
     $seedSql = @"
 insert into identity.identities
-    (institution_id, identity_id, actor_type, display_name, status, created_at, updated_at)
+    (institution_id, identity_id, actor_type, identity_type, display_name, status, created_at, updated_at, concurrency_version)
 values
-    ('$institutionId', '$actorId', 'Human', 'Phase 0 Administrator', 'Active', now(), now())
+    ('$institutionId', '$actorId', 'Human', 'Administrator', 'Phase 0 Administrator', 'Active', now(), now(), 1)
+on conflict (institution_id, identity_id) do update
+set status = 'Active', identity_type = 'Administrator', updated_at = now();
+
+insert into identity.institution_memberships
+    (institution_id, membership_id, identity_id, status, created_at, updated_at, concurrency_version)
+values
+    ('$institutionId', '${actorId}-membership', '$actorId', 'Active', now(), now(), 1)
 on conflict (institution_id, identity_id) do update
 set status = 'Active', updated_at = now();
 

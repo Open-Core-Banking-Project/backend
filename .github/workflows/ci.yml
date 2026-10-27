@@ -1,7 +1,7 @@
 # Continuous integration for the backend.
 #
 # Scope note: ADR-0010 and ADR-0011 are accepted. This workflow provides restore,
-# build, formatting, architecture/unit tests, dependency audit and evidence upload.
+# build, migration drift, formatting, architecture/unit tests, dependency audit and evidence upload.
 # Integration tests run against the local container stack. CodeQL and complete-history secret
 # scanning are defined in security.yml and enforced with this workflow through branch protection.
 
@@ -46,6 +46,12 @@ jobs:
 
       - name: Build
         run: dotnet build --no-restore --configuration Release
+
+      # Fails when a service's model no longer matches its committed migrations. The gate is
+      # read-only: it never connects to a database and never generates or applies a migration.
+      - name: Verify migration drift
+        shell: pwsh
+        run: ./scripts/migrations-verify.ps1 -Configuration Release -NoBuild
 
       - name: Verify formatting
         run: dotnet format --verify-no-changes

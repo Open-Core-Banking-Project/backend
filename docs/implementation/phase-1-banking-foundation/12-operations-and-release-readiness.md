@@ -515,7 +515,8 @@ Responses expose only coarse status to untrusted callers. Detailed component dia
 
 - Service deployment, verification and failed-deployment handling.
 - Application rollback and migration forward-fix decision.
-- Database migration failure, blocked migration and backfill restart.
+- Database migration failure, blocked migration and backfill restart, with the drift gate, migration status, SQL review, ordering, backup/restore and recovery procedure in `docs/operations/database-migrations.md`.
+- Database privilege verification and safest rollback for grant changes, in `docs/operations/database-privileges.md`.
 - Provider outage, timeout storm and circuit-open state.
 - Uncertain or duplicated payment investigation without unsafe replay.
 - Queue backlog, poison message, dead-letter and consumer-lag recovery.
