@@ -153,17 +153,60 @@ public sealed class SessionSecurityService
         return new SessionDetailsV1(session.SessionId, "active", session.DeviceId, session.AuthenticationStrength.ToString().ToLowerInvariant(), session.IssuedAt, session.ExpiresAt, session.LastActivityAt);
     }
 
-    public async Task<IReadOnlyList<SessionDetailsV1>> ListOwnSessionsAsync(ActorId actorId, CancellationToken cancellationToken) =>
-        await _context.Sessions.AsNoTracking().Where(record => record.IdentityId == actorId.Value)
-            .OrderByDescending(record => record.LastActivityAt)
-            .Select(record => new SessionDetailsV1(record.SessionId, record.Status.ToString().ToLowerInvariant(), record.DeviceId,
-                record.AuthenticationStrength.ToString().ToLowerInvariant(), record.IssuedAt, record.ExpiresAt, record.LastActivityAt))
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
-
-    public async Task RecordLockAsync(InstitutionId institutionId, string identityId, string scope, string reasonCode, DateTimeOffset? expiresAt, string correlationId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Lists the actor's sessions with the status that is true now. A session whose expiry has
+    /// elapsed is reported as expired even before the maintenance sweep records the transition, so
+    /// a caller never sees a lapsed session described as active.
+    /// </summary>
+    public async Task<IReadOnlyList<SessionDetailsV1>> ListOwnSessionsAsync(ActorId actorId, CancellationToken cancellationToken)
     {
         DateTimeOffset now = _timeProvider.GetUtcNow();
-        _context.SecurityLocks.Add(new SecurityLockRecord
+        List<SessionRecord> records = await _context.Sessions.AsNoTracking()
+            .Where(record => record.IdentityId == actorId.Value)
+            .OrderByDescending(record => record.LastActivityAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return records
+            .Select(record => new SessionDetailsV1(
+                record.SessionId,
+                EffectiveStatus(record, now),
+                record.DeviceId,
+                record.AuthenticationStrength.ToString().ToLowerInvariant(),
+                record.IssuedAt,
+                record.ExpiresAt,
+                record.LastActivityAt))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Records a lock for the identity and scope and returns its identifier. At most one lock per
+    /// identity and scope is unreleased, so a second attempt while a lock is still active keeps the
+    /// existing lock and records the attempt as evidence instead of adding a duplicate. A lapsed
+    /// lock that nobody released is closed at its expiry before the new lock is acquired.
+    /// </summary>
+    public async Task<string> RecordLockAsync(InstitutionId institutionId, string identityId, string scope, string reasonCode, DateTimeOffset? expiresAt, string correlationId, CancellationToken cancellationToken)
+    {
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        List<SecurityLockRecord> unreleased = await _context.SecurityLocks
+            .Where(record => record.IdentityId == identityId && record.Scope == scope && record.ReleasedAt == null)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        SecurityLockRecord? active = unreleased.FirstOrDefault(record => record.ExpiresAt is null || record.ExpiresAt > now);
+        if (active is not null)
+        {
+            AddAuthenticationEvent(institutionId.Value, identityId, "authentication_locked", AuthenticationOutcome.Failed, reasonCode, now);
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return active.SecurityLockId;
+        }
+
+        foreach (SecurityLockRecord lapsed in unreleased)
+        {
+            lapsed.ReleasedAt = lapsed.ExpiresAt;
+        }
+
+        SecurityLockRecord securityLock = new()
         {
             InstitutionId = institutionId.Value,
             SecurityLockId = Guid.NewGuid().ToString("N"),
@@ -172,18 +215,11 @@ public sealed class SessionSecurityService
             ReasonCode = reasonCode,
             CreatedAt = now,
             ExpiresAt = expiresAt,
-        });
-        _context.AuthenticationEvents.Add(new AuthenticationEventRecord
-        {
-            InstitutionId = institutionId.Value,
-            AuthenticationEventId = Guid.NewGuid().ToString("N"),
-            IdentityId = identityId,
-            EventType = "authentication_locked",
-            Outcome = AuthenticationOutcome.Failed,
-            Detail = reasonCode,
-            OccurredAt = now,
-        });
+        };
+        _context.SecurityLocks.Add(securityLock);
+        AddAuthenticationEvent(institutionId.Value, identityId, "authentication_locked", AuthenticationOutcome.Failed, reasonCode, now);
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return securityLock.SecurityLockId;
     }
 
     /// <summary>
@@ -225,19 +261,101 @@ public sealed class SessionSecurityService
 
         DateTimeOffset now = _timeProvider.GetUtcNow();
         securityLock.ReleasedAt = now;
-        _context.AuthenticationEvents.Add(new AuthenticationEventRecord
-        {
-            InstitutionId = securityLock.InstitutionId,
-            AuthenticationEventId = Guid.NewGuid().ToString("N"),
-            IdentityId = securityLock.IdentityId,
-            EventType = "authentication_lock_released",
-            Outcome = AuthenticationOutcome.Succeeded,
-            Detail = securityLock.ReasonCode,
-            OccurredAt = now,
-        });
+        AddAuthenticationEvent(securityLock.InstitutionId, securityLock.IdentityId, "authentication_lock_released", AuthenticationOutcome.Succeeded, securityLock.ReasonCode, now);
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return true;
     }
+
+    /// <summary>
+    /// Marks sessions whose expiry has elapsed as <c>Expired</c> and records one authentication
+    /// event per transition. This is a system maintenance pass: it deliberately reads across the
+    /// tenant boundary with a comment in ADR-0004 terms, and no request path may call it.
+    /// Returns the number of sessions transitioned so the caller can drain the backlog in batches.
+    /// </summary>
+    public async Task<int> ExpireLapsedSessionsAsync(int batchSize, CancellationToken cancellationToken)
+    {
+        if (batchSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(batchSize), "The batch size must be positive.");
+        }
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        List<SessionRecord> lapsed = await _context.Sessions
+            .IgnoreQueryFilters()
+            .Where(record =>
+                (record.Status == SessionLifecycleState.Active || record.Status == SessionLifecycleState.Refreshed)
+                && record.ExpiresAt <= now)
+            .OrderBy(record => record.ExpiresAt)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (SessionRecord session in lapsed)
+        {
+            session.Status = SessionLifecycleState.Expired;
+            session.ConcurrencyVersion++;
+            AddAuthenticationEvent(session.InstitutionId, session.IdentityId, "session_expired", AuthenticationOutcome.Succeeded, "expiry_elapsed", now);
+        }
+
+        if (lapsed.Count > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return lapsed.Count;
+    }
+
+    /// <summary>
+    /// Closes lapsed locks that nobody released, setting the release instant to the expiry instant so
+    /// the record states when the lock stopped applying. Also a system maintenance pass across the
+    /// tenant boundary; it keeps the one-unreleased-lock-per-scope rule satisfiable.
+    /// </summary>
+    public async Task<int> ReleaseExpiredLocksAsync(int batchSize, CancellationToken cancellationToken)
+    {
+        if (batchSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(batchSize), "The batch size must be positive.");
+        }
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        List<SecurityLockRecord> lapsed = await _context.SecurityLocks
+            .IgnoreQueryFilters()
+            .Where(record => record.ReleasedAt == null && record.ExpiresAt != null && record.ExpiresAt <= now)
+            .OrderBy(record => record.ExpiresAt)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (SecurityLockRecord securityLock in lapsed)
+        {
+            securityLock.ReleasedAt = securityLock.ExpiresAt;
+            AddAuthenticationEvent(securityLock.InstitutionId, securityLock.IdentityId, "authentication_lock_expired", AuthenticationOutcome.Succeeded, securityLock.ReasonCode, now);
+        }
+
+        if (lapsed.Count > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return lapsed.Count;
+    }
+
+    private static string EffectiveStatus(SessionRecord session, DateTimeOffset now) =>
+        (session.Status is SessionLifecycleState.Active or SessionLifecycleState.Refreshed) && session.ExpiresAt <= now
+            ? "expired"
+            : session.Status.ToString().ToLowerInvariant();
+
+    private void AddAuthenticationEvent(string institutionId, string identityId, string eventType, AuthenticationOutcome outcome, string detail, DateTimeOffset occurredAt) =>
+        _context.AuthenticationEvents.Add(new AuthenticationEventRecord
+        {
+            InstitutionId = institutionId,
+            AuthenticationEventId = Guid.NewGuid().ToString("N"),
+            IdentityId = identityId,
+            EventType = eventType,
+            Outcome = outcome,
+            Detail = detail,
+            OccurredAt = occurredAt,
+        });
 
     private async Task<string?> RevokeOnceAsync(InstitutionId institutionId, ActorId actorId, string sessionId, string correlationId, CancellationToken cancellationToken)
     {

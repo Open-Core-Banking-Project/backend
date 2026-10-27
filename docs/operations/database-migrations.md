@@ -171,7 +171,16 @@ SELECT count(*) FROM identity.sessions WHERE provider_session_fingerprint = '';
 -- The tenant-unique fingerprint index and the lock table are present.
 SELECT indexname FROM pg_indexes
 WHERE schemaname = 'identity' AND tablename = 'sessions';
+SELECT indexname FROM pg_indexes
+WHERE schemaname = 'security' AND tablename = 'locks';
 SELECT count(*) FROM security.locks;
+
+-- The maintenance passes are current: no lapsed session is still described as active and no
+-- lapsed lock is still unreleased. Run from the worker's configured interval.
+SELECT count(*) FROM identity.sessions
+WHERE status IN ('Active', 'Refreshed') AND expires_at <= now();
+SELECT count(*) FROM security.locks
+WHERE released_at IS NULL AND expires_at IS NOT NULL AND expires_at <= now();
 
 -- The application principal can use the new objects but still cannot change the schema.
 SET ROLE identityaccess_app;
@@ -185,6 +194,12 @@ A legacy marker is `legacy:` plus 32 hexadecimal characters. Real provider finge
 64-character hexadecimal SHA-256 digests, so the two can never collide. A legacy session was never
 bound to a provider session; when a refresh presents a provider reference the existing reuse check
 refuses it and revokes the session. Expect legacy sessions to require re-authentication.
+
+The worker process runs the maintenance passes that keep those queries returning zero. Confirm
+`IdentityLifecycle:SweepIntervalSeconds` (default `300`) and `IdentityLifecycle:SweepBatchSize`
+(default `200`) suit the environment and that `CoreBanking.IdentityAccess.Workers` is healthy before
+accepting the deployment; a stopped worker leaves lapsed sessions described as active and lapsed locks
+unreleased.
 
 ## Diagnose a failed migration and recover safely
 

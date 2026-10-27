@@ -59,16 +59,30 @@ that looks like a real fingerprint.
 A session whose own expiry has elapsed is also refused before any state change, so a refresh cannot
 resurrect a session the platform has stopped honouring.
 
-## Hardening deliberately not applied
+## Lock uniqueness and the maintenance sweep
 
-`security.locks` carries no unique constraint on `(institution_id, identity_id, scope)` while
-unreleased. A partial unique index cannot express expiry — the predicate would need `now()`, which is
-not immutable — so an expired lock that nobody released would block a legitimate new lock and the
-existing `RecordLockAsync` path does not release. The service therefore decides activity with an
-expiry-aware query (`HasActiveLockAsync`) and releases explicitly (`ReleaseLockAsync`, idempotent),
-and the database enforces only the invariants it can check: a lock cannot expire or be released
-before it was created, and a lock id or scope cannot be empty in practice because the columns are
-`NOT NULL`.
+Migration `20261027174230_AddActiveSecurityLockUniqueness` enforces **one unreleased lock per
+institution, identity and scope** with the partial unique index `ux_locks_unreleased_scope`
+(`WHERE released_at IS NULL`), replacing the non-unique index on the same columns. A predicate cannot
+evaluate expiry, so "currently locked" is expressed as "unreleased":
+
+- Acquisition closes a lapsed lock at its expiry instant before inserting the new one, so an expired
+  lock that nobody released cannot block reacquisition or violate the index.
+- Recording a lock while one is still active keeps the existing lock, returns its identifier and
+  writes the attempt as authentication evidence, so a duplicate cannot be created by a retry.
+- `SessionSecurityService.ReleaseExpiredLocksAsync` closes lapsed locks at the expiry instant in
+  batches, and `ExpireLapsedSessionsAsync` moves sessions whose window has passed from `Active` or
+  `Refreshed` to `Expired`, writing one authentication event per transition.
+- `SessionLifecycleWorker` runs both passes in the worker process. Configuration section
+  `IdentityLifecycle`: `SweepIntervalSeconds` (default 300) and `SweepBatchSize` (default 200). Each
+  pass drains until a batch is not full, so a backlog clears without one unbounded transaction.
+- Listing reports a session whose expiry has elapsed as `expired` even before the sweep records the
+  transition, so a caller never sees a lapsed session described as active.
+
+Both passes read across the tenant boundary (`IgnoreQueryFilters`) because they are system
+maintenance, following the outbox relay precedent; no request path may do this. A migration
+validation step closes lapsed locks and then fails with a count if a genuine duplicate remains, so
+ambiguity is surfaced instead of resolved by guesswork.
 
 ## Validation
 

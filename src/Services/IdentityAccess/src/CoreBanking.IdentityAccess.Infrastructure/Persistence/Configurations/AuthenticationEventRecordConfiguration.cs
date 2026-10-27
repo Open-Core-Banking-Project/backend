@@ -51,6 +51,13 @@ internal sealed class SecurityLockRecordConfiguration : IEntityTypeConfiguration
         builder.Property(lockRecord => lockRecord.CreatedAt).HasColumnName("created_at");
         builder.Property(lockRecord => lockRecord.ExpiresAt).HasColumnName("expires_at");
         builder.Property(lockRecord => lockRecord.ReleasedAt).HasColumnName("released_at");
-        builder.HasIndex(lockRecord => new { lockRecord.InstitutionId, lockRecord.IdentityId, lockRecord.Scope });
+
+        // One unreleased lock per identity and scope. The predicate is the only way to express
+        // "currently locked" as a constraint, because a partial index cannot evaluate expiry.
+        // Lapsed locks are closed by the maintenance sweep and by lock acquisition itself.
+        builder.HasIndex(lockRecord => new { lockRecord.InstitutionId, lockRecord.IdentityId, lockRecord.Scope })
+            .IsUnique()
+            .HasFilter("released_at IS NULL")
+            .HasDatabaseName("ux_locks_unreleased_scope");
     }
 }

@@ -346,6 +346,150 @@ public sealed class SessionSecurityDatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task Recording_a_lock_while_one_is_active_keeps_a_single_lock_and_records_the_attempt()
+    {
+        string firstLockId;
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            firstLockId = await CreateService(context, _time).RecordLockAsync(
+                _institution, _actor.Value, LockScope, "failed_attempts", _time.GetUtcNow().AddHours(1), "correlation-lock-1", CancellationToken.None);
+        }
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+
+        string secondLockId;
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            secondLockId = await CreateService(context, _time).RecordLockAsync(
+                _institution, _actor.Value, LockScope, "failed_attempts", _time.GetUtcNow().AddHours(2), "correlation-lock-2", CancellationToken.None);
+        }
+
+        Assert.Equal(firstLockId, secondLockId);
+
+        await using IdentityAccessDbContext verification = CreateContext(_institution);
+        Assert.Single(verification.SecurityLocks);
+        Assert.Equal(2, verification.AuthenticationEvents.Count(evidence => evidence.EventType == "authentication_locked"));
+    }
+
+    [Fact]
+    public async Task An_expired_unreleased_lock_is_closed_before_a_new_lock_is_acquired()
+    {
+        DateTimeOffset firstExpiry = _time.GetUtcNow().AddMinutes(15);
+        string firstLockId;
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            firstLockId = await CreateService(context, _time).RecordLockAsync(
+                _institution, _actor.Value, LockScope, "failed_attempts", firstExpiry, "correlation-lock-1", CancellationToken.None);
+        }
+
+        _time.Advance(TimeSpan.FromMinutes(16));
+
+        string secondLockId;
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            secondLockId = await CreateService(context, _time).RecordLockAsync(
+                _institution, _actor.Value, LockScope, "failed_attempts", _time.GetUtcNow().AddHours(1), "correlation-lock-2", CancellationToken.None);
+        }
+
+        Assert.NotEqual(firstLockId, secondLockId);
+
+        await using IdentityAccessDbContext verification = CreateContext(_institution);
+        SecurityLockRecord closed = await verification.SecurityLocks.SingleAsync(record => record.SecurityLockId == firstLockId);
+        SecurityLockRecord active = await verification.SecurityLocks.SingleAsync(record => record.SecurityLockId == secondLockId);
+        Assert.Equal(firstExpiry, closed.ReleasedAt);
+        Assert.Null(active.ReleasedAt);
+    }
+
+    [Fact]
+    public async Task The_sweep_closes_lapsed_locks_at_their_expiry_instant()
+    {
+        DateTimeOffset expiry = _time.GetUtcNow().AddMinutes(15);
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            await CreateService(context, _time).RecordLockAsync(
+                _institution, _actor.Value, LockScope, "failed_attempts", expiry, "correlation-lock", CancellationToken.None);
+        }
+
+        _time.Advance(TimeSpan.FromMinutes(16));
+
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            Assert.Equal(1, await CreateService(context, _time).ReleaseExpiredLocksAsync(100, CancellationToken.None));
+        }
+
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            Assert.Equal(0, await CreateService(context, _time).ReleaseExpiredLocksAsync(100, CancellationToken.None));
+        }
+
+        await using IdentityAccessDbContext verification = CreateContext(_institution);
+        SecurityLockRecord closed = await verification.SecurityLocks.SingleAsync();
+        Assert.Equal(expiry, closed.ReleasedAt);
+        Assert.Single(verification.AuthenticationEvents.Where(evidence => evidence.EventType == "authentication_lock_expired"));
+    }
+
+    [Fact]
+    public async Task A_second_unreleased_lock_for_the_same_scope_is_rejected()
+    {
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            await CreateService(context, _time).RecordLockAsync(
+                _institution, _actor.Value, LockScope, "failed_attempts", _time.GetUtcNow().AddHours(1), "correlation-lock", CancellationToken.None);
+        }
+
+        await using IdentityAccessDbContext context2 = CreateContext(_institution);
+        PostgresException exception = await Assert.ThrowsAsync<PostgresException>(() => context2.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO security.locks
+                (institution_id, security_lock_id, identity_id, scope, reason_code, created_at, expires_at, released_at)
+            VALUES ({0}, {1}, {2}, {3}, 'duplicate_attempt', now(), now() + interval '1 hour', NULL)
+            """,
+            _institution.Value, "duplicate-lock", _actor.Value, LockScope));
+
+        Assert.Equal("23505", exception.SqlState);
+        Assert.Equal("ux_locks_unreleased_scope", exception.ConstraintName);
+    }
+
+    [Fact]
+    public async Task A_lapsed_session_is_marked_expired_once_by_the_sweep()
+    {
+        SessionDetailsV1 details = await RegisterSessionAsync("provider-session-sweep");
+        _time.Advance(TimeSpan.FromHours(2));
+
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            Assert.Equal(1, await CreateService(context, _time).ExpireLapsedSessionsAsync(100, CancellationToken.None));
+        }
+
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            Assert.Equal(0, await CreateService(context, _time).ExpireLapsedSessionsAsync(100, CancellationToken.None));
+        }
+
+        await using IdentityAccessDbContext verification = CreateContext(_institution);
+        SessionRecord session = await verification.Sessions.SingleAsync(record => record.SessionId == details.SessionId);
+        Assert.Equal(SessionLifecycleState.Expired, session.Status);
+        Assert.Equal(2L, session.ConcurrencyVersion);
+        Assert.Single(verification.AuthenticationEvents.Where(evidence => evidence.EventType == "session_expired"));
+
+        IReadOnlyList<SessionDetailsV1> sessions = await CreateService(verification, _time).ListOwnSessionsAsync(_actor, CancellationToken.None);
+        Assert.Equal("expired", sessions.Single().Status);
+    }
+
+    [Fact]
+    public async Task Listing_reports_a_lapsed_session_as_expired_before_the_sweep_runs()
+    {
+        await RegisterSessionAsync("provider-session-lapsed");
+        _time.Advance(TimeSpan.FromHours(2));
+
+        await using IdentityAccessDbContext context = CreateContext(_institution);
+        IReadOnlyList<SessionDetailsV1> sessions = await CreateService(context, _time).ListOwnSessionsAsync(_actor, CancellationToken.None);
+
+        Assert.Equal("expired", sessions.Single().Status);
+        Assert.Equal(SessionLifecycleState.Active, (await context.Sessions.SingleAsync()).Status);
+    }
+
+    [Fact]
     public async Task The_committed_migration_created_the_lifecycle_columns_and_the_lock_table()
     {
         await using IdentityAccessDbContext context = CreateContext(_institution);
@@ -370,6 +514,10 @@ public sealed class SessionSecurityDatabaseTests : IDisposable
         string[] lockConstraints = await CheckConstraintNamesAsync("security.locks");
         Assert.Contains("ck_locks_expiry_after_creation", lockConstraints);
         Assert.Contains("ck_locks_release_after_creation", lockConstraints);
+
+        string[] lockIndexes = await IndexNamesAsync(context, "security", "locks");
+        Assert.Contains("ux_locks_unreleased_scope", lockIndexes);
+        Assert.DoesNotContain("IX_locks_institution_id_identity_id_scope", lockIndexes);
     }
 
     [Fact]
@@ -459,6 +607,14 @@ public sealed class SessionSecurityDatabaseTests : IDisposable
         await using NpgsqlCommand command = new(sql, connection);
         return (bool)(await command.ExecuteScalarAsync(CancellationToken.None))!;
     }
+
+    private static async Task<string[]> IndexNamesAsync(IdentityAccessDbContext context, string schema, string table) =>
+        await context.Database
+            .SqlQueryRaw<string>(
+                "SELECT indexname AS \"Value\" FROM pg_indexes WHERE schemaname = {0} AND tablename = {1} ORDER BY indexname",
+                schema,
+                table)
+            .ToArrayAsync(CancellationToken.None);
 
     private async Task<string[]> CheckConstraintNamesAsync(string qualifiedTable)
     {
