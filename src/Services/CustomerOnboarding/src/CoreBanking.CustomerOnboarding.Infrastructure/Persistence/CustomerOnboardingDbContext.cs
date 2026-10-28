@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
+using CoreBanking.CustomerOnboarding.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -23,6 +24,20 @@ public sealed class CustomerOnboardingDbContext : DbContext, IIntegrationStore
 
     public DbSet<InstitutionBoundaryRecord> InstitutionBoundaries => Set<InstitutionBoundaryRecord>();
 
+    public DbSet<PartyRecord> Parties => Set<PartyRecord>();
+
+    public DbSet<PartyIndividualRecord> PartyIndividuals => Set<PartyIndividualRecord>();
+
+    public DbSet<PartyNameRecord> PartyNames => Set<PartyNameRecord>();
+
+    public DbSet<PartyContactRecord> PartyContacts => Set<PartyContactRecord>();
+
+    public DbSet<PartyAddressRecord> PartyAddresses => Set<PartyAddressRecord>();
+
+    public DbSet<OnboardingApplicationRecord> OnboardingApplications => Set<OnboardingApplicationRecord>();
+
+    public DbSet<OnboardingApplicationRevisionRecord> OnboardingApplicationRevisions => Set<OnboardingApplicationRevisionRecord>();
+
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
 
     public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
@@ -40,6 +55,8 @@ public sealed class CustomerOnboardingDbContext : DbContext, IIntegrationStore
         System.ArgumentNullException.ThrowIfNull(modelBuilder);
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyIntegrationRecords();
+        modelBuilder.ApplyPartyRecords();
+        modelBuilder.ApplyOnboardingRecords();
 
         modelBuilder.Entity<InstitutionBoundaryRecord>(entity =>
         {
@@ -66,6 +83,20 @@ public sealed class CustomerOnboardingDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<IdempotencyRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<DeadLetterRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<PartyRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<PartyIndividualRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<PartyNameRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<PartyContactRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<PartyAddressRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<OnboardingApplicationRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<OnboardingApplicationRevisionRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
     }
 

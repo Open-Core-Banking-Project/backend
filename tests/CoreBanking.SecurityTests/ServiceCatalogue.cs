@@ -58,7 +58,7 @@ internal static class ServiceCatalogue
         new("CoreLedger", "core_ledger_db", "coreledger_app", "coreledger_migrator",
             ["institution", "product", "integration"], ["audit"]),
         new("CustomerOnboarding", "customer_onboarding_db", "customeronboarding_app", "customeronboarding_migrator",
-            ["platform", "integration"], []),
+            ["party", "onboarding", "platform", "integration"], []),
         new("IdentityAccess", "identity_access_db", "identityaccess_app", "identityaccess_migrator",
             ["identity", "access", "security", "platform", "integration"], ["audit"]),
         new("PaymentsVtu", "payments_vtu_db", "paymentsvtu_app", "paymentsvtu_migrator",

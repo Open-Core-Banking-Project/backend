@@ -611,6 +611,8 @@ All policy changes are versioned, approved, effective-dated and audited. Missing
 2. Define versioned Party, Customer, Application, KYC and event contracts plus architecture tests.
 3. Implement tenant/branch reference consumers and institution provisioning for `customer_onboarding_db`.
 4. Implement individual Party/Application capture with explicit field mapping, encryption/tokenisation ports and revision tests.
+   *Status: implemented — see [customer-onboarding-capture.md](../../operations/customer-onboarding-capture.md).
+   The API surface stays unregistered until request contracts and authorisation wiring land.*
 5. Implement requirement snapshots, document metadata/quarantine integration and submission validation.
 6. Implement exact duplicate tokens, explainable candidate sets and review workflow; add concurrency and enumeration tests.
 7. Implement KYC case/requirement model and canonical verification request/result contracts.
