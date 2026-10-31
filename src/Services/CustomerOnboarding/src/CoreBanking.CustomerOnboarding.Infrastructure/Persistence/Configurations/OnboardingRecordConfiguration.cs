@@ -51,6 +51,7 @@ public static class OnboardingRecordConfiguration
             entity.Property(record => record.CurrentCapture).HasColumnName("current_capture").HasColumnType("jsonb");
             entity.Property(record => record.CurrentPayloadHash).HasColumnName("current_payload_hash").HasMaxLength(64);
             entity.Property(record => record.PartyId).HasColumnName("party_id").HasMaxLength(64);
+            entity.Property(record => record.RequirementSnapshotId).HasColumnName("requirement_snapshot_id").HasMaxLength(64);
             entity.Property(record => record.CreatedAt).HasColumnName("created_at");
             entity.Property(record => record.UpdatedAt).HasColumnName("updated_at");
             entity.Property(record => record.SubmittedAt).HasColumnName("submitted_at");
@@ -84,6 +85,7 @@ public static class OnboardingRecordConfiguration
             entity.Property(record => record.PayloadHash).HasColumnName("payload_hash").HasMaxLength(64);
             entity.Property(record => record.Capture).HasColumnName("capture").HasColumnType("jsonb");
             entity.Property(record => record.Reason).HasColumnName("reason").HasMaxLength(32);
+            entity.Property(record => record.RequirementSnapshotId).HasColumnName("requirement_snapshot_id").HasMaxLength(64);
             entity.Property(record => record.RecordedBy).HasColumnName("recorded_by").HasMaxLength(128);
             entity.Property(record => record.RecordedAt).HasColumnName("recorded_at");
 

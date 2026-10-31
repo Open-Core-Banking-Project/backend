@@ -10,7 +10,9 @@ using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.CustomerOnboarding.Application.Onboarding;
 using CoreBanking.CustomerOnboarding.Domain.Onboarding;
 using CoreBanking.CustomerOnboarding.Domain.Parties;
+using CoreBanking.CustomerOnboarding.Domain.Requirements;
 using CoreBanking.CustomerOnboarding.Infrastructure.Persistence;
+using CoreBanking.CustomerOnboarding.Infrastructure.Requirements;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Npgsql;
@@ -27,6 +29,9 @@ public sealed class OnboardingApplicationService : IOnboardingApplicationService
     public const string OperationCreate = "customer.application.create";
     public const string OperationUpdate = "customer.application.update";
     public const string OperationSubmit = "customer.application.submit";
+
+    private const string EffectivePackStatus = "effective";
+    private const string RejectedScanStatus = "rejected";
 
     private readonly CustomerOnboardingDbContext _context;
     private readonly IProtectedValueProtector _protector;
@@ -262,9 +267,40 @@ public sealed class OnboardingApplicationService : IOnboardingApplicationService
         CapturePayload payload = CapturePayloadFactory.Deserialise(record.CurrentCapture);
         Party party = CapturePayloadFactory.ToParty(payload, command.InstitutionId, now);
 
-        OnboardingApplication application = Restore(record);
-        application.Submit(party.PartyId, now);
+        RequirementPackRecord? effectivePack = await _context.RequirementPacks
+            .SingleOrDefaultAsync(pack => pack.Status == EffectivePackStatus, cancellationToken)
+            .ConfigureAwait(false);
+        if (effectivePack is null)
+        {
+            throw new OnboardingApplicationConflictException(
+                "onboarding_requirement_pack_missing",
+                "No approved onboarding requirement pack is effective for this institution.");
+        }
 
+        bool rejectedDocument = await _context.DocumentReferences
+            .AnyAsync(
+                document => document.ApplicationId == record.ApplicationId && document.ScanStatus == RejectedScanStatus,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (rejectedDocument)
+        {
+            throw new OnboardingApplicationConflictException(
+                "onboarding_document_scan_rejected",
+                "A document registered for this application failed its security scan.");
+        }
+
+        RequirementSnapshot requirementSnapshot = RequirementSnapshot.Capture(
+            command.InstitutionId,
+            record.ApplicationId,
+            record.Revision + 1,
+            RequirementPayload.ToPack(effectivePack),
+            command.ActorId.Value,
+            now);
+
+        OnboardingApplication application = Restore(record);
+        application.Submit(party.PartyId, requirementSnapshot.RequirementSnapshotId, now);
+
+        _context.RequirementSnapshots.Add(RequirementPayload.ToRecord(requirementSnapshot));
         _context.Parties.Add(ToPartyRecord(party));
         Apply(application, record, payload, CapturePayloadFactory.Hash(payload), command.ActorId, now, reason: "submitted");
 
@@ -303,6 +339,14 @@ public sealed class OnboardingApplicationService : IOnboardingApplicationService
             throw new OnboardingApplicationConflictException(
                 "onboarding_revision_conflict",
                 "The application was changed by another request.");
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException postgres
+            && postgres.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            DiscardPendingChanges();
+            throw new OnboardingApplicationConflictException(
+                "onboarding_requirement_snapshot_conflict",
+                "A requirement snapshot already exists for this application revision.");
         }
         catch (DbUpdateException)
         {
@@ -372,6 +416,7 @@ public sealed class OnboardingApplicationService : IOnboardingApplicationService
             ParseStatus(record.Status),
             record.Revision,
             record.PartyId,
+            record.RequirementSnapshotId,
             record.CreatedAt,
             record.UpdatedAt,
             record.SubmittedAt,
@@ -395,6 +440,7 @@ public sealed class OnboardingApplicationService : IOnboardingApplicationService
         record.CurrentCapture = capture;
         record.CurrentPayloadHash = payloadHash;
         record.PartyId = application.PartyId;
+        record.RequirementSnapshotId = application.RequirementSnapshotId;
         record.UpdatedAt = application.UpdatedAt;
         record.SubmittedAt = application.SubmittedAt;
         record.WithdrawnAt = application.WithdrawnAt;
@@ -408,6 +454,7 @@ public sealed class OnboardingApplicationService : IOnboardingApplicationService
             PayloadHash = payloadHash,
             Capture = capture,
             Reason = reason,
+            RequirementSnapshotId = application.RequirementSnapshotId,
             RecordedBy = actorId.Value,
             RecordedAt = now,
         });
@@ -429,6 +476,7 @@ public sealed class OnboardingApplicationService : IOnboardingApplicationService
                 InstitutionId = party.InstitutionId.Value,
                 PartyId = party.PartyId,
                 BirthDateToken = party.BirthDetails.BirthDateToken,
+                BirthDateLookupToken = party.BirthDetails.BirthDateLookupToken,
                 BirthDateMasked = party.BirthDetails.BirthDateMasked,
                 BirthYear = party.BirthDetails.BirthYear,
                 CountryOfBirth = party.BirthDetails.CountryOfBirth,
@@ -474,6 +522,7 @@ public sealed class OnboardingApplicationService : IOnboardingApplicationService
                 PartyId = party.PartyId,
                 AddressType = address.Type.ToString().ToLowerInvariant(),
                 LineToken = address.LineToken,
+                LookupToken = address.LookupToken,
                 MaskedLine = address.MaskedLine,
                 City = address.City,
                 Region = address.Region,

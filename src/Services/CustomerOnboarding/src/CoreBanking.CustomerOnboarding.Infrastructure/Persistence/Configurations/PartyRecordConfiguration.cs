@@ -54,16 +54,23 @@ public static class PartyRecordConfiguration
         public void Configure(EntityTypeBuilder<PartyIndividualRecord> entity)
         {
             entity.ToTable("individuals", "party", table =>
-                table.HasCheckConstraint("ck_party_individuals_birth_year", "birth_year BETWEEN 1850 AND 2200"));
+            {
+                table.HasCheckConstraint("ck_party_individuals_birth_year", "birth_year BETWEEN 1850 AND 2200");
+                table.HasCheckConstraint("ck_party_individuals_birth_lookup_token", "char_length(birth_date_lookup_token) IN (0, 64)");
+            });
 
             entity.HasKey(record => new { record.InstitutionId, record.PartyId });
             entity.Property(record => record.InstitutionId).HasColumnName("institution_id").HasMaxLength(128);
             entity.Property(record => record.PartyId).HasColumnName("party_id").HasMaxLength(64);
             entity.Property(record => record.BirthDateToken).HasColumnName("birth_date_token").HasMaxLength(512);
+            entity.Property(record => record.BirthDateLookupToken).HasColumnName("birth_date_lookup_token").HasMaxLength(64);
             entity.Property(record => record.BirthDateMasked).HasColumnName("birth_date_masked").HasMaxLength(32);
             entity.Property(record => record.BirthYear).HasColumnName("birth_year");
             entity.Property(record => record.CountryOfBirth).HasColumnName("country_of_birth").HasMaxLength(2);
             entity.Property(record => record.CapturedAt).HasColumnName("captured_at");
+
+            entity.HasIndex(record => new { record.InstitutionId, record.BirthDateLookupToken })
+                .HasDatabaseName("ix_party_individuals_institution_birth_lookup");
 
             entity.HasOne(record => record.Party)
                 .WithOne(record => record.Individual)
@@ -152,6 +159,7 @@ public static class PartyRecordConfiguration
                 table.HasCheckConstraint("ck_party_addresses_type", "address_type IN ('residential', 'postal', 'business')");
                 table.HasCheckConstraint("ck_party_addresses_country", "country_code ~ '^[A-Z]{2}$'");
                 table.HasCheckConstraint("ck_party_addresses_effective_period", "effective_to IS NULL OR effective_to > effective_from");
+                table.HasCheckConstraint("ck_party_addresses_lookup_token", "char_length(lookup_token) IN (0, 64)");
             });
 
             entity.HasKey(record => new { record.InstitutionId, record.AddressId });
@@ -160,6 +168,7 @@ public static class PartyRecordConfiguration
             entity.Property(record => record.PartyId).HasColumnName("party_id").HasMaxLength(64);
             entity.Property(record => record.AddressType).HasColumnName("address_type").HasMaxLength(32);
             entity.Property(record => record.LineToken).HasColumnName("line_token").HasMaxLength(512);
+            entity.Property(record => record.LookupToken).HasColumnName("lookup_token").HasMaxLength(64);
             entity.Property(record => record.MaskedLine).HasColumnName("masked_line").HasMaxLength(64);
             entity.Property(record => record.City).HasColumnName("city").HasMaxLength(128);
             entity.Property(record => record.Region).HasColumnName("region").HasMaxLength(128);
@@ -175,6 +184,8 @@ public static class PartyRecordConfiguration
 
             entity.HasIndex(record => new { record.InstitutionId, record.PartyId, record.AddressType })
                 .HasDatabaseName("ix_party_addresses_institution_party_type");
+            entity.HasIndex(record => new { record.InstitutionId, record.LookupToken })
+                .HasDatabaseName("ix_party_addresses_institution_lookup");
         }
     }
 }

@@ -136,7 +136,7 @@ public sealed class OnboardingDomainTests
         OnboardingApplication application = Start();
         application.Revise(Now.AddMinutes(1));
 
-        application.Submit("party-1", Now.AddMinutes(2));
+        application.Submit("party-1", "snapshot-1", Now.AddMinutes(2));
 
         Assert.Equal(ApplicationStatus.Submitted, application.Status);
         Assert.Equal("party-1", application.PartyId);
@@ -149,21 +149,21 @@ public sealed class OnboardingDomainTests
     public void A_submitted_application_cannot_be_revised_or_submitted_again()
     {
         OnboardingApplication application = Start();
-        application.Submit("party-1", Now);
+        application.Submit("party-1", "snapshot-1", Now);
 
         Assert.Equal(
             "onboarding_revision_conflict",
             Assert.Throws<OnboardingRuleException>(() => application.Revise(Now)).Code);
         Assert.Equal(
             "onboarding_revision_conflict",
-            Assert.Throws<OnboardingRuleException>(() => application.Submit("party-2", Now)).Code);
+            Assert.Throws<OnboardingRuleException>(() => application.Submit("party-2", "snapshot-2", Now)).Code);
     }
 
     [Fact]
     public void A_submitted_application_can_be_withdrawn_once()
     {
         OnboardingApplication application = Start();
-        application.Submit("party-1", Now);
+        application.Submit("party-1", "snapshot-1", Now);
 
         application.Withdraw(Now.AddMinutes(1));
 

@@ -42,6 +42,8 @@ public sealed class PartyIndividualRecord : ITenantOwnedEntity
 
     public string BirthDateToken { get; set; } = string.Empty;
 
+    public string BirthDateLookupToken { get; set; } = string.Empty;
+
     public string BirthDateMasked { get; set; } = string.Empty;
 
     public int BirthYear { get; set; }
@@ -117,6 +119,8 @@ public sealed class PartyAddressRecord : ITenantOwnedEntity
     public string AddressType { get; set; } = string.Empty;
 
     public string LineToken { get; set; } = string.Empty;
+
+    public string LookupToken { get; set; } = string.Empty;
 
     public string MaskedLine { get; set; } = string.Empty;
 

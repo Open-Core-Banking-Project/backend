@@ -7,12 +7,15 @@ using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.CustomerOnboarding.Application.Onboarding;
+using CoreBanking.CustomerOnboarding.Application.Requirements;
 using CoreBanking.CustomerOnboarding.Domain;
 using CoreBanking.CustomerOnboarding.Domain.Onboarding;
 using CoreBanking.CustomerOnboarding.Domain.Parties;
+using CoreBanking.CustomerOnboarding.Domain.Requirements;
 using CoreBanking.CustomerOnboarding.Infrastructure.Onboarding;
 using CoreBanking.CustomerOnboarding.Infrastructure.Persistence;
 using CoreBanking.CustomerOnboarding.Infrastructure.Protection;
+using CoreBanking.CustomerOnboarding.Infrastructure.Requirements;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -138,6 +141,7 @@ public sealed class OnboardingCaptureDatabaseTests
     {
         await using CustomerOnboardingDbContext context = CreateContext(_institution);
         OnboardingApplicationService service = CreateService(context);
+        await PublishPackAsync(context);
 
         OnboardingApplicationView started = await service.StartAsync(StartCommand("APP-4", CompleteCapture()), CancellationToken.None);
         OnboardingApplicationView submitted = await service.SubmitAsync(
@@ -153,6 +157,18 @@ public sealed class OnboardingCaptureDatabaseTests
         Assert.Equal("submitted", submitted.Status);
         Assert.NotNull(submitted.PartyId);
         Assert.Equal(2, submitted.Revision);
+
+        RequirementSnapshotRecord snapshot = await context.RequirementSnapshots.SingleAsync();
+        Assert.Equal("phase1-test", snapshot.PackCode);
+        Assert.Equal(1, snapshot.PackVersion);
+        Assert.Equal(64, snapshot.ContentHash.Length);
+        Assert.Equal(submitted.Revision, snapshot.ApplicationRevision);
+
+        OnboardingApplicationRecord applicationRecord = await context.OnboardingApplications.SingleAsync();
+        Assert.Equal(snapshot.RequirementSnapshotId, applicationRecord.RequirementSnapshotId);
+        Assert.Equal(
+            snapshot.RequirementSnapshotId,
+            (await context.OnboardingApplicationRevisions.SingleAsync(revision => revision.Reason == "submitted")).RequirementSnapshotId);
 
         PartyRecord party = await context.Parties
             .Include(record => record.Individual)
@@ -208,6 +224,7 @@ public sealed class OnboardingCaptureDatabaseTests
     {
         await using CustomerOnboardingDbContext context = CreateContext(_institution);
         OnboardingApplicationService service = CreateService(context);
+        await PublishPackAsync(context);
 
         OnboardingApplicationView started = await service.StartAsync(StartCommand("APP-6", CompleteCapture()), CancellationToken.None);
         OnboardingApplicationView submitted = await service.SubmitAsync(
@@ -234,6 +251,7 @@ public sealed class OnboardingCaptureDatabaseTests
     {
         await using CustomerOnboardingDbContext context = CreateContext(_institution);
         OnboardingApplicationService service = CreateService(context);
+        await PublishPackAsync(context);
 
         OnboardingApplicationView started = await service.StartAsync(StartCommand("APP-7", CompleteCapture()), CancellationToken.None);
         OnboardingApplicationView submitted = await service.SubmitAsync(
@@ -358,6 +376,19 @@ public sealed class OnboardingCaptureDatabaseTests
             new AesGcmProtectedValueProtector(CreateProtectionOptions()),
             new IdempotencyService(context, _time),
             _time);
+
+    private async Task PublishPackAsync(CustomerOnboardingDbContext context)
+    {
+        RequirementService requirements = new(context, new PendingScanDocumentQuarantine(), _time);
+        await requirements.PublishPackAsync(
+            new PublishRequirementPackCommand(
+                _institution,
+                _actor,
+                "phase1-test",
+                [OnboardingRequirement.Create("contact_detail", "Contact detail", true, ["email", "mobile"])],
+                "correlation"),
+            CancellationToken.None);
+    }
 
     private static ProtectedValueProtectionOptions CreateProtectionOptions() =>
         ProtectedValueProtectionOptions.Create(

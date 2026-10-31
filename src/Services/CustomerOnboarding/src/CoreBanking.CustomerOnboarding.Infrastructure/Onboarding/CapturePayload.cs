@@ -41,6 +41,8 @@ public sealed record CaptureBirthPayload
 {
     public string BirthDateToken { get; init; } = string.Empty;
 
+    public string BirthDateLookupToken { get; init; } = string.Empty;
+
     public string BirthDateMasked { get; init; } = string.Empty;
 
     public int BirthYear { get; init; }
@@ -64,6 +66,8 @@ public sealed record CaptureAddressPayload
     public string Type { get; init; } = string.Empty;
 
     public string LineToken { get; init; } = string.Empty;
+
+    public string LookupToken { get; init; } = string.Empty;
 
     public string MaskedLine { get; init; } = string.Empty;
 
@@ -139,6 +143,7 @@ public static class CapturePayloadFactory
                 ? null
                 : new ProtectedBirthDetails(
                     payload.Birth.BirthDateToken,
+                    payload.Birth.BirthDateLookupToken,
                     payload.Birth.BirthDateMasked,
                     payload.Birth.BirthYear,
                     payload.Birth.CountryOfBirth,
@@ -152,6 +157,7 @@ public static class CapturePayloadFactory
             [.. payload.Addresses.Select(address => new ProtectedAddress(
                 ParseEnum<AddressType>(address.Type),
                 address.LineToken,
+                address.LookupToken,
                 address.MaskedLine,
                 address.City,
                 address.Region,
@@ -187,6 +193,7 @@ public static class CapturePayloadFactory
         return new CaptureBirthPayload
         {
             BirthDateToken = value.ValueToken,
+            BirthDateLookupToken = value.LookupToken,
             BirthDateMasked = birthDetails.BirthDate.ToString("yyyy-MM-**", System.Globalization.CultureInfo.InvariantCulture),
             BirthYear = birthDetails.BirthDate.Year,
             CountryOfBirth = birthDetails.CountryOfBirth,
@@ -215,6 +222,7 @@ public static class CapturePayloadFactory
         {
             Type = address.Type.ToString(),
             LineToken = value.ValueToken,
+            LookupToken = value.LookupToken,
             MaskedLine = value.MaskedValue,
             City = address.City,
             Region = address.Region,

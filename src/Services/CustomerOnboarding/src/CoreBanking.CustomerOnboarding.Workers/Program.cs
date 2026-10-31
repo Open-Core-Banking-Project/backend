@@ -1,10 +1,19 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
+using CoreBanking.CustomerOnboarding.Application.Audit;
+using CoreBanking.CustomerOnboarding.Infrastructure.Audit;
 using CoreBanking.CustomerOnboarding.Infrastructure.Institutions;
+using CoreBanking.CustomerOnboarding.Application.Customers;
+using CoreBanking.CustomerOnboarding.Application.Kyc;
+using CoreBanking.CustomerOnboarding.Infrastructure.Approvals;
+using CoreBanking.CustomerOnboarding.Infrastructure.Customers;
+using CoreBanking.CustomerOnboarding.Infrastructure.Integration;
+using CoreBanking.CustomerOnboarding.Infrastructure.Kyc;
+using CoreBanking.CustomerOnboarding.Infrastructure.Messaging;
 using CoreBanking.CustomerOnboarding.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -46,8 +55,10 @@ public static partial class Program
             provider.GetRequiredService<IIntegrationStore>(),
             provider.GetRequiredService<TimeProvider>()));
         builder.Services.AddScoped<InstitutionProvisioningConsumer>();
-        builder.Services.AddScoped<IIntegrationEventConsumer>(provider =>
-            provider.GetRequiredService<InstitutionProvisioningConsumer>());
+        builder.Services.AddScoped<CustomerClassificationApprovalDecidedConsumer>();
+        builder.Services.AddScoped<CustomerMergeApprovalDecidedConsumer>();
+        builder.Services.AddScoped<ICustomerMergeService, CustomerMergeService>();
+        builder.Services.AddScoped<IIntegrationEventConsumer, CustomerOnboardingEventRouter>();
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
         builder.Services.AddKafkaEventPublisher(new KafkaMessagingOptions
@@ -59,10 +70,25 @@ public static partial class Program
         {
             BootstrapServers = bootstrapServers,
             GroupId = InstitutionProvisioningConsumer.ConsumerName,
-            Topics = [InstitutionProvisioningConsumer.TopicName],
+            Topics =
+            [
+                InstitutionProvisioningConsumer.TopicName,
+                CustomerClassificationApprovalDecidedConsumer.TopicName,
+            ],
         });
         builder.Services.AddHostedService<OutboxRelayWorker>();
         builder.Services.AddHostedService<KafkaInboxConsumerWorker>();
+        builder.Services.AddScoped<ICustomerReconciliationService, CustomerReconciliationService>();
+        builder.Services.AddScoped<IKycCaseService, KycCaseService>();
+        builder.Services.AddSingleton(KycVerificationRunOptions.Default);
+        // Phase 1 binds the deterministic synthetic adapter only; a real route arrives with the provider agreement.
+        builder.Services.AddSingleton<IKycProviderPort>(_ =>
+            new SyntheticKycProviderAdapter(SyntheticKycProviderScript.Passed));
+        builder.Services.AddScoped<IKycVerificationRunner, KycVerificationRunner>();
+        builder.Services.AddScoped<ICustomerService, CustomerService>();
+        builder.Services.AddScoped<ICustomerCorrectionService, CustomerCorrectionService>();
+        builder.Services.AddSingleton(CustomerReconciliationOptions.FromConfiguration(builder.Configuration));
+        builder.Services.AddHostedService<CustomerReconciliationWorker>();
 
         IHost host = builder.Build();
         OutboxBacklogGauges.Register(host.Services.GetRequiredService<IServiceScopeFactory>());

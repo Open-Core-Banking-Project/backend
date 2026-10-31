@@ -23,6 +23,26 @@ public sealed class OnboardingModelTests
     [InlineData(typeof(PartyAddressRecord), "party", "addresses")]
     [InlineData(typeof(OnboardingApplicationRecord), "onboarding", "applications")]
     [InlineData(typeof(OnboardingApplicationRevisionRecord), "onboarding", "application_revisions")]
+    [InlineData(typeof(DuplicateCandidateSetRecord), "customer", "duplicate_candidate_sets")]
+    [InlineData(typeof(DuplicateCandidateRecord), "customer", "duplicate_candidates")]
+    [InlineData(typeof(RequirementPackRecord), "onboarding", "requirement_packs")]
+    [InlineData(typeof(RequirementSnapshotRecord), "onboarding", "requirement_snapshots")]
+    [InlineData(typeof(DocumentReferenceRecord), "kyc", "document_references")]
+    [InlineData(typeof(KycCaseRecord), "kyc", "kyc_cases")]
+    [InlineData(typeof(KycRequirementRecord), "kyc", "kyc_requirements")]
+    [InlineData(typeof(IdentityVerificationRecord), "kyc", "identity_verifications")]
+    [InlineData(typeof(VerificationAttemptRecord), "kyc", "verification_attempts")]
+    [InlineData(typeof(VerificationStatusHistoryRecord), "kyc", "verification_status_history")]
+    [InlineData(typeof(KycRequirementHistoryRecord), "kyc", "kyc_requirement_history")]
+    [InlineData(typeof(CustomerRecord), "customer", "customers")]
+    [InlineData(typeof(CustomerClassificationRecord), "customer", "customer_classifications")]
+    [InlineData(typeof(CustomerStatusHistoryRecord), "customer", "customer_status_history")]
+    [InlineData(typeof(CustomerNumberSequenceRecord), "customer", "customer_number_sequences")]
+    [InlineData(typeof(ServicePreferenceRecord), "customer", "service_preferences")]
+    [InlineData(typeof(ConsentEvidenceRecord), "privacy", "consents")]
+    [InlineData(typeof(MergeRequestRecord), "customer", "merge_requests")]
+    [InlineData(typeof(MergeConsumerStatusRecord), "customer", "merge_consumer_status")]
+    [InlineData(typeof(CustomerAliasRecord), "customer", "customer_aliases")]
     public void A_new_record_is_mapped_to_its_owned_schema(Type recordType, string schema, string table)
     {
         using CustomerOnboardingDbContext context = CreateContext();
@@ -75,6 +95,42 @@ public sealed class OnboardingModelTests
         IEntityType application = context.Model.FindEntityType(typeof(OnboardingApplicationRecord))!;
 
         Assert.Equal("jsonb", application.FindProperty(nameof(OnboardingApplicationRecord.CurrentCapture))!.GetColumnType());
+    }
+
+    [Fact]
+    public void Only_one_live_duplicate_candidate_set_exists_per_application_revision()
+    {
+        using CustomerOnboardingDbContext context = CreateContext();
+        IEntityType set = context.Model.FindEntityType(typeof(DuplicateCandidateSetRecord))!;
+
+        IIndex index = Assert.Single(set.GetIndexes(), candidate =>
+            candidate.IsUnique
+            && candidate.Properties.Select(property => property.Name).SequenceEqual(["InstitutionId", "ApplicationId", "ApplicationRevision"]));
+
+        Assert.Equal("status <> 'superseded'", index.GetFilter());
+    }
+
+    [Fact]
+    public void Only_one_requirement_pack_is_effective_per_institution()
+    {
+        using CustomerOnboardingDbContext context = CreateContext();
+        IEntityType pack = context.Model.FindEntityType(typeof(RequirementPackRecord))!;
+
+        IIndex index = Assert.Single(pack.GetIndexes(), candidate => candidate.IsUnique);
+
+        Assert.Equal(["InstitutionId"], index.Properties.Select(property => property.Name));
+        Assert.Equal("status = 'effective'", index.GetFilter());
+    }
+
+    [Fact]
+    public void A_requirement_snapshot_is_unique_per_application_revision()
+    {
+        using CustomerOnboardingDbContext context = CreateContext();
+        IEntityType snapshot = context.Model.FindEntityType(typeof(RequirementSnapshotRecord))!;
+
+        Assert.Contains(snapshot.GetIndexes(), index =>
+            index.IsUnique
+            && index.Properties.Select(property => property.Name).SequenceEqual(["InstitutionId", "ApplicationId", "ApplicationRevision"]));
     }
 
     private static CustomerOnboardingDbContext CreateContext()

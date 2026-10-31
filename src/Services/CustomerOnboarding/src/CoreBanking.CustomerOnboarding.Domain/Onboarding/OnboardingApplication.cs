@@ -75,6 +75,7 @@ public sealed class OnboardingApplication
         ApplicationStatus status,
         int revision,
         string? partyId,
+        string? requirementSnapshotId,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         DateTimeOffset? submittedAt,
@@ -89,6 +90,7 @@ public sealed class OnboardingApplication
         Status = status;
         Revision = revision;
         PartyId = partyId;
+        RequirementSnapshotId = requirementSnapshotId;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
         SubmittedAt = submittedAt;
@@ -113,6 +115,13 @@ public sealed class OnboardingApplication
     public int Revision { get; private set; }
 
     public string? PartyId { get; private set; }
+
+    /// <summary>
+    /// The requirement snapshot captured when this revision was submitted. It is set once and never
+    /// replaced, so a policy change cannot rewrite what an application was judged against.
+    /// Decision: P1-E03-D01, invariant 3.
+    /// </summary>
+    public string? RequirementSnapshotId { get; private set; }
 
     public DateTimeOffset CreatedAt { get; }
 
@@ -142,6 +151,7 @@ public sealed class OnboardingApplication
             ApplicationStatus.Draft,
             revision: 1,
             partyId: null,
+            requirementSnapshotId: null,
             now,
             now,
             submittedAt: null,
@@ -164,11 +174,13 @@ public sealed class OnboardingApplication
 
     /// <summary>
     /// Submits the exact revision the caller confirmed. Completeness is checked against the protected
-    /// snapshot by the caller, because this aggregate never holds personal data.
+    /// snapshot by the caller, because this aggregate never holds personal data. The requirement snapshot
+    /// is captured before submission, so a submitted application always cites the rules it was judged by.
     /// </summary>
-    public void Submit(string partyId, DateTimeOffset now)
+    public void Submit(string partyId, string requirementSnapshotId, DateTimeOffset now)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(partyId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(requirementSnapshotId);
 
         if (Status != ApplicationStatus.Draft)
         {
@@ -177,6 +189,7 @@ public sealed class OnboardingApplication
 
         Status = ApplicationStatus.Submitted;
         PartyId = partyId;
+        RequirementSnapshotId = requirementSnapshotId;
         Revision++;
         SubmittedAt = now;
         UpdatedAt = now;
@@ -208,10 +221,11 @@ public sealed class OnboardingApplication
         ApplicationStatus status,
         int revision,
         string? partyId,
+        string? requirementSnapshotId,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         DateTimeOffset? submittedAt,
         DateTimeOffset? withdrawnAt,
         long concurrencyVersion) =>
-        new(institutionId, applicationId, applicationReference, applicationType, branchId, status, revision, partyId, createdAt, updatedAt, submittedAt, withdrawnAt, concurrencyVersion);
+        new(institutionId, applicationId, applicationReference, applicationType, branchId, status, revision, partyId, requirementSnapshotId, createdAt, updatedAt, submittedAt, withdrawnAt, concurrencyVersion);
 }

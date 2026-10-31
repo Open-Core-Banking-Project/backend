@@ -27,8 +27,11 @@ special-case decisions reversible, and states exactly what it protects:
 
 - **Protected (encrypted + lookup token + masked display):** contact point values, address lines and
   date of birth. Each value is encrypted with AES-256-GCM using a fresh 96-bit nonce, so two captures
-  of the same value never produce the same stored token. The deterministic HMAC-SHA256 lookup token
-  exists only for future exact-match duplicate detection (slice 6) and is never exposed by an API.
+  of the same value never produce the same stored token. The deterministic HMAC-SHA256 lookup token is
+  stored alongside the encrypted value for exact-match duplicate detection: contacts on
+  `party.contacts.lookup_token`, addresses on `party.addresses.lookup_token` and dates of birth on
+  `party.individuals.birth_date_lookup_token`. A lookup token is never exposed by an API and is the only
+  value duplicate detection compares. Decision: P1-E03-D04/D05.
 - **Not protected, on purpose:** the legal name and its normalised comparison form, and the
   structured address parts (city, region, country). Names are needed for operational display and for
   the duplicate work in slice 6; treating them as secret would silently make that work impossible.
@@ -61,8 +64,33 @@ special-case decisions reversible, and states exactly what it protects:
 
 Failure codes emitted by slice 4: `onboarding_required_field_missing`, `onboarding_field_invalid`,
 `onboarding_field_too_long`, `onboarding_revision_conflict`, `onboarding_reference_conflict`,
-`onboarding_capture_in_progress`, `idempotency_key_reused_with_different_request`. The epic's
-`onboarding_policy_unavailable` and `onboarding_duplicate_review_required` belong to slices 5 and 6.
+`onboarding_capture_in_progress`, `idempotency_key_reused_with_different_request`. Slice 5 adds
+`onboarding_requirement_pack_missing`, `onboarding_document_scan_rejected` and
+`onboarding_requirement_snapshot_conflict`; slice 6 adds the duplicate review codes. The epic's
+`onboarding_policy_unavailable` and `onboarding_duplicate_review_required` remain unclaimed.
+
+## Requirement packs and the submission gate
+
+Submission now needs an approved requirement pack for the institution. The pack is **data**, not code:
+
+- `RequirementService.PublishPackAsync` publishes the next version of a pack. A new version supersedes the
+  previous one for future submissions only; requirement order, mandatory flags and evidence kinds are part
+  of a SHA-256 content hash.
+- Each submitted application revision captures one immutable `onboarding.requirement_snapshots` row that
+  cites the pack code, version and hash and copies the requirement list. A later policy change never
+  rewrites an existing snapshot.
+- With no effective pack, submission is refused with `onboarding_requirement_pack_missing`. Engineering
+  ships no jurisdictional content, so a fresh environment cannot submit an application until Compliance
+  publishes a pack.
+- Document metadata is registered through `RequirementService.RegisterDocumentAsync` and stored in
+  `kyc.document_references` (hash, length, content type, opaque storage reference, scan status). No binary
+  content is stored here.
+- `IDocumentQuarantine` is a port. `PendingScanDocumentQuarantine` answers "pending scan" for everything
+  until the approved document storage component is wired, so a document is never treated as clean by
+  default. Submission refuses only on an explicit `rejected` scan; `pending_scan` stays visible as
+  outstanding evidence for the KYC slices.
+
+Decision: [P1-E03-D01/D02/D03](../implementation/phase-1-banking-foundation/decisions/P1-E03-D01-D02-D03-requirement-packs-numbering-and-classification.md).
 
 ## Migration and privilege order
 
@@ -76,15 +104,22 @@ than trusting the statements.
 Both migrations are additive. `Down` removes the trigger and function before dropping the tables, so
 a rollback leaves no orphaned evidence function behind.
 
+Later slices add `AddDuplicateCandidateSets` (plus `customer` schema grants) with
+`AddDeterministicMatchLookupTokens`, and `AddRequirementPacksAndDocumentReferences` (plus `kyc` schema
+grants). The same per-schema default-privilege rule applies: every new schema gets its own grants
+migration, and `tests/CoreBanking.SecurityTests/ServiceCatalogue.cs` lists it as mutable for Customer
+Onboarding so the effective-privilege suite asserts it.
+
 ## Deliberately unavailable
 
-- **No onboarding API endpoints yet.** The service is reachable only from tests until the request
+- No onboarding API endpoints yet. The service is reachable only from tests until the request
   contracts, actor resolution and authorisation filter are wired the way Core Ledger does it. An
   unwired endpoint that answers would be worse than an absent one.
-- No requirement snapshots, policy resolution, duplicate checks, KYC cases, classification,
-  activation, merge or Customer 360. Those are slices 5 onwards and must not be inferred from this
-  slice.
-- Address verification status, document references and `party.relationships` are not modelled yet.
+- No KYC cases, verification requests, classification, activation, merge or Customer 360. Those are
+  slices 7 onwards and must not be inferred from this slice.
+- No document binary storage or malware scanning: only metadata and the quarantine port exist, and the
+  port answers "pending scan" until the approved component is wired.
+- Address verification status and `party.relationships` are not modelled yet.
 
 ## Verification
 

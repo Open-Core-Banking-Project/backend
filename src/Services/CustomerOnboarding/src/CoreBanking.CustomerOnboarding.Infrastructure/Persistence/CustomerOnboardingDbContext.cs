@@ -38,6 +38,52 @@ public sealed class CustomerOnboardingDbContext : DbContext, IIntegrationStore
 
     public DbSet<OnboardingApplicationRevisionRecord> OnboardingApplicationRevisions => Set<OnboardingApplicationRevisionRecord>();
 
+    public DbSet<DuplicateCandidateSetRecord> DuplicateCandidateSets => Set<DuplicateCandidateSetRecord>();
+
+    public DbSet<DuplicateCandidateRecord> DuplicateCandidates => Set<DuplicateCandidateRecord>();
+
+    public DbSet<RequirementPackRecord> RequirementPacks => Set<RequirementPackRecord>();
+
+    public DbSet<RequirementSnapshotRecord> RequirementSnapshots => Set<RequirementSnapshotRecord>();
+
+    public DbSet<DocumentReferenceRecord> DocumentReferences => Set<DocumentReferenceRecord>();
+
+    public DbSet<KycCaseRecord> KycCases => Set<KycCaseRecord>();
+
+    public DbSet<KycRequirementRecord> KycRequirements => Set<KycRequirementRecord>();
+
+    public DbSet<IdentityVerificationRecord> IdentityVerifications => Set<IdentityVerificationRecord>();
+
+    public DbSet<VerificationAttemptRecord> VerificationAttempts => Set<VerificationAttemptRecord>();
+
+    public DbSet<VerificationStatusHistoryRecord> VerificationStatusHistory => Set<VerificationStatusHistoryRecord>();
+
+    public DbSet<KycRequirementHistoryRecord> KycRequirementHistory => Set<KycRequirementHistoryRecord>();
+
+    public DbSet<CustomerRecord> Customers => Set<CustomerRecord>();
+
+    public DbSet<CustomerClassificationRecord> CustomerClassifications => Set<CustomerClassificationRecord>();
+
+    public DbSet<CustomerStatusHistoryRecord> CustomerStatusHistory => Set<CustomerStatusHistoryRecord>();
+
+    public DbSet<CustomerNumberSequenceRecord> CustomerNumberSequences => Set<CustomerNumberSequenceRecord>();
+
+    public DbSet<ServicePreferenceRecord> ServicePreferences => Set<ServicePreferenceRecord>();
+
+    public DbSet<ConsentEvidenceRecord> ConsentEvidence => Set<ConsentEvidenceRecord>();
+
+    public DbSet<RelationshipManagerAssignmentRecord> RelationshipManagerAssignments => Set<RelationshipManagerAssignmentRecord>();
+
+    public DbSet<CustomerCorrectionRecord> CustomerCorrections => Set<CustomerCorrectionRecord>();
+
+    public DbSet<MergeRequestRecord> MergeRequests => Set<MergeRequestRecord>();
+
+    public DbSet<MergeConsumerStatusRecord> MergeConsumerStatus => Set<MergeConsumerStatusRecord>();
+
+    public DbSet<CustomerAliasRecord> CustomerAliases => Set<CustomerAliasRecord>();
+
+    public DbSet<CustomerAuditEventRecord> CustomerAuditEvents => Set<CustomerAuditEventRecord>();
+
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
 
     public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
@@ -57,6 +103,15 @@ public sealed class CustomerOnboardingDbContext : DbContext, IIntegrationStore
         modelBuilder.ApplyIntegrationRecords();
         modelBuilder.ApplyPartyRecords();
         modelBuilder.ApplyOnboardingRecords();
+        modelBuilder.ApplyDuplicateRecords();
+        modelBuilder.ApplyRequirementRecords();
+        modelBuilder.ApplyKycRecords();
+        modelBuilder.ApplyCustomerRecords();
+        modelBuilder.ApplyPreferenceRecords();
+        modelBuilder.ApplyRelationshipManagerRecords();
+        modelBuilder.ApplyCorrectionRecords();
+        modelBuilder.ApplyMergeRecords();
+        modelBuilder.ApplyAuditRecords();
 
         modelBuilder.Entity<InstitutionBoundaryRecord>(entity =>
         {
@@ -97,6 +152,52 @@ public sealed class CustomerOnboardingDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<OnboardingApplicationRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OnboardingApplicationRevisionRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<DuplicateCandidateSetRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<DuplicateCandidateRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<RequirementPackRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<RequirementSnapshotRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<DocumentReferenceRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<KycCaseRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<KycRequirementRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<IdentityVerificationRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<VerificationAttemptRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<VerificationStatusHistoryRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<KycRequirementHistoryRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CustomerRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CustomerClassificationRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CustomerStatusHistoryRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CustomerNumberSequenceRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ServicePreferenceRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ConsentEvidenceRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<RelationshipManagerAssignmentRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CustomerCorrectionRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<MergeRequestRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<MergeConsumerStatusRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CustomerAliasRecord>().HasQueryFilter(record =>
+            CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CustomerAuditEventRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
     }
 

@@ -30,6 +30,8 @@ public sealed class OnboardingApplicationRecord : ITenantOwnedEntity
 
     public string? PartyId { get; set; }
 
+    public string? RequirementSnapshotId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
@@ -62,6 +64,8 @@ public sealed class OnboardingApplicationRevisionRecord : ITenantOwnedEntity
     public string Capture { get; set; } = string.Empty;
 
     public string Reason { get; set; } = string.Empty;
+
+    public string? RequirementSnapshotId { get; set; }
 
     public string RecordedBy { get; set; } = string.Empty;
 
