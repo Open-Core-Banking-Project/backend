@@ -31,6 +31,41 @@ internal sealed class ApprovalRequestRecordConfiguration : IEntityTypeConfigurat
         builder.Property(x => x.Version).HasColumnName("version").IsConcurrencyToken();
         builder.Property(x => x.SubmittedAt).HasColumnName("submitted_at");
         builder.Property(x => x.DecidedAt).HasColumnName("decided_at");
+        builder.Property(x => x.ApplicationStatus).HasColumnName("application_status").HasMaxLength(32);
+        builder.Property(x => x.AppliedAt).HasColumnName("applied_at");
+        builder.Property(x => x.ApplyFailureCode).HasColumnName("apply_failure_code").HasMaxLength(64);
+    }
+}
+
+/// <summary>
+/// The source-service acknowledgement table. The unique result identifier is the idempotency key and the row is
+/// append-only evidence of what the owning service reported. Decision: epic 06 section 11.
+/// </summary>
+internal sealed class ApprovalApplicationResultRecordConfiguration : IEntityTypeConfiguration<ApprovalApplicationResultRecord>
+{
+    public void Configure(EntityTypeBuilder<ApprovalApplicationResultRecord> builder)
+    {
+        builder.ToTable("application_results", "approval", table =>
+        {
+            table.HasCheckConstraint("ck_application_results_outcome", "outcome IN ('applied', 'rejected', 'apply_failed')");
+            table.HasCheckConstraint(
+                "ck_application_results_failure_code",
+                "outcome <> 'apply_failed' OR failure_code IS NOT NULL");
+        });
+        builder.HasKey(x => new { x.InstitutionId, x.ResultId });
+        builder.HasIndex(x => new { x.InstitutionId, x.RequestId }).IsUnique();
+        builder.Property(x => x.InstitutionId).HasColumnName("institution_id").HasMaxLength(128);
+        builder.Property(x => x.ResultId).HasColumnName("result_id").HasMaxLength(128);
+        builder.Property(x => x.RequestId).HasColumnName("request_id").HasMaxLength(128);
+        builder.Property(x => x.DecisionId).HasColumnName("decision_id").HasMaxLength(128);
+        builder.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(32);
+        builder.Property(x => x.FailureCode).HasColumnName("failure_code").HasMaxLength(64);
+        builder.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(500);
+        builder.Property(x => x.SourceService).HasColumnName("source_service").HasMaxLength(64);
+        builder.Property(x => x.SubjectVersion).HasColumnName("subject_version").HasMaxLength(128);
+        builder.Property(x => x.SubjectHash).HasColumnName("subject_hash").HasMaxLength(64);
+        builder.Property(x => x.CorrelationId).HasColumnName("correlation_id").HasMaxLength(128);
+        builder.Property(x => x.AcknowledgedAt).HasColumnName("acknowledged_at");
     }
 }
 

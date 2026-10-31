@@ -43,7 +43,8 @@ public static partial class Program
         builder.Services.AddScoped(provider => new InboxProcessor(
             provider.GetRequiredService<IIntegrationStore>(), provider.GetRequiredService<TimeProvider>()));
         builder.Services.AddScoped<InstitutionProvisioningConsumer>();
-        builder.Services.AddScoped<SavingsEligibilityApprovalRequestedConsumer>();
+        builder.Services.AddScoped<ApprovalRequestedConsumer>();
+builder.Services.AddScoped<ApprovalApplicationResultConsumer>();
         builder.Services.AddScoped<IIntegrationEventConsumer, OperationsWorkflowIntegrationEventConsumer>();
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
@@ -56,7 +57,7 @@ public static partial class Program
         {
             BootstrapServers = bootstrapServers,
             GroupId = "operations-workflow.integration-events",
-            Topics = [InstitutionProvisioningConsumer.TopicName, SavingsEligibilityApprovalRequestedConsumer.TopicName],
+            Topics = [InstitutionProvisioningConsumer.TopicName, .. ApprovalRequestedConsumer.TopicNames],
         });
         builder.Services.AddHostedService<OutboxRelayWorker>();
         builder.Services.AddHostedService<KafkaInboxConsumerWorker>();

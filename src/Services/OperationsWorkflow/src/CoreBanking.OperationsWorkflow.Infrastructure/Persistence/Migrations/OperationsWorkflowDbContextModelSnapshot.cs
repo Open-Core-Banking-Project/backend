@@ -265,6 +265,87 @@ namespace CoreBanking.OperationsWorkflow.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "integration");
                 });
 
+            modelBuilder.Entity("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.ApprovalApplicationResultRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("ResultId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("result_id");
+
+                    b.Property<DateTimeOffset>("AcknowledgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("DecisionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("decision_id");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("SourceService")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_service");
+
+                    b.Property<string>("SubjectHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subject_hash");
+
+                    b.Property<string>("SubjectVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("subject_version");
+
+                    b.HasKey("InstitutionId", "ResultId");
+
+                    b.HasIndex("InstitutionId", "RequestId")
+                        .IsUnique();
+
+                    b.ToTable("application_results", "approval", t =>
+                        {
+                            t.HasCheckConstraint("ck_application_results_failure_code", "outcome <> 'apply_failed' OR failure_code IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_application_results_outcome", "outcome IN ('applied', 'rejected', 'apply_failed')");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.OperationsWorkflow.Infrastructure.Persistence.ApprovalDecisionRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -367,6 +448,20 @@ namespace CoreBanking.OperationsWorkflow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
                         .HasColumnName("request_id");
+
+                    b.Property<string>("ApplicationStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("application_status");
+
+                    b.Property<DateTimeOffset?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("applied_at");
+
+                    b.Property<string>("ApplyFailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("apply_failure_code");
 
                     b.Property<string>("CorrelationId")
                         .IsRequired()
