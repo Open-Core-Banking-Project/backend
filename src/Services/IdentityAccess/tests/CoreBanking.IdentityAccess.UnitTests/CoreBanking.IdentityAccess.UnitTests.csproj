@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\CoreBanking.IdentityAccess.Contracts\CoreBanking.IdentityAccess.Contracts.csproj" />
     <ProjectReference Include="..\..\src\CoreBanking.IdentityAccess.Application\CoreBanking.IdentityAccess.Application.csproj" />
     <ProjectReference Include="..\..\src\CoreBanking.IdentityAccess.Infrastructure\CoreBanking.IdentityAccess.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Application\CoreBanking.BuildingBlocks.Application.csproj" />

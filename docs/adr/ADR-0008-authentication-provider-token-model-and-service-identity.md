@@ -10,6 +10,7 @@ referenced_by:
   - docs/implementation/phase-0-engineering-foundation/03-identity-and-permission-foundation.md
   - docs/implementation/phase-1-banking-foundation/02-identity-roles-and-permissions.md
   - docs/implementation/phase-1-banking-foundation/01-institution-and-tenancy.md
+  - docs/security/identity-access-threat-model.md
 supersedes: []
 approved_by: [Architecture, Security, Identity and Access]
 approved_on: 2026-10-16
@@ -45,6 +46,7 @@ identity_provider_selected_on: 2026-10-19
 10. **Staff and privileged access.** Staff authenticate through the same provider with mandatory multi-factor authentication for privileged roles, stricter session limits and device controls. Privileged access is subject to review under the Phase 2 privileged-access epic.
 11. **Failure behaviour.** Authentication and authorisation fail closed. Error responses do not reveal whether an account, customer or identifier exists. Only the identity service and provider handle credential material; no other service receives passwords, PINs or one-time codes.
 12. **Management surface.** Sessions and devices are listed and revoked through Identity and Access endpoints, matching the session, device and service-client use cases in `02-identity-roles-and-permissions.md`.
+13. **Channel protocol boundary.** Interactive browser and native-mobile clients use an approved OpenID Connect authorisation-code flow with PKCE. A channel-specific security review must choose token transport and storage before that channel is enabled: browser tokens must not be exposed to ordinary application JavaScript when a backend-for-frontend or equivalent protected server session is used, and native refresh material must use operating-system protected storage. Embedded user-agent credential collection is prohibited. USSD, WhatsApp and chatbot providers never receive platform bearer or refresh tokens; their adapters authenticate as service identities and submit only a verified, short-lived channel binding to controlled APIs. Redirect URI allow-lists, state/nonce validation, CSRF protection where cookies are used, and exact issuer/audience validation are mandatory.
 
 ## Alternatives considered
 
@@ -67,7 +69,7 @@ identity_provider_selected_on: 2026-10-19
 ## Compliance and evidence
 
 - Negative tests: expired, forged, revoked, wrong-audience and wrong-environment tokens; cross-institution token use; service token presented as a human actor; step-up bypass attempt; revoked device and revoked session.
-- Threat model covering token theft, refresh reuse, device enrolment abuse, step-up bypass and channel identity spoofing.
+- [Identity and Access threat model](../security/identity-access-threat-model.md) covering token theft, refresh reuse, device enrolment abuse, step-up bypass, channel identity spoofing and entitlement invalidation failure.
 - Architecture tests failing when a service accepts identity from an untrusted source or validates tokens without audience checking.
 - Recorded evidence for approval: claim inventory, token lifetimes, session and device lifecycle, and a worked step-up flow.
 
@@ -75,12 +77,11 @@ identity_provider_selected_on: 2026-10-19
 
 - Keycloak hosting model, operational ownership, support arrangement and production topology.
 - Second-factor method: authenticator application, passkey or short message service, and whether customer-facing authentication uses the same provider as staff.
-- Whether refresh tokens are stored server-side for introspection or validated statelessly with reuse detection only.
 - Whether partner and corporate clients authenticate through the same provider or a separate delegated surface.
 
 ## Approval gate
 
-Satisfied 2026-10-16 for the protocol, token model, session, device, step-up and service identity design. Keycloak was selected on 2026-10-19. Still outstanding: Keycloak hosting and operational ownership; the second-factor method; and whether partner and corporate clients use a separate delegated surface. No production enrolment may be claimed until those decisions, the realm configuration, entitlement projection and operational controls are approved and verified.
+Satisfied 2026-10-16 for the protocol, token model, session, device, step-up and service identity design. Keycloak was selected on 2026-10-19. The channel protocol boundary and security controls were recorded with the Slice 1 threat model on 2026-10-26. Still outstanding: Keycloak hosting and operational ownership; the second-factor method; each channel's reviewed token-storage deployment; and whether partner and corporate clients use a separate delegated surface. No production enrolment may be claimed until those decisions, the realm configuration, entitlement projection and operational controls are approved and verified.
 
 ## Related documents
 
@@ -88,4 +89,5 @@ Satisfied 2026-10-16 for the protocol, token model, session, device, step-up and
 - [ADR-0009](ADR-0009-roles-permissions-contextual-scopes-and-invalidation.md) - authorisation model consuming these claims
 - [ADR-0011](ADR-0011-secret-key-and-certificate-management.md) - signing keys, client credentials and certificate custody
 - [ADR-0012](ADR-0012-channel-security-boundaries.md) - channel identity linking and step-up
+- [Identity and Access threat model](../security/identity-access-threat-model.md) - assets, trust boundaries, abuse cases and required verification
 - [02-identity-roles-and-permissions.md](../implementation/phase-1-banking-foundation/02-identity-roles-and-permissions.md)

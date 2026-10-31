@@ -4,6 +4,7 @@ using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Access;
+using CoreBanking.IdentityAccess.Infrastructure.Persistence.Authentication;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Identity;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Platform;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Security;
@@ -30,6 +31,12 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
 
     public DbSet<IdentityRecord> Identities => Set<IdentityRecord>();
 
+    public DbSet<InstitutionMembershipRecord> InstitutionMemberships => Set<InstitutionMembershipRecord>();
+
+    public DbSet<ProviderIdentityLinkRecord> IdentityLinks => Set<ProviderIdentityLinkRecord>();
+
+    public DbSet<AuthenticationPolicyVersionRecord> AuthenticationPolicyVersions => Set<AuthenticationPolicyVersionRecord>();
+
     public DbSet<ServiceClientRecord> ServiceClients => Set<ServiceClientRecord>();
 
     public DbSet<SessionRecord> Sessions => Set<SessionRecord>();
@@ -53,6 +60,8 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
     public DbSet<EntitlementVersionRecord> EntitlementVersions => Set<EntitlementVersionRecord>();
 
     public DbSet<AuthenticationEventRecord> AuthenticationEvents => Set<AuthenticationEventRecord>();
+
+    public DbSet<SecurityLockRecord> SecurityLocks => Set<SecurityLockRecord>();
 
     public DbSet<AuthorisationAuditRecord> AuthorisationAuditEvents => Set<AuthorisationAuditRecord>();
 
@@ -93,6 +102,9 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
         modelBuilder.ApplyIntegrationRecords();
 
         modelBuilder.Entity<IdentityRecord>().HasQueryFilter(identity => CurrentInstitutionId != null && identity.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<InstitutionMembershipRecord>().HasQueryFilter(membership => CurrentInstitutionId != null && membership.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ProviderIdentityLinkRecord>().HasQueryFilter(link => CurrentInstitutionId != null && link.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AuthenticationPolicyVersionRecord>().HasQueryFilter(policy => CurrentInstitutionId != null && policy.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<ServiceClientRecord>().HasQueryFilter(client => CurrentInstitutionId != null && client.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<SessionRecord>().HasQueryFilter(session => CurrentInstitutionId != null && session.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<RoleRecord>().HasQueryFilter(role => CurrentInstitutionId != null && role.InstitutionId == CurrentInstitutionId);
@@ -104,6 +116,7 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<TemporaryGrantRecord>().HasQueryFilter(grant => CurrentInstitutionId != null && grant.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<EntitlementVersionRecord>().HasQueryFilter(version => CurrentInstitutionId != null && version.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AuthenticationEventRecord>().HasQueryFilter(evidence => CurrentInstitutionId != null && evidence.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<SecurityLockRecord>().HasQueryFilter(lockRecord => CurrentInstitutionId != null && lockRecord.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OperatorActionAuditRecord>().HasQueryFilter(evidence => CurrentInstitutionId != null && evidence.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);

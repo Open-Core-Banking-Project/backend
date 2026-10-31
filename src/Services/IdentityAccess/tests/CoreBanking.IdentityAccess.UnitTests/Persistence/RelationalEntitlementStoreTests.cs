@@ -4,6 +4,7 @@ using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
+using CoreBanking.IdentityAccess.Domain.Identities;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Access;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Identity;
@@ -189,9 +190,11 @@ public sealed class RelationalEntitlementStoreTests : IDisposable
             IdentityId = _actor.Value,
             ActorType = ActorType.Human,
             DisplayName = "Relational store test actor",
-            Status = RecordStatus.Active,
+            IdentityType = IdentityKind.Staff,
+            Status = IdentityState.Active,
             CreatedAt = now,
             UpdatedAt = now,
+            ConcurrencyVersion = 1,
         });
 
         context.SaveChanges();

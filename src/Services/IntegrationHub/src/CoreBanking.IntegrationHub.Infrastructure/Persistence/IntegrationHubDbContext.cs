@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
+using CoreBanking.IntegrationHub.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -23,6 +24,8 @@ public sealed class IntegrationHubDbContext : DbContext, IIntegrationStore
     public DbSet<InboxRecord> InboxMessages => Set<InboxRecord>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<DeadLetterRecord> DeadLetters => Set<DeadLetterRecord>();
+    public DbSet<CredentialReferenceRecord> CredentialReferences => Set<CredentialReferenceRecord>();
+    public DbSet<ApiClientRecord> ApiClients => Set<ApiClientRecord>();
     internal string? CurrentInstitutionId => _tenantContext.CurrentInstitution is InstitutionId current ? current.Value : null;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -30,6 +33,8 @@ public sealed class IntegrationHubDbContext : DbContext, IIntegrationStore
         System.ArgumentNullException.ThrowIfNull(modelBuilder);
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyIntegrationRecords();
+        modelBuilder.ApplyConfiguration(new CredentialReferenceRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new ApiClientRecordConfiguration());
         modelBuilder.Entity<InstitutionBoundaryRecord>(entity =>
         {
             entity.ToTable("institution_boundaries", "platform", table =>
@@ -50,6 +55,8 @@ public sealed class IntegrationHubDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<InboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<IdempotencyRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<DeadLetterRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<CredentialReferenceRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ApiClientRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
     }
 
     public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken) => Database.BeginTransactionAsync(cancellationToken);

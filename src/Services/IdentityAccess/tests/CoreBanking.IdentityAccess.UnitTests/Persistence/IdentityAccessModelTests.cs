@@ -35,6 +35,8 @@ public sealed class IdentityAccessModelTests
         "audit.authorisation_events",
         "audit.operator_actions",
         "identity.identities",
+        "identity.identity_links",
+        "identity.institution_memberships",
         "identity.service_clients",
         "identity.sessions",
         "integration.dead_letters",
@@ -44,6 +46,8 @@ public sealed class IdentityAccessModelTests
         "platform.foundation_records",
         "platform.institution_boundaries",
         "security.authentication_events",
+        "security.authentication_policy_versions",
+        "security.locks",
     ];
 
     [Fact]
@@ -148,6 +152,9 @@ public sealed class IdentityAccessModelTests
             [
                 "audit.event.view",
                 "identity.access.review",
+                "identity.identity.create",
+                "identity.identity.update",
+                "identity.identity.view",
                 "identity.permission.assign",
                 "identity.role.create",
                 "institution.tenant.create",
@@ -166,6 +173,29 @@ public sealed class IdentityAccessModelTests
         Assert.Contains(boundary.GetIndexes(), index =>
             index.IsUnique
             && index.Properties.Select(property => property.Name).SequenceEqual(["SourceEventId"]));
+    }
+
+    [Fact]
+    public void Memberships_and_provider_links_are_tenant_filtered_and_cannot_reference_another_tenant_identity()
+    {
+        IModel model = CreateModel();
+        IEntityType membership = model.GetEntityTypes()
+            .Single(entity => entity.GetTableName() == "institution_memberships");
+        IEntityType providerLink = model.GetEntityTypes()
+            .Single(entity => entity.GetTableName() == "identity_links");
+
+        Assert.NotEmpty(membership.GetDeclaredQueryFilters());
+        Assert.NotEmpty(providerLink.GetDeclaredQueryFilters());
+        Assert.Contains(membership.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name)
+                .SequenceEqual(["InstitutionId", "IdentityId"]));
+        Assert.Contains(providerLink.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name)
+                .SequenceEqual(["InstitutionId", "IdentityId"]));
+        Assert.Contains(providerLink.GetIndexes(), index =>
+            index.IsUnique
+            && index.Properties.Select(property => property.Name)
+                .SequenceEqual(["InstitutionId", "Provider", "Realm", "SubjectFingerprint"]));
     }
 
     private static IEnumerable<IEntityType> TenantOwned(IModel model) =>

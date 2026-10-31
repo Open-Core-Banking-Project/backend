@@ -23,6 +23,7 @@ public sealed class InstitutionApiSecurityTests
         Assert.Equal("institution.branch.suspend", InstitutionPermissions.BranchSuspend.Value);
         Assert.Equal("institution.calendar.manage", InstitutionPermissions.CalendarManage.Value);
         Assert.Equal("institution.business_date.advance", InstitutionPermissions.BusinessDateAdvance.Value);
+        Assert.Equal("platform.provisioning.repair", InstitutionPermissions.ProvisioningRepair.Value);
         Assert.True(InstitutionPermissions.CreateRequirement.RequiresStepUp);
         Assert.True(InstitutionPermissions.ActivateRequirement.RequiresStepUp);
         Assert.True(InstitutionPermissions.ActivateRequirement.IsRestrictedApproval);
@@ -34,6 +35,7 @@ public sealed class InstitutionApiSecurityTests
         Assert.True(InstitutionPermissions.CalendarPublishRequirement.IsRestrictedApproval);
         Assert.True(InstitutionPermissions.BusinessDateAdvanceRequirement.RequiresStepUp);
         Assert.True(InstitutionPermissions.BusinessDateAdvanceRequirement.IsRestrictedApproval);
+        Assert.True(InstitutionPermissions.ProvisioningRepairRequirement.RequiresStepUp);
         Assert.Equal("product.version.publish", ProductPermissions.Publish.Value);
         Assert.Equal("product.version.update", ProductPermissions.Update.Value);
         Assert.Equal("product.version.simulate", ProductPermissions.Simulate.Value);

@@ -87,6 +87,7 @@ if (useRelationalStore)
     builder.Services.AddScoped<IInstitutionCreationService, InstitutionCreationService>();
     builder.Services.AddScoped<IInstitutionActivationService, InstitutionActivationService>();
     builder.Services.AddScoped<IInstitutionSuspensionService, InstitutionSuspensionService>();
+    builder.Services.AddScoped<IInstitutionProvisioningRepairService, InstitutionProvisioningRepairService>();
     builder.Services.AddScoped<IOrganisationLifecycleService, OrganisationLifecycleService>();
     builder.Services.AddScoped<IBusinessCalendarService, BusinessCalendarService>();
     builder.Services.AddScoped<ISavingsProductConfigurationService, SavingsProductConfigurationService>();
@@ -99,6 +100,13 @@ CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBanking
     builder.Environment,
     "corebanking.core-ledger.api");
 WebApplication app = builder.Build();
+
+if (useRelationalStore)
+{
+    InstitutionOperationalGauges.Register(
+        app.Services.GetRequiredService<IServiceScopeFactory>(),
+        app.Services.GetRequiredService<TimeProvider>());
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -310,6 +318,7 @@ if (useRelationalStore)
     MapOrganisationLifecycleEndpoints(app);
     MapBusinessCalendarEndpoints(app);
     MapSavingsProductEndpoints(app);
+    MapInstitutionProvisioningRepairEndpoints(app);
 }
 
 app.Run();
@@ -335,6 +344,107 @@ static IResult Problem(string code, string title, string detail, int status) =>
         statusCode: status,
         title: title,
         extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = code });
+
+static void MapInstitutionProvisioningRepairEndpoints(WebApplication app)
+{
+    app.MapGet("/api/v1/institutions/{institutionId}/provisioning-runs/{provisioningRunId}", async (
+        string institutionId,
+        string provisioningRunId,
+        IInstitutionProvisioningRepairService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            InstitutionProvisioningStatusResult result = await service.GetStatusAsync(
+                InstitutionId.From(institutionId),
+                provisioningRunId,
+                cancellationToken);
+            return Results.Ok(new InstitutionProvisioningStatusResponseV1(
+                result.InstitutionId,
+                result.ProvisioningRunId,
+                result.PlanVersion,
+                result.Status,
+                result.StartedAt,
+                result.UpdatedAt,
+                result.Steps.Select(step => new InstitutionProvisioningStepStatusV1(
+                    step.ServiceId,
+                    step.Status,
+                    step.FailureCode,
+                    step.UpdatedAt)).ToArray()));
+        }
+        catch (InstitutionProvisioningRepairRejectedException exception)
+        {
+            int status = exception.Code == "cross_tenant_access_denied"
+                ? StatusCodes.Status403Forbidden
+                : StatusCodes.Status404NotFound;
+            return Problem(exception.Code, "Provisioning status unavailable", exception.Message, status);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid provisioning status request", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ProvisioningRepairRequirement,
+        "institution.provisioning.status.view"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/provisioning-runs/{provisioningRunId}/repair", async (
+        HttpContext http,
+        string institutionId,
+        string provisioningRunId,
+        RepairInstitutionProvisioningRequestV1 request,
+        IInstitutionProvisioningRepairService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            RepairInstitutionProvisioningResult result = await service.RepairAsync(
+                new RepairInstitutionProvisioningCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    provisioningRunId,
+                    request.Reason,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Accepted(value: new RepairInstitutionProvisioningResponseV1(
+                result.InstitutionId,
+                result.ProvisioningRunId,
+                result.SourceEventId,
+                result.AuditEventId,
+                result.RequestedAt,
+                result.Replayed,
+                "replay_queued"));
+        }
+        catch (InstitutionProvisioningRepairRejectedException exception)
+        {
+            int status = exception.Code switch
+            {
+                "cross_tenant_access_denied" => StatusCodes.Status403Forbidden,
+                "provisioning_run_not_found" => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status409Conflict,
+            };
+            return Problem(exception.Code, "Provisioning repair rejected", exception.Message, status);
+        }
+        catch (InstitutionProvisioningRepairInProgressException exception)
+        {
+            return Problem(
+                "request.idempotency_in_progress",
+                "Provisioning repair in progress",
+                exception.Message,
+                StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid provisioning repair", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ProvisioningRepairRequirement,
+        "institution.provisioning.repair"));
+}
 
 static void MapSavingsProductEndpoints(WebApplication app)
 {

@@ -7,10 +7,14 @@ using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.IdentityAccess.Api;
 using CoreBanking.IdentityAccess.Api.Authorisation;
+using CoreBanking.IdentityAccess.Application.Authentication;
 using CoreBanking.IdentityAccess.Application.Authorisation;
 using CoreBanking.IdentityAccess.Application.Permissions;
+using CoreBanking.IdentityAccess.Contracts;
+using CoreBanking.IdentityAccess.Infrastructure.Authentication;
 using CoreBanking.IdentityAccess.Infrastructure.Authorisation;
 using CoreBanking.IdentityAccess.Infrastructure.Foundation;
+using CoreBanking.IdentityAccess.Infrastructure.Identity;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -31,6 +35,21 @@ CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBanking
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITenantContext, AmbientTenantContext>();
+
+// The selected provider never accepts a platform password grant. Development can use explicitly
+// configured synthetic fixture references to exercise the adapter boundary without credentials.
+if (builder.Environment.IsDevelopment())
+{
+    Dictionary<string, string> syntheticSubjects = builder.Configuration
+        .GetSection("Authentication:DevelopmentSynthetic:Credentials")
+        .Get<Dictionary<string, string>>() ?? new Dictionary<string, string>(StringComparer.Ordinal);
+    builder.Services.AddSingleton<IAuthenticationProviderAdapter>(
+        new SyntheticAuthenticationProviderAdapter(syntheticSubjects));
+}
+else
+{
+    builder.Services.AddSingleton<IAuthenticationProviderAdapter, KeycloakAuthenticationProviderAdapter>();
+}
 
 IConfigurationSection keycloakSection = builder.Configuration.GetSection("Authentication:Keycloak");
 string? keycloakAuthority = keycloakSection["Authority"]?.Trim().TrimEnd('/');
@@ -118,6 +137,8 @@ if (useRelationalStore)
     builder.Services.AddScoped<IIntegrationStore>(provider => provider.GetRequiredService<IdentityAccessDbContext>());
     builder.Services.AddScoped<IdempotencyService>();
     builder.Services.AddScoped<FoundationRecordService>();
+    builder.Services.AddScoped<IdentityLifecycleService>();
+    builder.Services.AddScoped<SessionSecurityService>();
 }
 else
 {
@@ -173,6 +194,48 @@ if (app.Environment.IsDevelopment() && !useRelationalStore)
 
 if (useRelationalStore)
 {
+    app.MapGet("/api/v1/sessions", async (
+        HttpContext http,
+        SessionSecurityService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+        return Results.Ok(await service.ListOwnSessionsAsync(actor.Id, cancellationToken));
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(PermissionRequirement.For(IdentityPermissions.IdentityView), "identity.session.list.self"));
+
+    app.MapPost("/api/v1/sessions/{sessionId}/revoke", async (
+        HttpContext http,
+        string sessionId,
+        SessionSecurityService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+        string idempotencyKey = http.Request.Headers["Idempotency-Key"].ToString();
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Idempotency key required",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_key_required" });
+        }
+        try
+        {
+            return Results.Ok(await service.RevokeOwnSessionAsync(actor.InstitutionId, actor.Id, sessionId, idempotencyKey,
+                http.Items[ProtectedOperationFilter.CorrelationItemKey] as string ?? Guid.NewGuid().ToString("N"), cancellationToken));
+        }
+        catch (SessionSecurityException exception)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Session revocation refused",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = exception.Code });
+        }
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(PermissionRequirement.For(IdentityPermissions.IdentityView), "identity.session.revoke.self"));
+
     StartupLog.RelationalEntitlementStoreInUse(app.Logger);
 }
 
@@ -222,6 +285,177 @@ app.MapPost("/api/v1/identity/foundation-executions", (HttpContext http) =>
 // relational store is configured, because the in-memory stand-ins have no durable outbox.
 if (useRelationalStore)
 {
+    app.MapPost("/api/v1/identities", async (
+        HttpContext http,
+        RegisterIdentityV1 request,
+        IdentityLifecycleService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+
+        string? idempotencyKey = http.Request.Headers["Idempotency-Key"].ToString();
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return Results.Problem(
+                detail: "An Idempotency-Key header is required for this command.",
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Idempotency key required",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_key_required" });
+        }
+
+        string correlationId = http.Items[ProtectedOperationFilter.CorrelationItemKey] as string ?? Guid.NewGuid().ToString("N");
+        try
+        {
+            IdentityRegistrationResultV1 result = await service.RegisterAsync(
+                actor.InstitutionId,
+                actor.Id,
+                idempotencyKey,
+                request,
+                correlationId,
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (IdentityLifecycleException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Identity registration refused",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = exception.Code });
+        }
+        catch (ArgumentException)
+        {
+            return Results.Problem(
+                detail: "The identity registration request is invalid.",
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid identity registration",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "identity_registration_invalid" });
+        }
+        catch (IdempotencyConflictException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Idempotency key reused with a different request",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_conflict" });
+        }
+        catch (IdempotencyInProgressException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "An equivalent request is in progress",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_in_progress" });
+        }
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(
+        new PermissionRequirement
+        {
+            Permission = IdentityPermissions.IdentityCreate,
+            RequiresStepUp = true,
+        },
+        "identity.identity.create"));
+
+    app.MapGet("/api/v1/identities/{identityId}", async (
+        HttpContext http,
+        string identityId,
+        IdentityLifecycleService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+
+        IdentityDetailsV1? identity = await service.FindAsync(actor.InstitutionId, identityId, cancellationToken);
+        return identity is null ? Results.NotFound() : Results.Ok(identity);
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(
+        PermissionRequirement.For(IdentityPermissions.IdentityView),
+        "identity.identity.view"));
+
+    app.MapPut("/api/v1/identities/{identityId}/status", async (
+        HttpContext http,
+        string identityId,
+        ChangeIdentityStatusV1 request,
+        IdentityLifecycleService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+
+        string? idempotencyKey = http.Request.Headers["Idempotency-Key"].ToString();
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return Results.Problem(
+                detail: "An Idempotency-Key header is required for this command.",
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Idempotency key required",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_key_required" });
+        }
+
+        string correlationId = http.Items[ProtectedOperationFilter.CorrelationItemKey] as string ?? Guid.NewGuid().ToString("N");
+        try
+        {
+            IdentityStatusChangeResultV1 result = await service.ChangeStatusAsync(
+                actor.InstitutionId,
+                actor.Id,
+                identityId,
+                idempotencyKey,
+                request,
+                correlationId,
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (IdentityLifecycleException exception)
+        {
+            int status = string.Equals(exception.Code, "identity_not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status409Conflict;
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: status,
+                title: "Identity status change refused",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = exception.Code });
+        }
+        catch (ArgumentException)
+        {
+            return Results.Problem(
+                detail: "The identity status request is invalid.",
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid identity status request",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "identity_status_invalid" });
+        }
+        catch (IdempotencyConflictException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Idempotency key reused with a different request",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_conflict" });
+        }
+        catch (IdempotencyInProgressException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "An equivalent request is in progress",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.idempotency_in_progress" });
+        }
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(
+        new PermissionRequirement
+        {
+            Permission = IdentityPermissions.IdentityUpdate,
+            RequiresStepUp = true,
+        },
+        "identity.identity.update"));
+
     app.MapPost("/api/v1/identity/foundation-records", async (
         HttpContext http,
         FoundationRecordRequest request,

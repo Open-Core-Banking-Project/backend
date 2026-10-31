@@ -24,6 +24,7 @@ public static class DevelopmentAuthorisationSeed
         store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.Activate);
         store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.CalendarManage);
         store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.BusinessDateAdvance);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.ProvisioningRepair);
         store.Grant(ActorId.From(ProductPublisherActorValue), institutionId, ProductPermissions.Publish);
         store.Grant(ActorId.From(ProductMakerActorValue), institutionId, ProductPermissions.Update);
         store.Grant(ActorId.From(ProductMakerActorValue), institutionId, ProductPermissions.Simulate);

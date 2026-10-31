@@ -11,6 +11,7 @@ referenced_by:
   - docs/implementation/phase-0-engineering-foundation/03-identity-and-permission-foundation.md
   - docs/implementation/phase-1-banking-foundation/01-institution-and-tenancy.md
   - docs/implementation/phase-1-banking-foundation/02-identity-roles-and-permissions.md
+  - docs/security/identity-access-threat-model.md
 supersedes: []
 approved_by: [Architecture, Security, Identity and Access]
 approved_on: 2026-10-16
@@ -20,7 +21,7 @@ approved_on: 2026-10-16
 
 ## Status
 
-`Proposed` - decision drafted and ready for owner approval. Effective only when the owners listed below record `Accepted`. Until then no production authorisation enforcement, role storage or grant assignment may be implemented; policies, ports and negative tests may be built against a replaceable local implementation.
+`Accepted` - the permission, role, scope, entitlement-resolution and invalidation model was accepted on 2026-10-16. The Phase 1 snapshot delivery baseline was made explicit on 2026-10-26. Production enablement remains subject to the service-specific cache, role-template and conflict-rule gates below.
 
 ## Context
 
@@ -38,8 +39,8 @@ approved_on: 2026-10-16
 4. **Assignments.** An assignment binds an actor to a role version with a contextual scope and a validity window, and records the assigning actor. Temporary or privileged assignments require an expiry and are subject to access review.
 5. **Contextual scopes.** Supported scope dimensions: institution (always required), branch, channel, customer or account, corporate mandate, amount and currency limit, transaction-count limit, device, and authentication strength. Scopes are evaluated server-side in the owning service. A scope that cannot be resolved is a denial, not a wildcard.
 6. **Token contents.** Access tokens carry actor identity, actor type, institution, session, device, entitlement version and authentication strength. They do not carry the permission set, which keeps tokens small and revocation fast.
-7. **Entitlement resolution.** Each service resolves permissions locally from an entitlement snapshot contract owned by Identity and Access, keyed by actor and institution and versioned by entitlement version. Snapshots are cached with a bounded time to live (default 60 seconds, configured per environment and never longer than five minutes). A snapshot that is missing, stale beyond the window, or version-mismatched with the token results in denial.
-8. **Invalidation.** Revoking a session, device, grant, role version or institution assignment increments the entitlement version for the affected actor or institution. Services detect the change on the next snapshot refresh or immediately when the incoming token carries a newer version. Step-up and privileged operations force a fresh snapshot rather than using the cache. The maximum invalidation window is the configured cache lifetime and is documented per service.
+7. **Entitlement resolution.** Identity and Access exposes a versioned, actor-and-institution-scoped entitlement snapshot contract over an authenticated, audience-restricted service call. Each consuming service projects only the permissions and scopes it owns, resolves them locally at the business boundary and may keep a non-authoritative cache. The default cache lifetime is 60 seconds and may never exceed five minutes. A snapshot that is missing, stale beyond the configured window, incomplete, from another institution, or version-mismatched with the token results in denial. Permissions are never accepted from client input or copied into access tokens.
+8. **Invalidation and recovery.** Revoking a session, device, grant, role version or institution assignment atomically increments the applicable entitlement version and writes an outbox event. Consumers use the event to evict or advance local projections; duplicate events are idempotent and version regression is rejected. A sequence gap, unavailable snapshot source or failed refresh marks the affected entitlement incomplete and denies access until a fresh snapshot is obtained. Incoming tokens carrying a newer version force refresh. Privileged and financial operations require a current source snapshot and do not rely on a cached allow. The ordinary maximum invalidation window is the configured cache lifetime; emergency revocation also revokes the provider session or token family under ADR-0008.
 9. **Segregation of duties.** A maker cannot approve their own restricted action: the check compares actor identity, not session. Conflict-of-role rules are configuration data, not code branches, and apply even when an actor holds multiple roles. Overrides require a stated reason and produce audit evidence.
 10. **Service identities.** Service-to-service callers use distinct service permissions in their own namespace and never inherit human roles. A service token presented as a human identity, or a human token presented for a service-only permission, is rejected.
 11. **Enforcement point.** Each service enforces permissions in a single shared policy component used by its API and its background workers, so a message handler cannot bypass a check that an endpoint performs. Endpoints declare their required permission; an endpoint without a declared permission fails the architecture tests.
@@ -71,19 +72,19 @@ approved_on: 2026-10-16
 
 ## Open questions
 
-- How the entitlement snapshot is delivered: projection table, token extension, or a versioned contract call.
 - The default cache lifetime per service class, and whether privileged services use zero caching.
 - Whether the platform ships default role bundles per institution type or requires per-institution configuration.
 - Whether conflict-of-role rules are configured per institution or platform-wide.
 
 ## Approval gate
 
-Satisfied 2026-10-16 for the permission model, role and grant lifecycle, scope evaluation, entitlement versioning and invalidation, and enforcement placement. Still outstanding: how the entitlement snapshot is delivered, the per-service cache lifetimes, whether default role bundles ship with the platform, and whether conflict-of-role rules are configured per institution.
+Satisfied 2026-10-16 for the permission model, role and grant lifecycle, scope evaluation, entitlement versioning and invalidation, and enforcement placement. The versioned snapshot call plus durable invalidation-event baseline was recorded on 2026-10-26. Still outstanding before production enablement: service-specific cache lifetimes within the accepted maximum, whether default role bundles ship with the platform, and whether conflict-of-role rules are configured per institution. Privileged and financial operations are already constrained to fresh source resolution and fail closed.
 
 ## Related documents
 
 - [ADR index](README.md)
 - [ADR-0008](ADR-0008-authentication-provider-token-model-and-service-identity.md) - token claims that carry actor, session, device and entitlement version
 - [ADR-0010](ADR-0010-observability-audit-evidence-redaction-and-retention.md) - authorisation audit evidence and retention
+- [Identity and Access threat model](../security/identity-access-threat-model.md) - trust boundaries, threats, controls and verification cases
 - [03-identity-and-permission-foundation.md](../implementation/phase-0-engineering-foundation/03-identity-and-permission-foundation.md)
 - [02-identity-roles-and-permissions.md](../implementation/phase-1-banking-foundation/02-identity-roles-and-permissions.md)

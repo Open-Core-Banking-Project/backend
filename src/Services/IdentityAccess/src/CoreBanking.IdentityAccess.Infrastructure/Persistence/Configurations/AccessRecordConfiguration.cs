@@ -63,6 +63,9 @@ internal sealed class PermissionRecordConfiguration : IEntityTypeConfiguration<P
         ("identity.role.create", "Create an institution-scoped role"),
         ("identity.permission.assign", "Assign a permission to a role or an identity"),
         ("identity.access.review", "Review institution access"),
+        ("identity.identity.create", "Register an institution identity and membership"),
+        ("identity.identity.view", "View an institution identity"),
+        ("identity.identity.update", "Change an institution identity lifecycle status"),
         ("audit.event.view", "View audit evidence"),
     ];
 }

@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
   <ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /><PackageReference Include="xunit" /><PackageReference Include="xunit.runner.visualstudio" /></ItemGroup>
-  <ItemGroup><ProjectReference Include="..\..\src\CoreBanking.IntegrationHub.Infrastructure\CoreBanking.IntegrationHub.Infrastructure.csproj" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CoreBanking.IntegrationHub.Infrastructure\CoreBanking.IntegrationHub.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CoreBanking.IntegrationHub.Contracts\CoreBanking.IntegrationHub.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\CoreBanking.IntegrationHub.Domain\CoreBanking.IntegrationHub.Domain.csproj" />
+  </ItemGroup>
 </Project>

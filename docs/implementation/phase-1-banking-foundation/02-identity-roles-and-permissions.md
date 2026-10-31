@@ -17,7 +17,7 @@ modules:
   - Trusted Devices
   - Service Identities
   - Payload Encryption Contracts
-status: Draft
+status: In Progress
 requirements: [IAM-001, IAM-002, IAM-003, IAM-004, IAM-005, IAM-006, IAM-007, IAM-008, IAM-009, IAM-010, IAM-011, SEC-002, SEC-003, SEC-004, SEC-005, SEC-007, SEC-008, SEC-009, SEC-010, SEC-011, SEC-013, SEC-016, SEC-017, AUD-001, AUD-002, AUD-003, NFR-OBS-001, NFR-OBS-002, BR-007, BR-008, BR-009]
 stories: [US-005, US-006, US-007, US-008, US-009]
 dependencies:
@@ -26,7 +26,7 @@ dependencies:
   - Phase 0 - Observability and CI
   - Phase 1 - Institution and Tenancy
 adrs: [ADR-0008, ADR-0009]
-last_updated: 2026-10-15
+last_updated: 2026-10-26
 ---
 
 # Epic: Identity, Roles and Permissions
@@ -466,9 +466,12 @@ Outbox publication follows the local commit. Consumers use inbox deduplication. 
 - Create schemas and reference permission catalogue before enabling protected Phase 1 endpoints.
 - Seed only platform-owned permission definitions; never seed broad institution roles, real users, credentials or production grants.
 - Provision an institution baseline through the institution event and an idempotent application command, not ad hoc SQL.
-- Any legacy identity import requires mapping, duplicate detection, credential/provider migration, forced-reset policy, reconciliation totals and security approval.
+- Any legacy identity import requires mapping, duplicate detection, credential/provider migration, forced-reset policy, reconciliation totals and security approval. The applied procedure for a Phase 0 local database is `docs/operations/identity-access-legacy-identity-kind-mapping.md`.
 - Released migrations are append-only. Corrections use forward migrations with verification evidence.
 - Rollback of an access migration must never silently restore revoked access. Prefer forward-fix and fail closed.
+- Migration drift is verified per context by `scripts/migrations-verify.ps1`, which fails the build, `scripts/verify.ps1` and CI when a model change is not recorded in a migration. It never connects to a database and never generates or applies a migration.
+- The session lifecycle migration `20261027150150_AddSessionLifecycleAndSecurityLocks` adds its columns nullable, backfills deterministically, validates the backfill and only then applies `NOT NULL`, the tenant-unique provider fingerprint index and the lifecycle check constraints. Legacy rows carry a `legacy:` marker that cannot match a real provider fingerprint, so an unbound legacy session fails closed on refresh. `security.locks` records policy-driven lock evidence and is written, read and released through `SessionSecurityService`.
+- Application principals receive least-privilege grants from each service's `AddApplicationPrincipalPrivileges` migration; effective privileges, including role membership and ownership, are asserted by `tests/CoreBanking.SecurityTests`. Procedure: `docs/operations/database-privileges.md`.
 
 ## 11. Consistency, concurrency and entitlement invalidation
 
@@ -612,11 +615,13 @@ All security-affecting configuration is versioned, approved, effective-dated and
 
 Implement one deployable, reviewable slice at a time:
 
+Implementation progress as of 2026-10-26: Slice 1 is complete as an architecture and security baseline. ADR-0008 and ADR-0009 are accepted, their previously inconsistent status text is reconciled, the Phase 1 entitlement snapshot and invalidation delivery model is explicit, and the [Identity and Access threat model](../../security/identity-access-threat-model.md) records assets, trust boundaries, channel constraints, STRIDE threats, abuse cases, required controls and executable verification targets. Slice 2 promotes the Phase 0 security vocabulary into dependency-free version 1 contracts for explicit actor kinds, trusted tenant context, permission requirements, request/grant scopes, safe authorisation decisions, entitlement snapshot requests/responses and monotonic invalidation facts. Compatibility tests pin camel-case wire names, additive-field tolerance, decimal limits, stable codes, tenant/version fields, data minimisation and contract-assembly isolation. Slice 3 adds explicit customer, staff, agent, corporate-user, administrator and service identity kinds; institution membership and hashed provider-link records; active-institution gating; capability- and step-up-protected registration and status transitions; tenant-scoped retrieval; optimistic lifecycle concurrency; entitlement-version advancement; idempotency; immutable operator evidence; and durable `IdentityRegistered.v1` and `IdentityStatusChanged.v1` outbox facts. Provider subjects are used transiently and never returned or stored in plaintext. The append-only migration refuses to invent actor kinds for legacy Phase 0 identities and requires an approved mapping before upgrade. This does not authorise production enrolment. Keycloak hosting and operational ownership, approved second-factor methods, channel-specific token-storage deployment reviews, service-specific cache settings, initial role/conflict configuration and production SLOs remain named release gates.
+
 1. Approve ADR-0008 identity provider/token/channel model and ADR-0009 authorisation distribution/invalidation model; add a threat model.
 2. Promote Phase 0 actor, tenant, permission, scope, decision and entitlement contracts to versioned production contracts with compatibility tests.
 3. Implement identity, membership and provider-link lifecycle with institution provisioning events and cross-tenant tests.
-4. Implement authentication-policy versions and the approved provider adapter using synthetic/non-production credentials.
-5. Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence.
+4. Implement authentication-policy versions and the approved provider adapter using synthetic/non-production credentials. **Complete:** effective-dated, immutable policy metadata is tenant-scoped and does not invent the still-open password/MFA/lockout floors. The Keycloak adapter refuses direct platform credential grants, while Development registers a separately configured synthetic fixture adapter that returns only a provider subject. No production enrolment, policy administration, session, lockout or MFA flow is enabled by this slice.
+5. Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence. **In progress:** local session lifecycle state now fails closed on idempotent self-revocation, persists only a provider-session fingerprint, emits durable revocation work, and records append-only authentication evidence. Security locks are tenant-scoped evidence records; policy thresholds and provider-side refresh confirmation remain configuration/provider integration work and are not invented here.
 6. Implement MFA enrolment/challenges and step-up evidence for one approved customer channel and one staff/privileged flow.
 7. Implement permission catalogue plus role draft, simulation, approval and publication lifecycle.
 8. Implement scoped grants, conflict-of-duty evaluation, temporary expiry and entitlement version advancement.
@@ -701,12 +706,12 @@ Performance and abuse tests must use approved production-load and attack-rate pr
 
 | Decision | Impact | Owner | Required by | Status |
 | --- | --- | --- | --- | --- |
-| Identity provider and licensing/hosting model | Credential, MFA, token, HA and operational design | Architecture/Security/Product | Slice 1 | Open |
-| Channel-specific OAuth/OIDC flows and token transport | Web/mobile/staff/USSD/chat security | Security/Channel owners | Slice 1 | Open |
-| Token lifetimes, refresh rotation and revocation mechanism | Session UX and breach containment | Security | Slice 1 | Open |
-| Service-to-service authentication mechanism | Workload identity, rotation and platform dependency | Security/Platform | Slice 1 | Open |
-| Entitlement distribution/read-model strategy | Latency, availability and consistency | Architecture/Security | Slice 1 | Open |
-| Maximum entitlement/revocation propagation window | Residual access risk and cache settings | Security/Risk | Slice 1 | Open |
+| Identity provider and licensing/hosting model | Credential, MFA, token, HA and operational design | Architecture/Security/Product | Slice 1 | Keycloak selected in ADR-0008; hosting, support and operations remain a production gate |
+| Channel-specific OAuth/OIDC flows and token transport | Web/mobile/staff/USSD/chat security | Security/Channel owners | Slice 1 | Protocol boundary approved in ADR-0008 and threat model; each deployed channel still requires a token-storage review |
+| Token lifetimes, refresh rotation and revocation mechanism | Session UX and breach containment | Security | Slice 1 | Approved by ADR-0008; environment values remain configuration evidence |
+| Service-to-service authentication mechanism | Workload identity, rotation and platform dependency | Security/Platform | Slice 1 | Client credentials and audience-scoped service permissions approved by ADR-0008 |
+| Entitlement distribution/read-model strategy | Latency, availability and consistency | Architecture/Security | Slice 1 | Versioned snapshot call, consumer projection/cache and durable invalidation event approved by ADR-0009 |
+| Maximum entitlement/revocation propagation window | Residual access risk and cache settings | Security/Risk | Slice 1 | Default 60 seconds, hard maximum five minutes; privileged/financial paths require fresh source resolution |
 | Platform security floors for passwords, lockout and MFA | Institution configurability boundary | Security | Slice 4 | Open |
 | Approved MFA and recovery methods per actor/channel | Provider dependency and assurance | Security/Product | Slice 6 | Open |
 | Initial system permission catalogue and role templates | Launch operations and least privilege | Domain owners/Security | Slice 7 | Open |

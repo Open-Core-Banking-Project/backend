@@ -4,6 +4,7 @@ using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
+using CoreBanking.IdentityAccess.Infrastructure.Identity;
 using CoreBanking.IdentityAccess.Infrastructure.Institutions;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -52,6 +53,9 @@ public static partial class Program
         builder.Services.AddScoped(provider => new InboxProcessor(
             provider.GetRequiredService<IIntegrationStore>(),
             provider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddScoped<IdempotencyService>();
+        builder.Services.AddScoped<SessionSecurityService>();
+        builder.Services.AddSingleton(SessionLifecycleOptions.FromConfiguration(builder.Configuration));
         builder.Services.AddScoped<InstitutionProvisioningConsumer>();
         builder.Services.AddScoped<IIntegrationEventConsumer>(provider =>
             provider.GetRequiredService<InstitutionProvisioningConsumer>());
@@ -70,6 +74,7 @@ public static partial class Program
         });
 
         builder.Services.AddHostedService<OutboxRelayWorker>();
+        builder.Services.AddHostedService<SessionLifecycleWorker>();
         builder.Services.AddHostedService<KafkaInboxConsumerWorker>();
 
         IHost host = builder.Build();
