@@ -27,7 +27,10 @@ docs/implementation/
 │   └── 05-observability-and-ci.md
 ├── phase-1-banking-foundation/
 │   ├── 00-phase-overview.md
-│   └── 01..12 epic implementation documents
+│   ├── 01..12 epic implementation documents
+│   ├── slice-ledger.md, slice-ledger.csv, decision-register.csv
+│   ├── decisions/ decision briefs for open decisions
+│   └── reviews/ slice review packs for human approval
 ├── phase-2-regulated-operations/
 │   ├── 00-phase-overview.md
 │   └── 01..11 epic implementation documents

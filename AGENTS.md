@@ -12,7 +12,7 @@ Read the following before making architectural or domain changes:
 
 1. `README.md` for backend scope, domain ownership, and the C#/.NET technology decision.
 2. `docs/architecture/BACKEND_ARCHITECTURE.md` for the target project structure, nine-service topology, database ownership, contracts, infrastructure, and implementation order.
-3. `docs/implementation/README.md`, the applicable phase overview, and the applicable epic instructions for executable scope, sequence, contracts, tests, and acceptance gates.
+3. `docs/implementation/README.md`, the applicable phase overview, the applicable epic instructions for executable scope, sequence, contracts, tests, and acceptance gates, and the phase slice ledger where one exists, for slice status, approval state, and unresolved decisions.
 4. `CONTRIBUTING.md` for contribution, review, security, and documentation expectations.
 5. The applicable requirement and user story in:
    - `../Core_Banking_Software_Requirements_Specification.pdf`
@@ -59,6 +59,7 @@ Before completion:
 - Run the narrowest relevant tests, then the broader affected suite.
 - Run formatting and static analysis configured by the repository.
 - Inspect the diff for secrets, sensitive data, accidental generated files, and unrelated edits.
+- Update the applicable phase slice ledger with the slice status and recorded evidence; never mark a slice approved yourself.
 - Report commands run, results, assumptions, and any remaining risk.
 
 Never claim a build, test, migration, or provider flow passed unless it was actually run successfully.
