@@ -218,6 +218,7 @@ internal sealed class TemporaryGrantRecordConfiguration : IEntityTypeConfigurati
         builder.Property(grant => grant.ValidTo).HasColumnName("valid_to");
         builder.Property(grant => grant.GrantedBy).HasColumnName("granted_by");
         builder.Property(grant => grant.Reason).HasColumnName("reason");
+        builder.Property(grant => grant.ExpiredAt).HasColumnName("expired_at");
 
         builder.HasIndex(grant => new { grant.InstitutionId, grant.IdentityId });
 

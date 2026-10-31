@@ -158,6 +158,9 @@ public sealed class TemporaryGrantRecord : ITenantOwnedEntity
     public required string GrantedBy { get; set; }
 
     public required string Reason { get; set; }
+
+    /// <summary>Set by the expiry sweep. A lapsed grant keeps its history and stops being effective.</summary>
+    public DateTimeOffset? ExpiredAt { get; set; }
 }
 
 /// <summary>

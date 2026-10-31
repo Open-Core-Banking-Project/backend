@@ -3,7 +3,9 @@ using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
+using CoreBanking.IdentityAccess.Application.Authentication;
 using CoreBanking.IdentityAccess.Application.Authorisation;
+using CoreBanking.IdentityAccess.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -27,7 +29,8 @@ public sealed class ProtectedOperationFilter : IEndpointFilter
 
     private const string AuthenticationHeaderName = "X-Development-Actor";
     private const string CorrelationHeaderName = "X-Correlation-Id";
-    private const string InstitutionHeaderName = "X-Institution-Id";
+    /// <summary>The tenant header used by discovery routes that run before an actor exists.</summary>
+    public const string InstitutionHeaderName = "X-Institution-Id";
     private const string BranchHeaderName = "X-Branch-Id";
 
     private readonly PermissionRequirement _requirement;
@@ -61,6 +64,26 @@ public sealed class ProtectedOperationFilter : IEndpointFilter
                 tenantContext.Establish(actor.InstitutionId);
             }
 
+            // A service token must belong to an active, unexpired service client. This runs before
+            // authorisation so an unregistered or expired client can never reach a handler.
+            if (actor is { Type: ActorType.Service })
+            {
+                IServiceClientValidator? validator = services.GetService<IServiceClientValidator>();
+                if (validator is not null
+                    && !await validator.IsUsableAsync(actor, http.RequestAborted).ConfigureAwait(false))
+                {
+                    return Results.Problem(
+                        detail: "The service identity is not active for this institution.",
+                        statusCode: StatusCodes.Status403Forbidden,
+                        title: "Service identity not permitted",
+                        extensions: new System.Collections.Generic.Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["code"] = ServiceClientContractV1.InvalidServiceIdentity,
+                            ["correlationId"] = correlationId,
+                        });
+                }
+            }
+
             AuthorisationRequest request = new()
             {
                 Requirement = _requirement,
@@ -71,6 +94,28 @@ public sealed class ProtectedOperationFilter : IEndpointFilter
             AuthorisationDecision decision = await services.GetRequiredService<AuthorisationService>()
                 .AuthoriseAsync(request, _operationName, correlationId, http.RequestAborted)
                 .ConfigureAwait(false);
+
+            // A fresh, purpose-bound step-up record satisfies the requirement without inventing a
+            // token claim. It is consumed once, so the same evidence cannot authorise a second
+            // operation. Decision: P1-E02-D08.
+            if (!decision.IsAllowed
+                && decision.Reason == DenialReason.StepUpRequired
+                && _requirement.RequiresStepUp
+                && actor is not null)
+            {
+                IStepUpEvidenceSource? stepUpEvidence = services.GetService<IStepUpEvidenceSource>();
+                if (stepUpEvidence is not null
+                    && await stepUpEvidence.TryConsumeAsync(actor, _operationName, http.RequestAborted).ConfigureAwait(false))
+                {
+                    actor = actor with { Strength = AuthenticationStrength.StepUp };
+                    tenantContext.Establish(actor.InstitutionId);
+                    request = request with { Actor = actor, StepUpSatisfied = true };
+
+                    decision = await services.GetRequiredService<AuthorisationService>()
+                        .AuthoriseAsync(request, _operationName + ".step_up", correlationId, http.RequestAborted)
+                        .ConfigureAwait(false);
+                }
+            }
 
             if (!decision.IsAllowed)
             {

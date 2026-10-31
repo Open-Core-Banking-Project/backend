@@ -196,8 +196,14 @@ public sealed class OutboxAndInboxTests : IDisposable
 
         OutboxRelayResult result = await new OutboxRelay(context, publisher, TimeProvider.System).RunOnceAsync(CancellationToken.None);
 
-        Assert.Equal(0, result.Claimed);
-        Assert.Empty(publisher.Published);
+        // The relay is deliberately cross-tenant, so another suite's due record may be claimed here. What must
+        // never happen is this record being claimed or published before its next attempt time.
+        _ = result;
+        OutboxRecord reloaded = await context.OutboxMessages
+            .AsNoTracking()
+            .SingleAsync(candidate => candidate.EventId == "event-not-due");
+        Assert.Equal(OutboxStatus.Pending, reloaded.Status);
+        Assert.Equal(0, reloaded.Attempts);
     }
 
     [Fact]

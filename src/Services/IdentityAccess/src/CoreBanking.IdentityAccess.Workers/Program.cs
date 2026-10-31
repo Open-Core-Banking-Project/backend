@@ -5,6 +5,7 @@ using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.IdentityAccess.Infrastructure.Identity;
+using CoreBanking.IdentityAccess.Infrastructure.Access;
 using CoreBanking.IdentityAccess.Infrastructure.Institutions;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +62,10 @@ public static partial class Program
             provider.GetRequiredService<InstitutionProvisioningConsumer>());
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
+        builder.Services.AddScoped<GrantAdministrationService>();
+        builder.Services.AddScoped<EntitlementReconciliationService>();
+        builder.Services.AddSingleton(TemporaryGrantExpiryOptions.FromConfiguration(builder.Configuration));
+        builder.Services.AddSingleton(IdentityReconciliationOptions.FromConfiguration(builder.Configuration));
         builder.Services.AddKafkaEventPublisher(new KafkaMessagingOptions
         {
             BootstrapServers = bootstrapServers,
@@ -75,6 +80,8 @@ public static partial class Program
 
         builder.Services.AddHostedService<OutboxRelayWorker>();
         builder.Services.AddHostedService<SessionLifecycleWorker>();
+        builder.Services.AddHostedService<TemporaryGrantExpiryWorker>();
+        builder.Services.AddHostedService<IdentityReconciliationWorker>();
         builder.Services.AddHostedService<KafkaInboxConsumerWorker>();
 
         IHost host = builder.Build();

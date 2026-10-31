@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using CoreBanking.BuildingBlocks.Application.Persistence;
@@ -47,7 +47,12 @@ public sealed class IdentityAccessModelTests
         "platform.institution_boundaries",
         "security.authentication_events",
         "security.authentication_policy_versions",
+        "security.envelope_replay_records",
+        "security.key_metadata",
         "security.locks",
+        "security.mfa_enrolments",
+        "security.step_up_evidence",
+        "security.trusted_devices",
     ];
 
     [Fact]

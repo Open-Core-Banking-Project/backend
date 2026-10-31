@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
@@ -63,6 +63,12 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
 
     public DbSet<SecurityLockRecord> SecurityLocks => Set<SecurityLockRecord>();
 
+    public DbSet<MfaEnrolmentRecord> MfaEnrolments => Set<MfaEnrolmentRecord>();
+
+    public DbSet<StepUpEvidenceRecord> StepUpEvidence => Set<StepUpEvidenceRecord>();
+
+    public DbSet<TrustedDeviceRecord> TrustedDevices => Set<TrustedDeviceRecord>();
+
     public DbSet<AuthorisationAuditRecord> AuthorisationAuditEvents => Set<AuthorisationAuditRecord>();
 
     public DbSet<OperatorActionAuditRecord> OperatorActionAuditEvents => Set<OperatorActionAuditRecord>();
@@ -78,6 +84,10 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
     public DbSet<FoundationRecord> FoundationRecords => Set<FoundationRecord>();
 
     public DbSet<InstitutionBoundaryRecord> InstitutionBoundaries => Set<InstitutionBoundaryRecord>();
+
+    public DbSet<SecurityKeyMetadataRecord> SecurityKeyMetadata => Set<SecurityKeyMetadataRecord>();
+
+    public DbSet<EnvelopeReplayRecord> EnvelopeReplays => Set<EnvelopeReplayRecord>();
 
     /// <summary>
     /// The institution of the current operation, read as a parameter by every tenant query filter.
@@ -117,6 +127,11 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<EntitlementVersionRecord>().HasQueryFilter(version => CurrentInstitutionId != null && version.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AuthenticationEventRecord>().HasQueryFilter(evidence => CurrentInstitutionId != null && evidence.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<SecurityLockRecord>().HasQueryFilter(lockRecord => CurrentInstitutionId != null && lockRecord.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<MfaEnrolmentRecord>().HasQueryFilter(enrolment => CurrentInstitutionId != null && enrolment.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<StepUpEvidenceRecord>().HasQueryFilter(evidence => CurrentInstitutionId != null && evidence.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<TrustedDeviceRecord>().HasQueryFilter(device => CurrentInstitutionId != null && device.InstitutionId == CurrentInstitutionId);
+    modelBuilder.Entity<SecurityKeyMetadataRecord>().HasQueryFilter(key => CurrentInstitutionId != null && key.InstitutionId == CurrentInstitutionId);
+    modelBuilder.Entity<EnvelopeReplayRecord>().HasQueryFilter(replay => CurrentInstitutionId != null && replay.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OperatorActionAuditRecord>().HasQueryFilter(evidence => CurrentInstitutionId != null && evidence.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InboxRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);

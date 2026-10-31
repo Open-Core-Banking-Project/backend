@@ -29,10 +29,25 @@ public static class DevelopmentSeed
         InMemoryEntitlementStore store = services.GetRequiredService<InMemoryEntitlementStore>();
         InstitutionId institution = InstitutionId.From(InstitutionValue);
 
-        long administratorVersion = store.Grant(
+        store.Grant(
             ActorId.From(AdministratorsActorValue),
             institution,
             IdentityPermissions.PlatformFoundationExecute,
+            GrantScope.ForInstitution(institution));
+
+        // The approver-eligibility query needs its own capability so the reference flow can be
+        // exercised without inventing a production role bundle. Epic 02 slice 10.
+        store.Grant(
+            ActorId.From(AdministratorsActorValue),
+            institution,
+            IdentityPermissions.ApprovalEligibilityReview,
+            GrantScope.ForInstitution(institution));
+
+        // Self-scoped entitlement distribution, so the snapshot contract can be exercised locally.
+        long administratorVersion = store.Grant(
+            ActorId.From(AdministratorsActorValue),
+            institution,
+            IdentityPermissions.IdentityView,
             GrantScope.ForInstitution(institution));
 
         // An actor with no grants exists so a 403 can be demonstrated against a real identity.
