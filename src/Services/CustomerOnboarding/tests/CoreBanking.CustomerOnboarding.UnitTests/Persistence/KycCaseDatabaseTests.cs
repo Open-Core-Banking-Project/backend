@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -223,7 +223,7 @@ public sealed class KycCaseDatabaseTests
                 VerificationAttemptStatus.Uncertain,
                 null,
                 null,
-                null,                null,                "correlation"),
+                null, null, "correlation"),
             CancellationToken.None);
 
         Assert.Equal(VerificationStatus.Uncertain, uncertain.Status);

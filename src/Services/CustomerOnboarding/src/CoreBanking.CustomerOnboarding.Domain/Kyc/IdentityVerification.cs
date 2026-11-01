@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CoreBanking.BuildingBlocks.Domain.Identity;
@@ -375,7 +375,8 @@ public sealed class IdentityVerification
     }
 
     /// <summary>Sends an inconclusive or uncertain verification to a human decision.</summary>
-    public void MarkManualReview(DateTimeOffset now)    {
+    public void MarkManualReview(DateTimeOffset now)
+    {
         if (IsTerminal)
         {
             throw new OnboardingRuleException("kyc_verification_closed", "A resolved verification cannot be sent to manual review.");

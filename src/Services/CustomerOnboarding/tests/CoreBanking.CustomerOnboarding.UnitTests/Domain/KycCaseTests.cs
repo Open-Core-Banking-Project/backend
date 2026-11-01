@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.CustomerOnboarding.Domain;

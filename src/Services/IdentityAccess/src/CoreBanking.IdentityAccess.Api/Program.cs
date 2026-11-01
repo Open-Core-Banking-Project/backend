@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,20 +12,20 @@ using CoreBanking.BuildingBlocks.Infrastructure.Security;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.IdentityAccess.Api;
 using CoreBanking.IdentityAccess.Api.Authorisation;
-using CoreBanking.IdentityAccess.Application.Authentication;
-using CoreBanking.IdentityAccess.Application.Approvals;
-using CoreBanking.IdentityAccess.Application.Authorisation;
 using CoreBanking.IdentityAccess.Api.Security;
+using CoreBanking.IdentityAccess.Application.Approvals;
+using CoreBanking.IdentityAccess.Application.Authentication;
+using CoreBanking.IdentityAccess.Application.Authorisation;
 using CoreBanking.IdentityAccess.Application.Devices;
-using CoreBanking.IdentityAccess.Application.Security;
-using CoreBanking.IdentityAccess.Infrastructure.Entitlements;
 using CoreBanking.IdentityAccess.Application.Permissions;
+using CoreBanking.IdentityAccess.Application.Security;
 using CoreBanking.IdentityAccess.Contracts;
 using CoreBanking.IdentityAccess.Domain.Authentication;
 using CoreBanking.IdentityAccess.Domain.Security;
 using CoreBanking.IdentityAccess.Infrastructure.Access;
 using CoreBanking.IdentityAccess.Infrastructure.Authentication;
 using CoreBanking.IdentityAccess.Infrastructure.Authorisation;
+using CoreBanking.IdentityAccess.Infrastructure.Entitlements;
 using CoreBanking.IdentityAccess.Infrastructure.Foundation;
 using CoreBanking.IdentityAccess.Infrastructure.Identity;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
@@ -188,10 +188,10 @@ if (useRelationalStore)
     builder.Services.AddScoped<ServiceClientAdministrationService>();
     builder.Services.AddScoped<IServiceClientValidator>(provider => provider.GetRequiredService<ServiceClientAdministrationService>());
     builder.Services.AddScoped<EntitlementReconciliationService>();
-builder.Services.AddSingleton(TrustDurationPolicy.Default);
-builder.Services.AddScoped<ITrustedDeviceService, TrustedDeviceService>();
-builder.Services.AddScoped<IPublicKeyMetadataService, PublicKeyMetadataService>();
-builder.Services.AddScoped<IPayloadEnvelopeService, PayloadEnvelopeService>();
+    builder.Services.AddSingleton(TrustDurationPolicy.Default);
+    builder.Services.AddScoped<ITrustedDeviceService, TrustedDeviceService>();
+    builder.Services.AddScoped<IPublicKeyMetadataService, PublicKeyMetadataService>();
+    builder.Services.AddScoped<IPayloadEnvelopeService, PayloadEnvelopeService>();
 }
 else
 {
@@ -252,46 +252,46 @@ if (app.Environment.IsDevelopment() && useRelationalStore)
     await PayloadKeyBootstrap.EnsureAsync(app.Services, builder.Configuration, app.Logger);
 }
 
-    // Entitlement distribution. The actor may read their own snapshot; a stale or regressed answer
-    // is a denial, never an empty permission set. A service-authenticated variant for other actors
-    // arrives with slice 13.
-    app.MapPost("/api/v1/entitlements/snapshot", (
-        HttpContext http,
-        EntitlementSnapshotRequestV1 request,
-        EntitlementDistributionService service) =>
+// Entitlement distribution. The actor may read their own snapshot; a stale or regressed answer
+// is a denial, never an empty permission set. A service-authenticated variant for other actors
+// arrives with slice 13.
+app.MapPost("/api/v1/entitlements/snapshot", (
+    HttpContext http,
+    EntitlementSnapshotRequestV1 request,
+    EntitlementDistributionService service) =>
+{
+    if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
     {
-        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        return Results.Unauthorized();
+    }
+
+    EntitlementDistributionResult result = service.GetSnapshot(
+        actor,
+        ActorId.From(request.ActorId),
+        InstitutionId.From(request.InstitutionId),
+        request.MinimumVersion);
+
+    if (!result.IsAllowed)
+    {
+        int status = result.DenialCode switch
         {
-            return Results.Unauthorized();
-        }
+            AuthorisationCodes.MissingAuthentication => StatusCodes.Status401Unauthorized,
+            EntitlementDistributionV1.VersionRegressed => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status403Forbidden,
+        };
 
-        EntitlementDistributionResult result = service.GetSnapshot(
-            actor,
-            ActorId.From(request.ActorId),
-            InstitutionId.From(request.InstitutionId),
-            request.MinimumVersion);
+        return Results.Problem(
+            detail: "The entitlement snapshot is not available for this request.",
+            statusCode: status,
+            title: "Entitlement snapshot refused",
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = result.DenialCode });
+    }
 
-        if (!result.IsAllowed)
-        {
-            int status = result.DenialCode switch
-            {
-                AuthorisationCodes.MissingAuthentication => StatusCodes.Status401Unauthorized,
-                EntitlementDistributionV1.VersionRegressed => StatusCodes.Status409Conflict,
-                _ => StatusCodes.Status403Forbidden,
-            };
-
-            return Results.Problem(
-                detail: "The entitlement snapshot is not available for this request.",
-                statusCode: status,
-                title: "Entitlement snapshot refused",
-                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = result.DenialCode });
-        }
-
-        return Results.Ok(result.Snapshot);
-    })
-    .AddEndpointFilter(new ProtectedOperationFilter(
-        PermissionRequirement.For(IdentityPermissions.IdentityView),
-        "identity.identity.view"));
+    return Results.Ok(result.Snapshot);
+})
+.AddEndpointFilter(new ProtectedOperationFilter(
+    PermissionRequirement.For(IdentityPermissions.IdentityView),
+    "identity.identity.view"));
 
 if (useRelationalStore)
 {

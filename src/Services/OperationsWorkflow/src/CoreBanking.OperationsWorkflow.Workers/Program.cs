@@ -44,7 +44,7 @@ public static partial class Program
             provider.GetRequiredService<IIntegrationStore>(), provider.GetRequiredService<TimeProvider>()));
         builder.Services.AddScoped<InstitutionProvisioningConsumer>();
         builder.Services.AddScoped<ApprovalRequestedConsumer>();
-builder.Services.AddScoped<ApprovalApplicationResultConsumer>();
+        builder.Services.AddScoped<ApprovalApplicationResultConsumer>();
         builder.Services.AddScoped<IIntegrationEventConsumer, OperationsWorkflowIntegrationEventConsumer>();
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
