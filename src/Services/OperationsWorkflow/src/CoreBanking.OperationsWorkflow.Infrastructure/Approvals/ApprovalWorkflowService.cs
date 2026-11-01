@@ -74,7 +74,17 @@ public sealed class ApprovalWorkflowService : IApprovalWorkflowService
             cancellationToken).ConfigureAwait(false)
             ?? throw Reject("approval_permission_missing", "Identity and Access could not prove a current approval entitlement.");
 
-        ApprovalRequest aggregate = ApprovalRequest.SubmitSavingsEligibilityPublication(
+        // The stored request names its profile; rebuilding with any other profile would enforce the wrong permission.
+        ApprovalProfile profile = ApprovalProfiles.Find(record.WorkflowKey)
+            ?? throw Reject("approval_profile_unknown", "The approval request names an unapproved workflow profile.");
+        if (!string.Equals(record.WorkflowVersionId, profile.WorkflowVersionId, StringComparison.Ordinal)
+            || !string.Equals(record.WorkflowDefinitionHash, profile.DefinitionHash, StringComparison.Ordinal))
+        {
+            throw Reject("approval_profile_mismatch", "The approval request does not match its approved profile version.");
+        }
+
+        ApprovalRequest aggregate = ApprovalRequest.Submit(
+            profile,
             command.InstitutionId,
             record.RequestId,
             record.SourceRequestKey,

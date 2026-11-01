@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CoreBanking.CustomerOnboarding.Domain\CoreBanking.CustomerOnboarding.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CoreBanking.BuildingBlocks.Application\CoreBanking.BuildingBlocks.Application.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

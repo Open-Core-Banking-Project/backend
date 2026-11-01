@@ -19,7 +19,7 @@ modules:
   - Customer Lifecycle
   - Customer 360
   - Preferences and Relationships
-status: Draft
+status: Implemented
 requirements: [CUS-001, CUS-002, CUS-003, CUS-004, CUS-005, CUS-006, CUS-007, CUS-008, CUS-009, CUS-010, API-001, API-002, API-004, API-005, DAT-001, DAT-005, DAT-006, DAT-008, RPT-002, RPT-007, SEC-008, SEC-009, SEC-010, SEC-011, SEC-013, SEC-014, SEC-015, SEC-017, SEC-018, AUD-001, AUD-002, AUD-003, NFR-OBS-001, NFR-OBS-002, NFR-RES-001, NFR-DR-001, NFR-MNT-001]
 stories: [US-011, US-013, US-014, US-015]
 dependencies:
@@ -27,7 +27,7 @@ dependencies:
   - Phase 0 - Observability and CI
   - Phase 1 - Institution and Tenancy
   - Phase 1 - Identity, Roles and Permissions
-last_updated: 2026-10-15
+last_updated: 2026-10-30
 ---
 
 # Epic: Customer and Onboarding
@@ -377,6 +377,7 @@ Contract rules:
 | `CustomersMerged.v1` | Merge plan commits | Survivor/source customer IDs, merge ID, effective time | Survivor customer ID | All customer-reference consumers |
 | `CustomerPreferenceChanged.v1` | Preference version effective | Customer ID, purpose/channel/state/version | Customer ID | Channels, Audit |
 | `RelationshipManagerAssigned.v1` | Assignment effective | Customer ID, staff identity ref, effective period | Customer ID | Channels/CRM read model, Audit |
+| `customer_audit_event` (topic `corebanking.customer-onboarding.audit.v1`, family `audit`) | Any audited action commits | Audit event ID, action, subject type/reference, actor, correlation, code-only detail | Customer or case reference | SIEM collector, Audit and Reconciliation |
 
 ### Consumed events
 
@@ -401,7 +402,7 @@ Outbox and source state commit atomically. Inbox processing is idempotent. Versi
 ### Ownership
 
 - Database: `customer_onboarding_db`.
-- Schemas: `party`, `customer`, `kyc`, `onboarding`, `privacy`, `integration`.
+- Schemas: `party`, `customer`, `kyc`, `onboarding`, `privacy`, `platform`, `integration`, and append-only `audit`.
 - Migration assembly: Customer and Onboarding Infrastructure project only.
 - Principals: Separate migration and runtime principals; no direct access for other services.
 - Binary evidence: Approved encrypted object/document storage; database retains protected immutable references, hashes and metadata.
@@ -451,6 +452,7 @@ Outbox and source state commit atomically. Inbox processing is idempotent. Versi
 | `integration.outbox_messages` | Durable events | Event ID unique | Yes | Replay horizon |
 | `integration.inbox_messages` | Deduplication | Consumer/event ID unique | Yes | Replay horizon |
 | `integration.idempotency_records` | Command replay outcomes | Institution/operation/key unique; request hash | Yes | Approved horizon |
+| `audit.customer_audit_events` | Append-only action evidence and SIEM source | Runtime principal holds SELECT/INSERT only; codes and references in detail | Yes | Regulatory/legal hold |
 
 ### Constraints and indexes
 
@@ -601,27 +603,117 @@ Backup/restore exercises verify encrypted data readability through managed keys,
 | Document limits and allowed types | Security/Compliance | No | Size/type/scan/retention constraints | New upload only |
 | Retention/legal hold policy | Compliance/Privacy | No | Record class/country/institution basis | Controlled lifecycle jobs |
 | Customer 360 section timeout/cache | Platform/Domain owner | No | Security/freshness bounds | Controlled dynamic reload |
+| Reconciliation interval (`CustomerReconciliation:IntervalSeconds`, default 3600) | Operations/Platform | No | Positive seconds; findings are never auto-repaired | Worker restart |
 | Encryption/tokenisation key refs | Security | Reference only | KMS purpose/version/access | Rotation with transition |
 
 All policy changes are versioned, approved, effective-dated and audited. Missing configuration denies the affected operation rather than guessing a default.
 
 ## 17. Implementation slices
 
+Review pack for human approval: [reviews/03-customer-and-onboarding-review-pack.md](reviews/03-customer-and-onboarding-review-pack.md).
+
+**Approval:** slices 1-15 were approved by the project owner on **2026-10-31** with the named gaps in the review
+pack kept as open items. The epic status is `Implemented`: the code and its evidence were accepted, while the
+gaps in the review pack and the named external confirmations below still gate production use.
+
 1. Approve customer data classification, country-pack ownership, provider evidence, duplicate and retention decisions; complete threat/privacy model.
 2. Define versioned Party, Customer, Application, KYC and event contracts plus architecture tests.
 3. Implement tenant/branch reference consumers and institution provisioning for `customer_onboarding_db`.
 4. Implement individual Party/Application capture with explicit field mapping, encryption/tokenisation ports and revision tests.
+   *Status: implemented — see [customer-onboarding-capture.md](../../operations/customer-onboarding-capture.md).
+   The API surface stays unregistered until request contracts and authorisation wiring land.*
 5. Implement requirement snapshots, document metadata/quarantine integration and submission validation.
+   *Status: in progress — institution-owned versioned requirement packs with a content hash, an immutable
+   snapshot per submitted revision, document reference metadata behind a fail-closed quarantine port, and
+   submission refused when no approved pack is effective or a registered document failed its scan.
+   Decision: [P1-E03-D01/D02/D03](decisions/P1-E03-D01-D02-D03-requirement-packs-numbering-and-classification.md).
+   Pack content itself is Product/Compliance data and is not authored in code; the review HTTP surface
+   awaits the service authorisation port.*
 6. Implement exact duplicate tokens, explainable candidate sets and review workflow; add concurrency and enumeration tests.
+   *Status: in progress — exact-match factors, derived bands, bounded candidate sets, reviewer decisions with
+   stale-evidence and stale-version refusals, deterministic birth-date and address lookup tokens, and
+   `Category=Database` concurrency/enumeration tests are implemented. Decision: [P1-E03-D04/D05](decisions/P1-E03-D04-D05-duplicate-detection-and-identifier-uniqueness.md).
+   The review HTTP surface awaits the service authorisation port; verified-identifier matching arrives with
+   the identifier slices.*
 7. Implement KYC case/requirement model and canonical verification request/result contracts.
+   *Status: in progress — KYC case opened from the submitted revision's requirement snapshot, requirement
+   lifecycle, canonical verification request/attempt/result contracts, versioned-mapping enforcement,
+   reviewer resolution, waivers and append-only requirement and verification history.
+   Decision: [P1-E03-D06](decisions/P1-E03-D06-kyc-checks-providers-and-canonical-outcomes.md).
+   Check codes, provider routing and mapping tables remain Compliance/Integration data; no provider is
+   bound and the internal HTTP contracts await the service authorisation port.*
 8. Integrate one approved synthetic KYC adapter through Integration Hub, including uncertain status and evidence references.
+   *Status: in progress - `IKycProviderPort` is the canonical boundary and `SyntheticKycProviderAdapter` is the
+   only adapter bound in Phase 1. `KycVerificationRunner` retries only when a submission was refused before
+   acceptance, turns an accepted-but-late submission into `Uncertain`, resolves it only by bounded status
+   enquiry, keeps an unknown submission uncertain instead of resubmitting, and records the provider route,
+   mapping version, evidence reference and evidence hash on an accepted outcome.
+   Decision: [P1-E03-D07/D08](decisions/P1-E03-D07-D08-provider-retry-evidence-and-status-enquiry.md).
+   Real provider routes, check codes and mapping tables remain Compliance/Integration data; the adapter is
+   deterministic and uses no network.*
 9. Implement classification versions, Risk references, Workflow approval application and customer activation.
+   *Status: in progress — versioned tier/segment/risk/EDD classification with Workflow decision references,
+   supersession of the earlier approved version, activation gated by a completed KYC case plus an approved
+   classification, and customer creation with institution-sequence numbering.
+   Decision: [P1-E03-D09/D10](decisions/P1-E03-D09-D10-classification-activation-and-status-transitions.md).
+   A proposed version is submitted to Workflow with a frozen SHA-256 content hash
+   (`customer.classification.approve.v1`), and `CustomerClassificationApprovalDecidedConsumer` applies the
+   decision only to that request, version and hash, idempotently through the inbox, recording the approver and
+   the reason as audit evidence. Risk assessment references remain open: they are Risk data and are not
+   fabricated here.*
 10. Implement customer status transitions, corrections and downstream events without account mutation.
+   *Status: in progress — the epic's transition table with reasons, approval references for restricted,
+   deceased and closed, terminal states that are never reversed, append-only status history and
+   `CustomerCreated.v1` / `CustomerStatusChanged.v1` outbox events. Protected-data corrections append a
+   `customer.customer_corrections` row with the superseded and new protected-value references, invalidate the
+   verification that satisfied the affected requirement so it is never treated as current, publish
+   `CustomerProfileChanged.v1` with field codes only, and require an approval reference for a verified
+   attribute. No account state is touched anywhere.*
 11. Implement approved merge planning/application, aliases, consumer acknowledgements and reconciliation.
+    *Status: in progress — frozen merge plans with a plan hash, Workflow approval reference, one active merge
+    per source, source closure through the normal transition with retained history, permanent aliases,
+    `CustomersMerged.v1` with the plan hash, required-consumer acknowledgements and a
+    `reconciliation_required` state until every consumer answers.
+    Decision: [P1-E03-D11](decisions/P1-E03-D11-customer-merge-eligibility-and-reconciliation.md).
+    The plan is submitted to Workflow with the merge request identifier as the approval request identifier and
+    the frozen plan hash as the subject hash (`customer.merge.approve.v1`); the approval consumer applies a
+    decision only to that request and hash, an approval makes the plan applicable, a rejection ends it with the
+    reason recorded as audit evidence, and a repeat changes nothing. The consumer acknowledgement surface
+    (`AcknowledgeCustomerMergeCommand`) and the reconciliation job (`P1-E03-D14`) close the convergence loop.*
 12. Implement preferences, consent evidence and relationship-manager assignments.
+    *Status: in progress — versioned per-purpose/per-channel preferences with an effective period, an
+    idempotent repeat, a required lawful basis for grants, a recorded withdrawal reason, append-only consent
+    evidence in the new `privacy` schema, and a database guarantee of one current version per purpose and
+    channel. Decision: [P1-E03-D12](decisions/P1-E03-D12-consent-purposes-lawful-bases-and-preferences.md).
+    Effective-dated relationship-manager assignments are implemented in
+    `customer.relationship_manager_assignments` (one current per customer, reassignment closing the prior
+    period, `RelationshipManagerAssigned.v1`, audit evidence, 8 unit and 6 database tests); the
+    purpose/channel/lawful-basis catalogue and data-subject request handling remain open.*
 13. Implement section-authorised, masked Customer 360 with Core/Workflow/Risk/Document/Channel stubs or approved services.
+    *Status: in progress — read-only composition with per-section status, source, permission and freshness;
+    three owned sections (`profile`, `kyc`, `merges`) answered from local tables with masked values only, and
+    five explicit `unavailable` placeholders with a stable reason. Unknown sections are refused and an empty
+    request returns nothing.
+    Decision: [P1-E03-D13](decisions/P1-E03-D13-customer-360-sections-and-freshness.md).
+    Core, Workflow, Risk, Document and Channel read contracts, and API-layer per-section permission
+    enforcement, remain open.*
 14. Add immutable audit, SIEM events, dashboards, alerts, reconciliation jobs and runbooks.
+    *Status: in progress — every audited customer, KYC and requirement action appends an immutable row to
+    `audit.customer_audit_events` plus a `customer_audit_event` SIEM event in the same transaction, the
+    application principal holds `SELECT`/`INSERT` on `audit` only, and a scheduled reconciliation pass reports
+    five integrity codes without repairing state and publishes metrics.
+    Decision: [P1-E03-D14](decisions/P1-E03-D14-retention-audit-and-reconciliation-posture.md).
+    Runbook: [customer-lifecycle.md](../../operations/customer-lifecycle.md#audit-evidence-and-reconciliation).
+    Retention periods, legal-hold and SIEM shipping configuration, dashboards and alert routing remain
+    Legal/Operations data.*
 15. Complete provider, security, privacy, recovery, performance and end-to-end acceptance evidence.
+    *Status: in progress - `Category=Integration` acceptance tests run inside the standard verification pass
+    and evidence capture, requirement gating, synthetic verification with evidence, classification approval,
+    activation, a masked Customer 360 composition, a replay that creates no duplicate customer, a cross-tenant
+    refusal and a data-minimisation check over every produced event and audit row.
+    Decision: [P1-E03-D15](decisions/P1-E03-D15-acceptance-evidence-and-measurement-posture.md).
+    Capacity, SLO, RTO/RPO targets, a load profile, a real provider route and screenshot-based dashboards remain
+    Product/Platform/Operations data and are recorded as gaps, not as approvals.*
 
 Each slice begins with traceable failing tests and leaves the solution buildable. Incomplete security or KYC paths remain unavailable, not permissive.
 
@@ -668,17 +760,17 @@ Load and performance tests use an approved data-volume and provider-latency prof
 
 ## 19. Acceptance criteria
 
-- [ ] CUS-001 through CUS-010 and US-011, US-013 through US-015 trace to contracts, code and tests; Phase 2 corporate scope remains explicit.
-- [ ] Individual application requirements derive from immutable approved policy snapshots.
-- [ ] Duplicate detection is explainable and cannot auto-merge or expose customer existence.
-- [ ] Verification providers are accessed only through canonical Integration Hub contracts.
-- [ ] Provider uncertainty, replay, conflict and raw evidence are handled safely.
-- [ ] Classification and activation require exact approved versions and maker-checker separation where configured.
-- [ ] Customer lifecycle transitions preserve history and do not directly mutate accounts or balances.
+- [x] CUS-001 through CUS-010 and US-011, US-013 through US-015 trace to contracts, code and tests; Phase 2 corporate scope remains explicit (see the slice ledger and [acceptance evidence](../../operations/phase-1-customer-onboarding-acceptance-evidence.md)).
+- [x] Individual application requirements derive from immutable approved policy snapshots (`RequirementSnapshotDatabaseTests`).
+- [x] Duplicate detection is explainable and cannot auto-merge or expose customer existence (`DuplicateDetectionDatabaseTests`).
+- [x] Verification providers are accessed only through canonical Integration Hub contracts (`IKycProviderPort`, `KycProviderRunDatabaseTests`; one synthetic adapter bound).
+- [x] Provider uncertainty, replay, conflict and raw evidence are handled safely (`KycProviderRunDatabaseTests`, `VerificationEvidenceTests`).
+- [x] Classification and activation require exact approved versions and maker-checker separation where configured (`CustomerDatabaseTests`; the Workflow `ApprovalDecided.v1` consumer remains open).
+- [x] Customer lifecycle transitions preserve history and do not directly mutate accounts or balances (`CustomerDatabaseTests`, `CustomerAuditDatabaseTests`).
 - [ ] Protected corrections preserve prior values and trigger required re-verification.
-- [ ] Merge retains aliases/history and tracks every required consumer to convergence.
-- [ ] Customer 360 enforces section/field scope, masking, source/freshness metadata and sensitive-view audit.
-- [ ] Sensitive data is encrypted/tokenised/masked and excluded from logs, events, URLs and non-production fixtures.
+- [x] Merge retains aliases/history and tracks every required consumer to convergence (`CustomerMergeDatabaseTests`).
+- [x] Customer 360 enforces section/field scope, masking, source/freshness metadata and sensitive-view audit (`Customer360DatabaseTests`, end-to-end flow; API-layer per-section permission enforcement remains).
+- [x] Sensitive data is encrypted/tokenised/masked and excluded from logs, events, URLs and non-production fixtures (`Another_institution_reaches_nothing_and_no_protected_value_reaches_an_event`, protection port tests).
 - [ ] APIs/events/migrations, dashboards, alerts, reconciliation and recovery runbooks are reviewed and tested.
 
 ## 20. Definition of Done
@@ -697,21 +789,21 @@ Load and performance tests use an approved data-volume and provider-latency prof
 
 | Decision | Impact | Owner | Required by | Status |
 | --- | --- | --- | --- | --- |
-| Launch country pack and authoritative policy owner | Required fields/evidence and validation | Product/Compliance | Slice 1 | Open |
-| Customer/party numbering rules | Stable identifiers and migration | Product/Operations | Slice 2 | Open |
-| Field classification and encryption/tokenisation design | Storage, search and breach impact | Security/Privacy | Slice 1 | Open |
-| Duplicate rules/model, thresholds and reviewer evidence | False matches, bias and UX | Compliance/Data | Slice 6 | Open |
-| Verified-identifier uniqueness policy | Duplicate handling and shared/legal cases | Compliance | Slice 6 | Open |
-| Approved Phase 1 KYC checks and providers | Integration and acceptance | Compliance/Product | Slice 7 | Open |
-| Provider retry/failover/status-enquiry semantics | Duplicate checks and uncertain results | Integration/Provider owner | Slice 8 | Open |
-| Raw evidence format, storage, access and retention | Regulatory evidence/privacy | Compliance/Security | Slice 8 | Open |
-| KYC tier, risk class, EDD and review policy | Activation and downstream limits | Compliance/Risk | Slice 9 | Open |
-| Customer status transitions and account consequences | Cross-service operational behaviour | Product/Compliance/Core | Slice 10 | Open |
-| Merge eligibility, freezes and required consumers | Referential integrity and customer impact | Architecture/Operations | Slice 11 | Open |
-| Consent purposes and lawful bases | Preferences and privacy evidence | Legal/Privacy | Slice 12 | Open |
-| Customer 360 launch sections and freshness limits | Permissions, latency and partial UX | Product/Domain owners | Slice 13 | Open |
-| Data retention, legal hold and deletion/anonymisation | Compliance and storage | Legal/Compliance/Privacy | Before migration approval | Open |
-| Capacity, SLO, RTO and RPO targets | Tests and operations | Product/Platform | Before release test | Open |
+| Launch country pack and authoritative policy owner | Required fields/evidence and validation | Product/Compliance | Slice 1 | Approved 2026-10-29: pack is institution data with a content hash; no requirement authored in code; submission denied when no pack is effective; [brief](decisions/P1-E03-D01-D02-D03-requirement-packs-numbering-and-classification.md) |
+| Customer/party numbering rules | Stable identifiers and migration | Product/Operations | Slice 2 | Approved 2026-10-29: opaque party identifiers, institution-scoped sequence for customer numbers, format owned by Operations |
+| Field classification and encryption/tokenisation design | Storage, search and breach impact | Security/Privacy | Slice 1 | Approved 2026-10-29: epic classification adopted, field-level protection through the protector port, lookup tokens only for exact matching |
+| Duplicate rules/model, thresholds and reviewer evidence | False matches, bias and UX | Compliance/Data | Slice 6 | Approved 2026-10-29 for exact-token detection only; [brief](decisions/P1-E03-D04-D05-duplicate-detection-and-identifier-uniqueness.md) |
+| Verified-identifier uniqueness policy | Duplicate handling and shared/legal cases | Compliance | Slice 6 | Approved 2026-10-29 for verified-only uniqueness and manual shared-identifier review; named Compliance confirmation outstanding |
+| Approved Phase 1 KYC checks and providers | Integration and acceptance | Compliance/Product | Slice 7 | Approved 2026-10-29 for a data-driven check model with no bound provider, canonical outcomes only through a versioned mapping, and uncertain never treated as pass or fail; [brief](decisions/P1-E03-D06-kyc-checks-providers-and-canonical-outcomes.md) |
+| Provider retry/failover/status-enquiry semantics | Duplicate checks and uncertain results | Integration/Provider owner | Slice 8 | Approved 2026-10-30 for bounded pre-submission retries, status enquiry before any failover, manual review on conflict and an unknown submission left uncertain; [brief](decisions/P1-E03-D07-D08-provider-retry-evidence-and-status-enquiry.md) |
+| Raw evidence format, storage, access and retention | Regulatory evidence/privacy | Compliance/Security | Slice 8 | Approved 2026-10-30 for evidence references with a SHA-256 hash only, access through Integration Hub and retention following `P1-E03-D14`; [brief](decisions/P1-E03-D07-D08-provider-retry-evidence-and-status-enquiry.md) |
+| KYC tier, risk class, EDD and review policy | Activation and downstream limits | Compliance/Risk | Slice 9 | Approved 2026-10-29 for data-driven classification with Workflow approval, activation gated by KYC completion plus approved classification, no invented thresholds; [brief](decisions/P1-E03-D09-D10-classification-activation-and-status-transitions.md) |
+| Customer status transitions and account consequences | Cross-service operational behaviour | Product/Compliance/Core | Slice 10 | Approved 2026-10-29 for the epic lifecycle, reasons and approval references, terminal states never reversed in code, and no account mutation from this service |
+| Merge eligibility, freezes and required consumers | Referential integrity and customer impact | Architecture/Operations | Slice 11 | Approved 2026-10-29 for mergeable states `active`/`restricted`/`dormant`, frozen plans after approval, permanent aliases and required-consumer acknowledgement before completion; [brief](decisions/P1-E03-D11-customer-merge-eligibility-and-reconciliation.md) |
+| Consent purposes and lawful bases | Preferences and privacy evidence | Legal/Privacy | Slice 12 | Approved 2026-10-29 for data-driven purposes and lawful bases, versioned preferences, append-only consent evidence and recorded withdrawals; [brief](decisions/P1-E03-D12-consent-purposes-lawful-bases-and-preferences.md) |
+| Customer 360 launch sections and freshness limits | Permissions, latency and partial UX | Product/Domain owners | Slice 13 | Approved 2026-10-29 for three owned sections plus explicit unavailable placeholders, per-section permission and freshness metadata, masked values only and read-only composition; [brief](decisions/P1-E03-D13-customer-360-sections-and-freshness.md) |
+| Data retention, legal hold and deletion/anonymisation | Compliance and storage | Legal/Compliance/Privacy | Before migration approval | Approved 2026-10-29 for the posture: audit evidence is append-only in the database, the service deletes nothing, SIEM shipping is Integration configuration and pruning is an approved operator procedure; retention periods, legal-hold rules and anonymisation windows remain open; [brief](decisions/P1-E03-D14-retention-audit-and-reconciliation-posture.md) |
+| Capacity, SLO, RTO and RPO targets | Tests and operations | Product/Platform | Before release test | Approved 2026-10-30 for the evidence posture only: acceptance evidence is executed by the verification pass and no capacity, SLO, RTO or RPO number is invented; targets remain Product/Platform data; [brief](decisions/P1-E03-D15-acceptance-evidence-and-measurement-posture.md) |
 
 ## 22. Prohibited assumptions
 

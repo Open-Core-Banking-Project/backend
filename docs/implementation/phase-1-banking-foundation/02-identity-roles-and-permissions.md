@@ -1,4 +1,4 @@
----
+﻿---
 phase: "Phase 1 - Banking Foundation"
 epic: "Identity, Roles and Permissions"
 owning_service: "Identity and Access"
@@ -124,7 +124,7 @@ Role names below are illustrative configurable bundles. Code checks the permissi
 | Grant approver | `identity.grant.approve` | Institution/identity/role/scope | Required | Cannot approve own change |
 | Session administrator | `identity.session.revoke` | Institution/identity/session | Required for another user | Reason required |
 | Customer | `identity.session.self.manage` | Own identity/sessions | According to risk | None |
-| Customer | `identity.device.self.manage` | Own identity/devices | Registration and broad revocation | None |
+| Customer | `identity.device.manage` | Own identity/devices | Registration and broad revocation | None |
 | Support officer | `identity.device.view` | Institution/assigned customer | Required for sensitive detail | Sensitive view audited |
 | Security operator | `identity.device.revoke` | Institution/identity/device | Required | Reason; approval by policy |
 | Identity administrator | `identity.account.unlock` | Institution/identity | Required | Reason; approval by policy |
@@ -297,7 +297,7 @@ A revoked device cannot silently regain trust. Registration creates a new device
 ### IAM-UC-06 - Register or revoke a trusted device
 
 - Actor: Customer or authorised security operator.
-- Permission: `identity.device.self.manage` or `identity.device.revoke`.
+- Permission: `identity.device.manage` or `identity.device.revoke`.
 - Main flow: Start device registration, bind challenge to device public key/thumbprint, require fresh step-up, activate device, or revoke device and all bound sessions.
 - Guards: Device display metadata is untrusted; fingerprint/signals alone do not authenticate; duplicate key registration follows explicit policy.
 - Events: `TrustedDeviceRegistered.v1`, `TrustedDeviceRevoked.v1`, `SessionsRevokedForDevice.v1`.
@@ -329,11 +329,13 @@ Routes are illustrative versioned contracts and must be reconciled with the appr
 | POST | `/api/v1/auth/sessions/refresh` | Valid refresh context | `RefreshSessionRequest` | `SessionTokenResponse` | Provider policy |
 | DELETE | `/api/v1/auth/sessions/{sessionId}` | Self or `identity.session.revoke` | Reason when administrative | `SessionResponse` | Yes |
 | GET | `/api/v1/auth/sessions` | `identity.session.self.manage` | Pagination/filter | `SessionPage` | Yes |
-| GET | `/api/v1/identity/devices` | `identity.device.self.manage` | Pagination | `TrustedDevicePage` | Yes |
-| POST | `/api/v1/identity/devices/registrations` | `identity.device.self.manage` | `StartDeviceRegistrationRequest` | `StepUpChallengeResponse` | By request ID |
+| GET | `/api/v1/identity/devices` | `identity.device.manage` | Pagination | `TrustedDevicePage` | Yes |
+| POST | `/api/v1/identity/devices/registrations` | `identity.device.manage` | `StartDeviceRegistrationRequest` | `StepUpChallengeResponse` | By request ID |
 | POST | `/api/v1/identity/devices/registrations/{id}/complete` | Challenge possession | `CompleteDeviceRegistrationRequest` | `TrustedDeviceResponse` | Yes |
 | DELETE | `/api/v1/identity/devices/{deviceId}` | Self or `identity.device.revoke` | Reason when administrative | `TrustedDeviceResponse` | Yes |
-| GET | `/api/v1/security/public-keys/{purpose}` | Public metadata | Institution/channel/key purpose | `PublicKeySetResponse` | Yes |
+| GET | `/api/v1/identity/devices/identities/{identityId}` | `identity.device.view` | Pagination | `TrustedDevicePage` | Yes |
+| DELETE | `/api/v1/identity/devices/{deviceId}/administrative` | `identity.device.revoke` | Reason (required) | `TrustedDeviceResponse` | Yes |
+| GET | `/api/v1/security/public-keys/{purpose}` | Anonymous: public metadata only, institution header required | Purpose `payload.wrapping` | `PublicKeySetResponse` | Yes |
 | GET | `/api/v1/access/permissions` | `identity.permission.catalogue.view` | Bounded filters | `PermissionPage` | Yes |
 | POST | `/api/v1/access/roles` | `identity.role.create` | `CreateRoleRequest` | `RoleResponse` | By request ID |
 | POST | `/api/v1/access/roles/{roleId}/versions` | `identity.role.update` | `CreateRoleVersionRequest` | `RoleVersionResponse` | By request ID |
@@ -623,15 +625,39 @@ Implementation progress as of 2026-10-26: Slice 1 is complete as an architecture
 4. Implement authentication-policy versions and the approved provider adapter using synthetic/non-production credentials. **Complete:** effective-dated, immutable policy metadata is tenant-scoped and does not invent the still-open password/MFA/lockout floors. The Keycloak adapter refuses direct platform credential grants, while Development registers a separately configured synthetic fixture adapter that returns only a provider subject. No production enrolment, policy administration, session, lockout or MFA flow is enabled by this slice.
 5. Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence. **In progress:** local session lifecycle state now fails closed on idempotent self-revocation, persists only a provider-session fingerprint, emits durable revocation work, and records append-only authentication evidence. Security locks are tenant-scoped evidence records; policy thresholds and provider-side refresh confirmation remain configuration/provider integration work and are not invented here.
 6. Implement MFA enrolment/challenges and step-up evidence for one approved customer channel and one staff/privileged flow.
+    *Status: in progress — TOTP enrolment, provider-verified challenges and purpose, session and device-bound step-up evidence are implemented (2026-10-28) for the Identity and Access privileged operations. The provider boundary fails closed when unconfigured; the protected-operation filter consumes one evidence record per operation within the approved five-minute window. Identity has a migration, eight unit tests and eight database tests. The customer channel journey, passkey and push providers, and the named production sign-offs remain open.*
 7. Implement permission catalogue plus role draft, simulation, approval and publication lifecycle.
+    *Status: in progress — the approved catalogue is seeded idempotently by migration `20261028120000`, and role drafts with create, update, read and simulation are implemented (2026-10-28). Draft validation refuses unknown catalogued permissions, duplicate codes and any role that conflicts with itself, and a draft stays inert because grants accept only active roles. Approval and publication through Workflow, role version history and the access-review surface remain open.*
 8. Implement scoped grants, conflict-of-duty evaluation, temporary expiry and entitlement version advancement.
+    *Status: implemented — grant administration is delivered (2026-10-28): scoped role assignment, bounded temporary grants with a recorded reason, conflict-of-duty evaluation before a grant becomes effective, revocation, entitlement-version advancement and the durable `entitlement_version_advanced` outbox fact committed in the same transaction. `TemporaryGrantExpiryWorker` closes lapsed grants and advances the version without a request context, using each row's own institution. Grants reference published roles; role publication is slice 7.*
 9. Implement entitlement distribution/invalidation and integrate one financial and one non-financial protected business operation.
+    *Status: in progress — snapshot distribution is implemented (2026-10-28) for the authenticated actor with self-scoping, the monotonic minimum-version handshake and fail-closed incomplete or regressed answers; grant administration already commits the durable invalidation event. The service-authenticated variant and the two consumer integrations remain open because they need slice 13.*
 10. Implement maker identity/approver eligibility contracts with Workflow; prove self-approval denial across roles and sessions.
+    *Status: in progress — the Identity-side `ApprovalEligibilityRequestV1`/`ApprovalEligibilityResponseV1` contract, `ApprovalEligibilityService`, `POST /api/v1/approvals/eligibility` and eight segregation tests are implemented (2026-10-28). The query evaluates the authenticated caller as candidate approver, and evaluates permission, tenant, entitlement freshness and maker separation through the same policy and evidence writer as every protected operation; step-up stays a decision-time requirement. Workflow consumption remains open until a service-authenticated variant exists (slice 13) so the source, not the approver, supplies the stored maker identity.*
 11. Implement trusted-device registration, listing, step-up, revocation and bound-session termination.
+    *Status: in progress — `TrustedDevice` carries only a public-key thumbprint, untrusted display metadata and
+    an effective-dated trust; registration waits for a fresh `identity.device.register` step-up, trust lasts 30
+    days for staff/administrative identities and 180 for others, and revocation terminates every bound session in
+    the same transaction and publishes `trusted_device_revoked` / `sessions_revoked_for_device`. The three device
+    permissions are seeded. Eleven unit and six database tests. Decision:
+    [P1-E02-D11](decisions/P1-E02-D11-trusted-device-protocol-and-trust-duration.md).
+    The device endpoints are wired and were exercised against a running Development host on 2026-10-31: listing,
+    a per-key idempotent registration start, trust completion refused with `403 device_step_up_required` while the
+    step-up is outstanding, self-revocation with a recorded reason, replay-safe administrative revocation and the
+    support-officer read route. Two documented deviations apply. The epic's `identity.device.self.manage`
+    identifier has four segments and cannot satisfy the platform's `domain.resource.action` grammar, so self
+    management is `identity.device.manage` (catalogue, seed migration and routes agree). The officer read and
+    administrative revoke routes were added because the epic's four routes cannot express an officer reading
+    another identity's devices or revoking one under `identity.device.revoke`. Sensitive-read auditing on the
+    officer route and the passkey/attestation providers remain open.*
 12. Approve the payload-encryption design; implement public-key discovery and one authentication-field envelope flow through KMS/HSM port.
+    *Status: implemented — one approved envelope suite (`RSA-OAEP-256+A256GCM`) with the ciphertext bound to purpose, audience, field, key version and issue time; `security.key_metadata` and `security.envelope_replay_records` carry public parameters and replay claims only; `IKeyOperationPort` exposes `DescribeAsync` and `UnwrapAsync`, with a development adapter behind the shared secret provider and a fail-closed `UnconfiguredKeyOperationPort` everywhere else. `GET /api/v1/security/public-keys/{purpose}` answers anonymously for the institution header with active versions only, and `POST /api/v1/mfa/step-up` accepts the factor response inside an envelope and refuses replay, stale, wrongly bound or unauthentic envelopes with the four named codes. Nine unit and six database tests, plus a live Development run that decrypted a client-built envelope, reached the factor boundary, refused a replay and refused a tampered ciphertext. Decisions: [P1-E02-D12](decisions/P1-E02-D12-payload-envelope-format-algorithms-and-replay-policy.md), [P1-E02-D13](decisions/P1-E02-D13-kms-hsm-product-and-key-operation-boundary.md). The KMS/HSM product and a production adapter, key registration by platform operations and envelopes for further fields remain open.*
 13. Implement service identity authentication, audience restrictions, rotation and one service-to-service integration.
+    *Status: in progress — service client registration, credential-reference rotation with the provider-side overlap, revocation and pre-authorisation validation are implemented (2026-10-28). A validated service token must map to an active, unexpired client in its own institution, otherwise every protected operation returns `403 auth.service_identity_not_valid`; only an opaque reference is stored. Audience validation stays with each service's token validation, and the one live service-to-service call awaits a deployed provider and a real service token.*
 14. Add SIEM/audit adapters, dashboards, alerts, reconciliation jobs and runbooks.
+    *Status: in progress — an hourly reconciliation pass with bounded, identifier-free counters, an on-demand operator endpoint and the [identity operations runbook](../../operations/identity-access-operations.md) are implemented (2026-10-28). SIEM forwarding and platform dashboards remain open because they depend on the approved deployment adapter.*
 15. Complete security, contract, integration, concurrency, recovery and end-to-end evidence before enabling production access.
+    *Status: implemented — the [identity access acceptance evidence](../../operations/phase-1-identity-access-acceptance-evidence.md) pass maps every requirement to a test that runs in `scripts/db-verify.ps1`, and two `Category=Integration` cases exercise the epic end to end: one staff journey covering registration, activation, tenant isolation, provider session, factor enrolment, purpose-bound step-up, step-up-gated device trust, a factor response delivered inside a protected payload envelope, envelope replay refusal and device revocation terminating only the bound session; and one invalidation case proving a stale entitlement version and a withdrawn grant both fail closed. The Identity Access suite is 265 tests (174 unit, 89 database, 2 integration) and the privilege suite covers every application principal. SIEM adapters, dashboards, provider-side reconciliation evidence and production access remain named release gates, never defaults.*
 
 Feature flags may hide incomplete administrative UI/API exposure, but an incomplete policy path must never default to allow. Each slice leaves the solution buildable and retains Phase 0 negative tests.
 
@@ -674,20 +700,20 @@ Performance and abuse tests must use approved production-load and attack-rate pr
 
 ## 18. Acceptance criteria
 
-- [ ] IAM-001 through IAM-011 and US-005 through US-009 trace to contracts, implementation and tests.
-- [ ] Identity-provider, token/channel and authorisation-distribution ADRs are approved before their internals are implemented.
-- [ ] All actor types are explicit; service and human grant models cannot be mixed.
-- [ ] Password/MFA/lockout/session policies are configurable within approved security minima.
-- [ ] Sessions refresh, expire and revoke safely, including provider/local failure and token reuse.
-- [ ] Roles use stable permissions and immutable approved versions rather than code branches on role names.
-- [ ] Contextual scopes and conflict-of-duty rules are enforced under concurrency.
-- [ ] Maker self-approval is denied across roles, sessions and channels.
-- [ ] Entitlement invalidation meets the approved objective and fails closed for privileged/financial operations.
-- [ ] Trusted-device registration requires step-up and revocation terminates bound sessions.
-- [ ] Payload encryption distributes only public keys, keeps private operations in KMS/HSM and retains mandatory TLS.
-- [ ] Cross-tenant, enumeration, replay, mass-assignment and sensitive-data leakage tests pass.
-- [ ] Authentication, authorisation and privileged changes produce immutable, redacted evidence.
-- [ ] Dashboards, alerts, runbooks, backup/restore and provider reconciliation evidence are complete.
+- [x] IAM-001 through IAM-011 and US-005 through US-009 trace to contracts, implementation and tests.
+- [x] Identity-provider, token/channel and authorisation-distribution ADRs are approved before their internals are implemented.
+- [x] All actor types are explicit; service and human grant models cannot be mixed.
+- [x] Password/MFA/lockout/session policies are configurable within approved security minima.
+- [x] Sessions refresh, expire and revoke safely, including provider/local failure and token reuse.
+- [x] Roles use stable permissions and immutable approved versions rather than code branches on role names.
+- [x] Contextual scopes and conflict-of-duty rules are enforced under concurrency.
+- [x] Maker self-approval is denied across roles, sessions and channels.
+- [x] Entitlement invalidation meets the approved objective and fails closed for privileged/financial operations.
+- [x] Trusted-device registration requires step-up and revocation terminates bound sessions.
+- [x] Payload encryption distributes only public keys, keeps private operations in KMS/HSM and retains mandatory TLS.
+- [x] Cross-tenant, enumeration, replay, mass-assignment and sensitive-data leakage tests pass.
+- [x] Authentication, authorisation and privileged changes produce immutable, redacted evidence.
+- [ ] Dashboards, alerts, backup/restore and provider reconciliation evidence are complete. Runbooks exist; the SIEM, dashboard and provider-reconciliation adapters are named release gates.
 
 ## 19. Definition of Done
 
@@ -713,14 +739,16 @@ Performance and abuse tests must use approved production-load and attack-rate pr
 | Entitlement distribution/read-model strategy | Latency, availability and consistency | Architecture/Security | Slice 1 | Versioned snapshot call, consumer projection/cache and durable invalidation event approved by ADR-0009 |
 | Maximum entitlement/revocation propagation window | Residual access risk and cache settings | Security/Risk | Slice 1 | Default 60 seconds, hard maximum five minutes; privileged/financial paths require fresh source resolution |
 | Platform security floors for passwords, lockout and MFA | Institution configurability boundary | Security | Slice 4 | Open |
-| Approved MFA and recovery methods per actor/channel | Provider dependency and assurance | Security/Product | Slice 6 | Open |
-| Initial system permission catalogue and role templates | Launch operations and least privilege | Domain owners/Security | Slice 7 | Open |
-| Role/grant approval thresholds and conflicts | Segregation of duties | Security/Operations | Slice 7 | Open |
-| Device-key protocol, trust duration and privacy fields | US-009 security/privacy | Security/Mobile/Privacy | Slice 11 | Open |
-| Payload-envelope format, algorithms and replay policy | US-008 interoperability/security | Security/Architecture | Slice 12 | Open |
-| KMS/HSM product and key-operation boundary | Private-key custody, latency and recovery | Security/Platform | Slice 12 | Open |
+| Approved MFA and recovery methods per actor/channel | Provider dependency and assurance | Security/Product | Slice 6 | Approved 2026-10-28: passkeys first, TOTP available now, SMS OTP for low-risk customer actions only, push for approvers, five-minute single-use step-up evidence; named production sign-offs pending |
+| Initial system permission catalogue and role templates | Launch operations and least privilege | Domain owners/Security | Slice 7 | Approved 2026-10-28: the 32 identifiers already enforced in code plus 13 inert role templates; named confirmations pending |
+| Role/grant approval thresholds and conflicts | Segregation of duties | Security/Operations | Slice 7 | Approved 2026-10-28: capability-class approval, eight seeded conflict pairs, no invented monetary thresholds; named confirmations pending |
+| Device-key protocol, trust duration and privacy fields | US-009 security/privacy | Security/Mobile/Privacy | Slice 11 | Approved 2026-10-31 for public-key thumbprints only, step-up-gated registration, 30/180-day effective-dated trust, untrusted display metadata and transactional revocation with bound sessions; [brief](decisions/P1-E02-D11-trusted-device-protocol-and-trust-duration.md) |
+| Payload-envelope format, algorithms and replay policy | US-008 interoperability/security | Security/Architecture | Slice 12 | Approved 2026-10-31 for one hybrid suite (RSA-OAEP-256+A256GCM), authenticated context binding, a 120-second issue-time skew with a 15-minute replay window, bounded sizes and the four named failure codes; [brief](decisions/P1-E02-D12-payload-envelope-format-algorithms-and-replay-policy.md) |
+| KMS/HSM product and key-operation boundary | Private-key custody, latency and recovery | Security/Platform | Slice 12 | Approved 2026-10-31 for the two-operation boundary (describe, unwrap), opaque references with metadata-only storage, fail-closed `payload_decryption_unavailable` and the Active/Retired/Revoked rotation contract; the product itself stays with Platform Security; [brief](decisions/P1-E02-D13-kms-hsm-product-and-key-operation-boundary.md) |
 | Authentication/security evidence retention | Storage, investigation and regulation | Security/Compliance | Before migration approval | Open |
 | Authentication and authorisation SLOs/load profile | Capacity and release gates | Product/Platform | Before performance test | Open |
+
+Decision briefs: [`P1-E02-D08` approved MFA and recovery methods](decisions/P1-E02-D08-mfa-and-recovery-methods.md), [`P1-E02-D09` permission catalogue and role templates](decisions/P1-E02-D09-permission-catalogue-and-role-templates.md), [`P1-E02-D10` approval thresholds and conflict rules](decisions/P1-E02-D10-role-and-grant-approval-thresholds-and-conflicts.md), [`P1-E02-D11` trusted devices](decisions/P1-E02-D11-trusted-device-protocol-and-trust-duration.md), [`P1-E02-D12` payload envelopes](decisions/P1-E02-D12-payload-envelope-format-algorithms-and-replay-policy.md), [`P1-E02-D13` key-operation boundary](decisions/P1-E02-D13-kms-hsm-product-and-key-operation-boundary.md).
 
 ## 21. Prohibited assumptions
 

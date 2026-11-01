@@ -89,6 +89,15 @@ public sealed class ServiceClientRecord : ITenantOwnedEntity
 
     public required string Audience { get; set; }
 
+    /// <summary>Opaque provider reference only; the provider holds the secret. Never logged.</summary>
+    public required string CredentialReference { get; set; }
+
+    public DateTimeOffset? CredentialExpiresAt { get; set; }
+
+    public string? PreviousCredentialReference { get; set; }
+
+    public DateTimeOffset? PreviousValidUntil { get; set; }
+
     public RecordStatus Status { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }

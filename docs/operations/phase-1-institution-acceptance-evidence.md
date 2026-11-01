@@ -1,8 +1,9 @@
 # Phase 1 institution and tenancy acceptance evidence
 
 Evidence date: 2026-10-26. Scope: implementation slices 1-12 of
-`01-institution-and-tenancy.md`. Repository status is **Implemented, pending human acceptance and
-production-policy approvals**; this record does not claim `Verified`.
+`01-institution-and-tenancy.md`. Human slice acceptance for slices 2-12 was recorded on 2026-10-28
+in the [slice ledger](../../implementation/phase-1-banking-foundation/slice-ledger.md); production-policy
+approvals and the concurrency coverage named below remain open.
 
 ## Automated traceability
 
@@ -47,3 +48,22 @@ captured in the target environment.
 - Production secret manager/HSM choice and target-environment verification of runtime grants.
 - Target-environment migration, broker replay, concurrent-command, backup/restore and telemetry
   redaction evidence.
+- PostgreSQL contention tests for INS-002, INS-004 and INS-005; the current CoreLedger suites provide
+  model-level and unit-level evidence only.
+
+## Verification run 2026-10-28
+
+Commands and results from a local re-verification of the claims above. This run does not change the
+status: the slices remain implemented and awaiting human acceptance.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Solution build | `dotnet build CoreBanking.sln` | Pass, 0 warnings, 0 errors |
+| Institution unit and architecture | `dotnet test` CoreLedger unit and ArchitectureTests | 101 and 15 passed |
+| Migrations and database suites | `scripts/db-verify.ps1` | Pass: migrations applied for all nine services; CustomerOnboarding 11, IdentityAccess 48 and AuditReconciliation 2 database tests passed |
+| Principal privileges | `scripts/db-verify.ps1` security phase | 54 passed |
+
+Gap found: CoreLedger publishes no `Category=Database` or `Category=Integration` tests, so INS-002
+(concurrent duplicate institution code), INS-004 (boundary acknowledgement) and INS-005
+(service-unavailable retry) currently have model-level or unit-level evidence only. PostgreSQL
+contention coverage is still required before those concurrency claims can be called verified.

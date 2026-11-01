@@ -1,11 +1,13 @@
 using System;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 
 namespace CoreBanking.OperationsWorkflow.Domain.Approvals;
 
+/// <summary>
+/// The first approved profile. The constants delegate to the profile catalogue so the hash the source service
+/// computes and the hash this service enforces cannot drift apart.
+/// </summary>
 public static class SavingsEligibilityPublicationProfile
 {
     public const string WorkflowKey = "product.savings.eligibility.publish.v1";
@@ -14,9 +16,7 @@ public static class SavingsEligibilityPublicationProfile
     public const string SourceService = "core-ledger";
     public const string RequiredPermission = "product.version.approve";
 
-    public static string DefinitionHash { get; } = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-        $"{WorkflowKey}|{WorkflowVersionId}|one-level|maker-excluded|{RequiredPermission}|decision-time-entitlement")))
-        .ToLowerInvariant();
+    public static string DefinitionHash => ApprovalProfiles.SavingsEligibilityPublication.DefinitionHash;
 }
 
 public enum ApprovalRequestStatus
@@ -92,6 +92,7 @@ public sealed record ApprovalDecision(
 public sealed class ApprovalRequest
 {
     private ApprovalRequest(
+        ApprovalProfile profile,
         InstitutionId institutionId,
         string requestId,
         string sourceRequestKey,
@@ -105,16 +106,16 @@ public sealed class ApprovalRequest
         InstitutionId = institutionId;
         RequestId = requestId;
         SourceRequestKey = sourceRequestKey;
-        WorkflowKey = SavingsEligibilityPublicationProfile.WorkflowKey;
-        WorkflowVersionId = SavingsEligibilityPublicationProfile.WorkflowVersionId;
-        WorkflowDefinitionHash = SavingsEligibilityPublicationProfile.DefinitionHash;
-        SourceService = SavingsEligibilityPublicationProfile.SourceService;
-        SubjectType = SavingsEligibilityPublicationProfile.SubjectType;
+        WorkflowKey = profile.WorkflowKey;
+        WorkflowVersionId = profile.WorkflowVersionId;
+        WorkflowDefinitionHash = profile.DefinitionHash;
+        SourceService = profile.SourceService;
+        SubjectType = profile.SubjectType;
         SubjectId = subjectId;
         SubjectVersion = subjectVersion;
         SubjectHash = subjectHash;
         Maker = maker;
-        RequiredPermission = SavingsEligibilityPublicationProfile.RequiredPermission;
+        RequiredPermission = profile.RequiredPermission;
         CorrelationId = correlationId;
         SubmittedAt = submittedAt;
     }
@@ -137,7 +138,36 @@ public sealed class ApprovalRequest
     public ApprovalRequestStatus Status { get; private set; } = ApprovalRequestStatus.Submitted;
     public ApprovalDecision? Decision { get; private set; }
 
+    /// <summary>The first approved profile, kept as a named factory for the Core Ledger flow.</summary>
     public static ApprovalRequest SubmitSavingsEligibilityPublication(
+        InstitutionId institutionId,
+        string requestId,
+        string sourceRequestKey,
+        string subjectId,
+        string subjectVersion,
+        string subjectHash,
+        ActorId maker,
+        string correlationId,
+        DateTimeOffset submittedAt) =>
+        Submit(
+            ApprovalProfiles.SavingsEligibilityPublication,
+            institutionId,
+            requestId,
+            sourceRequestKey,
+            subjectId,
+            subjectVersion,
+            subjectHash,
+            maker,
+            correlationId,
+            submittedAt);
+
+    /// <summary>
+    /// Submits a request pinned to one approved profile and to the exact subject version and hash the approver will
+    /// see. The profile decides the workflow key, version, definition hash, source service, subject type and
+    /// required permission; a caller cannot supply them.
+    /// </summary>
+    public static ApprovalRequest Submit(
+        ApprovalProfile profile,
         InstitutionId institutionId,
         string requestId,
         string sourceRequestKey,
@@ -148,6 +178,7 @@ public sealed class ApprovalRequest
         string correlationId,
         DateTimeOffset submittedAt)
     {
+        ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(institutionId);
         ArgumentNullException.ThrowIfNull(maker);
         Require(requestId, nameof(requestId));
@@ -159,6 +190,7 @@ public sealed class ApprovalRequest
         if (subjectHash.Length != 64 || !subjectHash.All(Uri.IsHexDigit))
             throw new ArgumentException("Subject hash must be a SHA-256 hexadecimal digest.", nameof(subjectHash));
         return new ApprovalRequest(
+            profile,
             institutionId, requestId.Trim(), sourceRequestKey.Trim(), subjectId.Trim(), subjectVersion.Trim(),
             subjectHash.ToLowerInvariant(), maker, correlationId.Trim(), submittedAt);
     }

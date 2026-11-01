@@ -50,4 +50,26 @@ internal static partial class StartupLog
         Level = LogLevel.Information,
         Message = "Keycloak JWT authentication is enabled for authority {Authority} and audience {Audience}.")]
     public static partial void KeycloakAuthenticationEnabled(ILogger logger, string authority, string audience);
+
+    [LoggerMessage(
+        EventId = 1007,
+        Level = LogLevel.Information,
+        Message = "Registered the development payload wrapping key {KeyId} version {KeyVersion} in institution {InstitutionId}.")]
+    public static partial void DevelopmentPayloadKeyRegistered(
+        ILogger logger,
+        string keyId,
+        int keyVersion,
+        string institutionId);
+
+    [LoggerMessage(
+        EventId = 1008,
+        Level = LogLevel.Warning,
+        Message = "No development payload wrapping key is configured; protected payload envelopes are refused until CB_SECRET_IDENTITY_PAYLOAD_WRAPPING_DEVELOPMENT is supplied.")]
+    public static partial void DevelopmentPayloadKeyUnavailable(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1009,
+        Level = LogLevel.Warning,
+        Message = "The development payload wrapping key could not be registered; protected payload envelopes may be unavailable.")]
+    public static partial void DevelopmentPayloadKeyRegistrationFailed(ILogger logger, Exception exception);
 }
