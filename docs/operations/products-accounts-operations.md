@@ -1,11 +1,13 @@
 # Products and accounts operations
 
 Operational contract for the Core Banking and Ledger product and account configuration areas
-(`product_eligibility.v1`, `institution.currencies`). Decision: P1-E04 slice 14.
+(`product_eligibility.v1`, `institution.currencies`, `institution.account-opening-policy`) and the account
+application boundary. Decisions: P1-E04 slice 14, P1-E04-D07.
 
-Account opening, restrictions, liens, dormancy and statements are not yet implemented, so this runbook
-covers the configuration lifecycle, reference-fact consumption and the integrity signals that exist today.
-Extend it in the same change that enables those features; do not document a capability ahead of the code.
+Account numbers, accounts, restrictions, liens, dormancy and statements are not implemented, so this runbook
+covers the configuration lifecycle, reference-fact consumption, account applications with their eligibility
+evidence, and the integrity signals that exist today. Extend it in the same change that enables those
+features; do not document a capability ahead of the code.
 
 ## Signals
 
@@ -17,7 +19,8 @@ monetary value is ever a tag or a log field.
 | --- | --- | --- |
 | `corebanking.product_account.configuration.commands` | counter | Lifecycle command by `area`, `command` (`draft.create`, `simulate`, `submit`, `publish`) and `outcome` (`succeeded`, `replayed`, `rejected`) |
 | `corebanking.product_account.reference_facts.lookups` | counter | Authoritative customer-fact lookups by bounded `outcome` code |
-| `corebanking.product_account.configurations.published` | gauge | Published configuration versions across both areas |
+| `corebanking.product_account.account.commands` | counter | Account-application commands by `command` (`create`, `evaluate`) and `outcome` (`succeeded`, `replayed`, `rejected`) |
+| `corebanking.product_account.configurations.published` | gauge | Published configuration versions across the product, currency and opening-policy areas |
 | `corebanking.product_account.configurations.awaiting_publication` | gauge | Approved versions not yet published |
 | `corebanking.product_account.outbox.pending` | gauge | Outbox messages not yet relayed |
 | `corebanking.product_account.outbox.oldest_pending_age_seconds` | gauge | Age of the oldest pending outbox message |
@@ -33,6 +36,9 @@ Existing institution instruments remain on `CoreBanking.Institutions` (provision
 | Simulation rejected | `configuration.commands{command="simulate",outcome="rejected"}` rising | Validate the currency set (`baseCurrency` must be a member, ISO alpha-3, no duplicates) or the product rules payload |
 | Reference facts unavailable | `reference_facts.lookups{outcome="eligibility_facts_unavailable"}` or `eligibility_facts_stale` rising | Check the Customer and Onboarding host, the allow-list, the audience and the Keycloak client; eligibility must stay denied |
 | Reference facts mismatched | `reference_facts.lookups{outcome="eligibility_facts_mismatch"}` above zero | Stop: a caller is receiving another institution's or malformed facts. Investigate the service token audience and claim mapping before anything else |
+| Applications refused by policy | `account.commands{command="evaluate",outcome="rejected"}` rising with `account_opening_policy_unavailable` | The institution has no effective opening ceiling, so opening stays blocked by design. Publish an approved `institution.account-opening-policy` version; never widen the code to allow an open-ended limit |
+| Concurrent opening held | `account.commands{command="evaluate",outcome="rejected"}` with `account_opening_claim_busy` | One claim per customer and counting basis is expected; a sustained rate means a stuck evaluation. Claims expire after 60 seconds and an expired claim is released when the next evaluation runs, so investigate the failing path rather than deleting rows |
+| Applications refused by limit | `account.commands{command="evaluate",outcome="rejected"}` rising with `account_limit_reached` | Read the recorded evaluation: the counted holdings and effective maximum are evidence. Do not edit the snapshot; a legitimate exception needs the approved override path, which is not enabled here |
 | Outbox backlog | `outbox.pending` above the approved threshold, or `oldest_pending_age_seconds` above the relay budget | Check the relay worker and broker; approvals and publications stay pending until the relay drains |
 | Reconciliation findings | `GET /internal/v1/reconciliation/product-accounts` returns any finding | Follow the finding code below; findings are configuration-integrity failures, never warnings |
 
@@ -59,6 +65,16 @@ pending outbox message exists.
 **Product or currency publication failure.** Read the stable code, correct the cause, and re-submit with the
 same idempotency key only when the payload is unchanged. A changed payload needs a new key. Never edit a
 configuration version row directly: published versions are immutable and the hash is the evidence.
+
+**Opening ceiling missing or invalid.** Every account application refuses with
+`account_opening_policy_unavailable`, `account_opening_policy_integrity_failed` or `account_opening_policy_invalid`.
+Confirm the `institution.account-opening-policy` set has exactly one version effective now, that its content hash
+matches the publication and that the publisher was not the maker. Do not create an open-ended ceiling and do not
+permit opening while the ceiling is unknown.
+
+**Eligibility evidence.** The evaluation snapshot is immutable. `trace_json`, the counted holding ids, the
+effective maximum, the facts versions and the product content hash answer a later dispute; a remediation is a new
+evaluation under a corrected configuration, never an edited row.
 
 **Reference-fact outage.** Eligibility denies by design. Confirm `CustomerFacts:BaseUrl`, the workload client
 id, `CustomerFacts:AllowedServiceClientIds`, the token audience `corebanking-customer-api` and the capability

@@ -1,5 +1,6 @@
 using System;
 using CoreBanking.BuildingBlocks.Domain.Identity;
+using CoreBanking.CoreLedger.Application.Accounts;
 using CoreBanking.CoreLedger.Application.Institutions;
 using CoreBanking.CoreLedger.Application.Products;
 
@@ -28,5 +29,10 @@ public static class DevelopmentAuthorisationSeed
         store.Grant(ActorId.From(ProductPublisherActorValue), institutionId, ProductPermissions.Publish);
         store.Grant(ActorId.From(ProductMakerActorValue), institutionId, ProductPermissions.Update);
         store.Grant(ActorId.From(ProductMakerActorValue), institutionId, ProductPermissions.Simulate);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, InstitutionPermissions.ConfigurationCreate);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.ConfigurationPublish);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.ApplicationCreate);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.ApplicationView);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ApplicationView);
     }
 }

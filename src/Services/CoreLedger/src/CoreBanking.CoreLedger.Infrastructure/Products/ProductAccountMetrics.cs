@@ -22,6 +22,9 @@ public sealed class ProductAccountMetrics
         ReferenceFactLookups = meter.CreateCounter<long>(
             "corebanking.product_account.reference_facts.lookups",
             description: "Authoritative reference-fact lookups by bounded outcome code.");
+        AccountCommands = meter.CreateCounter<long>(
+            "corebanking.product_account.account.commands",
+            description: "Account-application commands by command and bounded outcome.");
     }
 
     public static ProductAccountMetrics Shared { get; } = new(new Meter(MeterName));
@@ -32,8 +35,13 @@ public sealed class ProductAccountMetrics
 
     public Counter<long> ReferenceFactLookups { get; }
 
+    public Counter<long> AccountCommands { get; }
+
     public void RecordConfigurationCommand(string area, string command, string outcome) =>
         ConfigurationCommands.Add(1, new KeyValuePair<string, object?>("area", area), new KeyValuePair<string, object?>("command", command), new KeyValuePair<string, object?>("outcome", outcome));
+
+    public void RecordAccountCommand(string command, string outcome) =>
+        AccountCommands.Add(1, new KeyValuePair<string, object?>("command", command), new KeyValuePair<string, object?>("outcome", outcome));
 
     public void RecordReferenceFactLookup(string outcome) =>
         ReferenceFactLookups.Add(1, new KeyValuePair<string, object?>("outcome", outcome));

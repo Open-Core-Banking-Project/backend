@@ -9,6 +9,7 @@ using CoreBanking.BuildingBlocks.Application.Messaging;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
+using CoreBanking.CoreLedger.Application.Accounts;
 using CoreBanking.CoreLedger.Application.Products;
 using CoreBanking.CoreLedger.Contracts;
 using CoreBanking.CoreLedger.Domain.Institutions;
@@ -34,17 +35,20 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
     private readonly IdempotencyService _idempotency;
     private readonly ITenantContext _tenantContext;
     private readonly TimeProvider _timeProvider;
+    private readonly IAccountOpeningPolicySource _openingPolicies;
 
     public SavingsProductConfigurationService(
         CoreLedgerDbContext context,
         IdempotencyService idempotency,
         ITenantContext tenantContext,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IAccountOpeningPolicySource? openingPolicies = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _idempotency = idempotency ?? throw new ArgumentNullException(nameof(idempotency));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _openingPolicies = openingPolicies ?? UnconfiguredAccountOpeningPolicySource.Instance;
     }
 
     public async Task<SavingsEligibilityDraftResult> CreateDraftAsync(
@@ -379,6 +383,29 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
                 throw new SavingsProductConfigurationRejectedException(
                     "eligibility_criterion_unavailable",
                     "The approved rules require a residency fact the platform cannot resolve.");
+            }
+
+            // A product rule may tighten the institution ceiling and never loosen it, so a rule that
+            // allows more accounts than the effective ceiling is refused at publication.
+            // Decision: P1-E04-D07.
+            if (!rules.ExistingAccounts.AllowsAny)
+            {
+                AccountOpeningPolicyLookup ceiling = await _openingPolicies
+                    .GetAsync(command.InstitutionId, command.EffectiveFrom, cancellationToken)
+                    .ConfigureAwait(false);
+                if (ceiling.Policy is null)
+                {
+                    throw new SavingsProductConfigurationRejectedException(
+                        ceiling.RejectionCode ?? "account_opening_policy_unavailable",
+                        "The institution account-opening policy is unavailable, so no multiple-account rule can be published.");
+                }
+
+                if (rules.ExistingAccounts.MaximumAccounts > ceiling.Policy.MaximumOpenAccounts)
+                {
+                    throw new SavingsProductConfigurationRejectedException(
+                        "product_account_limit_exceeds_institution_ceiling",
+                        "The product allows more accounts than the institution ceiling.");
+                }
             }
         }
         catch (ArgumentException exception)

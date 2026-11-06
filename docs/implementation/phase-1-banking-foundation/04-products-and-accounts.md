@@ -118,9 +118,10 @@ Role names are examples only. Code checks permissions plus contextual scope.
 | Product analyst | `product.version.simulate` | Institution/draft version | Policy-based | None |
 | Product approver | `product.version.approve` | Institution/product family | Required | Cannot approve own version |
 | Product publisher | `product.version.publish` | Institution/product/effective date | Required | Exact approved version only |
-| Operations officer | `account.open` | Institution/branch/product/customer | According to channel/risk | Approval by policy |
-| Account approver | `account.open.approve` | Institution/branch/product | Required | Cannot approve own application |
-| Operations officer | `account.activate` | Institution/branch/account | Required if manual | Approved application only |
+| Operations officer | `account.application.create` | Institution/branch/product/customer | Required | Approval by policy |
+| Account approver | `account.application.approve` | Institution/branch/product | Required | Cannot approve own application |
+| Staff user | `account.application.view` | Institution/application | Policy-based | None |
+| Operations officer | `account.activation.create` | Institution/branch/account | Required if manual | Approved application only |
 | Authorised operations officer | `account.restriction.apply` | Institution/branch/account/restriction type | Required | High-risk controls require approval |
 | Restriction approver | `account.restriction.approve` | Institution/branch/account/type | Required | Cannot approve own control |
 | Authorised operations officer | `account.status.change` | Institution/branch/account/transition | Required | Transition-specific approval |
@@ -130,6 +131,10 @@ Role names are examples only. Code checks permissions plus contextual scope.
 | Staff user | `account.summary.view` | Institution/branch/customer/account | Sensitive access by policy | None |
 | Customer/staff | `account.statement.request` | Own or authorised account/period | According to channel | None |
 | Ledger service identity | `service.account.controls.evaluate` | Audience/account/transaction context | Service authentication | No human role |
+
+The epic's two-segment names (`account.open`, `account.open.approve`, `account.activate`) are not expressible under the
+`domain.resource.action` grammar; [P1-E04-D09](decisions/P1-E04-D09-account-approval-activation-sequence.md) approved their
+three-segment replacements and the implemented code uses those.
 
 Additional rules:
 
@@ -330,8 +335,13 @@ Simulation rules:
 | POST | `/api/v1/institutions/{institutionId}/product-versions/{versionId}/submit` | `product.version.update` plus step-up | `SubmitSavingsEligibilityRequestV1` plus `Idempotency-Key` | `SavingsEligibilityApprovalSubmissionResponseV1` | By idempotency key |
 | POST | `/api/v1/institutions/{institutionId}/product-versions/{versionId}/publish` | `product.version.publish` plus step-up | `PublishSavingsEligibilityRequestV1` plus `Idempotency-Key` | `SavingsEligibilityPublicationResponseV1` | By idempotency key |
 | GET | `/api/v1/products` | `product.catalogue.view` | Bounded filters/effective date | `ProductPage` | Yes |
-| POST | `/api/v1/account-applications` | `account.open` | `CreateAccountApplicationRequest` | `AccountApplicationResponse` | By request ID |
-| POST | `/api/v1/account-applications/{id}/submit` | `account.open` | Expected version/reason | `AccountApplicationResponse` | Yes |
+| POST | `/api/v1/institutions/{institutionId}/account-applications` | `account.application.create` plus step-up | `CreateAccountApplicationRequestV1` plus `Idempotency-Key` | `AccountApplicationResponseV1` | By idempotency key |
+| POST | `/api/v1/institutions/{institutionId}/account-applications/{applicationId}/submit` | `account.application.create` plus step-up | `SubmitAccountApplicationRequestV1` plus `Idempotency-Key` | `AccountEligibilityEvaluationResponseV1` | By idempotency key |
+| GET | `/api/v1/institutions/{institutionId}/account-applications/{applicationId}/eligibility` | `account.application.view` | None | `AccountEligibilityEvaluationResponseV1` | Yes |
+| POST | `/api/v1/institutions/{institutionId}/configurations/institution.account-opening-policy/versions` | `institution.configuration.create` plus step-up | `CreateAccountOpeningPolicyDraftRequestV1` plus `Idempotency-Key` | Draft result | By idempotency key |
+| POST | `/api/v1/configurations/account-opening-policy/{versionId}/simulate` | `institution.configuration.simulate` | `SimulateAccountOpeningPolicyRequestV1` plus `Idempotency-Key` | Simulation result | By idempotency key |
+| POST | `/api/v1/configurations/account-opening-policy/{versionId}/submit` | `institution.configuration.submit` | `SubmitAccountOpeningPolicyRequestV1` plus `Idempotency-Key` | Submission result | By idempotency key |
+| POST | `/api/v1/configurations/account-opening-policy/{versionId}/publish` | `institution.configuration.publish` plus step-up | `PublishAccountOpeningPolicyRequestV1` plus `Idempotency-Key` | Publication result | By idempotency key |
 | POST | `/api/v1/accounts/{id}/activate` | `account.activate` | Approved application/version | `AccountResponse` | Yes |
 | GET | `/api/v1/accounts/{id}` | Self or `account.summary.view` | Requested field set | `AccountSummaryResponse` | Yes |
 | POST | `/api/v1/accounts/{id}/restrictions` | `account.restriction.apply` | `CreateRestrictionRequest` | `RestrictionResponse` | By request ID |
@@ -552,10 +562,12 @@ Implementation progress as of 2026-10-21: the first configuration-area engine is
 3. Implement product identity/version lifecycle and typed rule persistence with migration tests.
 4. Implement deterministic rule evaluation and simulation with boundary/golden tests and content hashing.
 5. Integrate product approval/publication with Workflow using exact version/hash and outbox events.
-6. Build customer/branch/classification reference consumers and freshness handling. *Status: implemented pending review (2026-11-06) under [P1-E04-D17](decisions/P1-E04-D17-reference-fact-transport-contracts.md). The customer service publishes `CustomerEligibilityFactsV1` and answers one internal route that requires a service actor, an allow-listed client, the approved audience, the exact capability and a trusted institution claim; it selects the classification effective at the instant, derives age from protected birth data through a fail-closed internal unprotect and declares a 60-second validity. Core Ledger adds the private wire projection and workload-token caller, in-process branch and currency reference sources, and a resolver that rejects stale, longer-window, mismatched, inactive-branch, unsupported-currency and unavailable cases with stable codes; caller-supplied facts are gone from the authoritative path. Publication refuses a residency criterion and the evaluator returns `residency_fact_unavailable` as a second guard. The `institution.currencies` area is now authored through the approved configuration lifecycle: draft, exact-content validation evidence, Workflow approval under the new `institution.configuration.publish.v1` profile (Configuration Approver capability from Epic 1 section 5) and effective-dated publication with no overlap, self-publication refusal and emulated idempotency. Production still requires the Keycloak client/audience registration, `CustomerFacts:AllowedServiceClientIds` values and a published currency set; account opening remains unavailable.*
-7. Implement account application and eligibility snapshots with negative scope tests. *Status: ready ? [P1-E04-D07](decisions/P1-E04-D07-multiple-account-rules.md) approved the multiple-account rules on 2026-11-06.*
-8. Implement atomic account-number reservation, account creation and retry/concurrency tests. *Status: ready ? [P1-E04-D06](decisions/P1-E04-D06-account-number-scheme.md) approved the numbering scheme on 2026-11-06.*
-9. Implement approval/activation and ledger-initialization handoff, proving no opening balance/posting. *Status: ready ? [P1-E04-D09](decisions/P1-E04-D09-account-approval-activation-sequence.md) approved the approval and activation sequence on 2026-11-06.*
+6. Build customer/branch/classification reference consumers and freshness handling. *Status: implemented pending review (2026-11-06) under [P1-E04-D17](decisions/P1-E04-D17-reference-fact-transport-contracts.md). The customer service publishes `CustomerEligibilityFactsV1` and answers one internal route that requires a service actor, an allow-listed client, the approved audience, the exact capability and a trusted institution claim; it selects the classification effective at the instant, derives age from protected birth data through a fail-closed internal unprotect and declares a 60-second validity. Core Ledger adds the private wire projection and workload-token caller, in-process branch and currency reference sources, and a resolver that rejects stale, longer-window, mismatched, inactive-branch, unsupported-currency and unavailable cases with stable codes; caller-supplied facts are gone from the authoritative path. Publication refuses a residency criterion and the evaluator returns `residency_fact_unavailable` as a second guard. The `institution.currencies` area is now authored through the approved configuration lifecycle: draft, exact-content validation evidence, Workflow approval under the new `institution.configuration.publish.v1` profile (Configuration Approver capability from Epic 1 section 5) and effective-dated publication with no overlap, self-publication refusal and emulated idempotency. Production still requires the Keycloak client/audience registration, `CustomerFacts:AllowedServiceClientIds` values and a published currency set. Account opening now builds on this through
+slice 7.*
+7. Implement account application and eligibility snapshots with negative scope tests. *Status: implemented 2026-11-06 — `AccountApplication` (draft only, no number and no account), an immutable `EligibilityEvaluation` snapshot carrying the product version and hash, the customer/branch/currency fact versions, the rule trace, the counted holdings and the decision code, the `existing_accounts` criterion, the `institution.account-opening-policy` ceiling published through the approved lifecycle and a
+short-lived `AccountOpeningClaim` whose unique filtered index serialises concurrent openings on the same counting basis. A missing ceiling, a stale fact set or an unavailable holdings count refuses the application; no balance, posting, number or account is created. Live-stack verification is pending because the integration suites need the containerised database.*
+8. Implement atomic account-number reservation, account creation and retry/concurrency tests. *Status: ready — [P1-E04-D06](decisions/P1-E04-D06-account-number-scheme.md) approved the numbering scheme on 2026-11-06.*
+9. Implement approval/activation and ledger-initialization handoff, proving no opening balance/posting. *Status: ready — [P1-E04-D09](decisions/P1-E04-D09-account-approval-activation-sequence.md) approved the approval and activation sequence on 2026-11-06.*
 10. Implement typed restrictions, freezes and blocks plus ledger control-evaluation contract.
 11. Implement lien lifecycle and ledger availability-control handoff without Account balance arithmetic.
 12. Implement dormancy assessment/reactivation and controlled closure prerequisites.

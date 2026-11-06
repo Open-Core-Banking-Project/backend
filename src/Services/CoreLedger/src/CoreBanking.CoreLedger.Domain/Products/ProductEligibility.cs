@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using CoreBanking.BuildingBlocks.Domain.Identity;
+using CoreBanking.CoreLedger.Domain.Accounts;
 using CoreBanking.CoreLedger.Domain.Institutions;
 
 namespace CoreBanking.CoreLedger.Domain.Products;
@@ -103,6 +104,29 @@ public sealed class EligibilityCodeCriterion
     }
 }
 
+/// <summary>
+/// The optional multiple-account rule of a product version. A product may tighten the institution
+/// ceiling and never loosen it, so the stricter of the two applies. Decision: P1-E04-D07.
+/// </summary>
+public sealed record ExistingAccountsCriterion(bool AllowsAny, int? MaximumAccounts, AccountLimitKey LimitKey)
+{
+    public static ExistingAccountsCriterion Any() => new(true, null, AccountLimitKey.ProductFamily);
+
+    public static ExistingAccountsCriterion Limit(int maximumAccounts, AccountLimitKey limitKey)
+    {
+        if (maximumAccounts < 1)
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumAccounts), "A multiple-account rule must allow at least one account.");
+        if (!Enum.IsDefined(limitKey))
+            throw new ArgumentException("The limit key is not an approved counting basis.", nameof(limitKey));
+        return new ExistingAccountsCriterion(false, maximumAccounts, limitKey);
+    }
+
+    internal object ToContract() => AllowsAny
+        ? new { mode = "any" }
+        : new { mode = "limit", maximumAccounts = MaximumAccounts, limitKey = AccountOpeningPolicy.ToToken(LimitKey) };
+}
+
 public sealed record EligibilityAgeCriterion(bool AllowsAny, int? MinimumYears, int? MaximumYears)
 {
     public static EligibilityAgeCriterion Any() => new(true, null, null);
@@ -128,6 +152,12 @@ public sealed class ProductEligibilityRules
     {
         "schema", "ruleSetId", "version", "customerTypes", "kycTiers", "segments",
         "riskRatings", "ages", "branches", "residencyCountries", "currencies",
+        "existingAccounts",
+    };
+
+    private static readonly HashSet<string> ExistingAccountsProperties = new(StringComparer.Ordinal)
+    {
+        "mode", "maximumAccounts", "limitKey",
     };
 
     private static readonly HashSet<string> CodeCriterionProperties = new(StringComparer.Ordinal)
@@ -150,7 +180,8 @@ public sealed class ProductEligibilityRules
         EligibilityAgeCriterion ages,
         EligibilityCodeCriterion branches,
         EligibilityCodeCriterion residencyCountries,
-        EligibilityCodeCriterion currencies)
+        EligibilityCodeCriterion currencies,
+        ExistingAccountsCriterion existingAccounts)
     {
         RuleSetId = ruleSetId;
         Version = version;
@@ -162,6 +193,7 @@ public sealed class ProductEligibilityRules
         Branches = branches;
         ResidencyCountries = residencyCountries;
         Currencies = currencies;
+        ExistingAccounts = existingAccounts;
     }
 
     public string RuleSetId { get; }
@@ -174,6 +206,7 @@ public sealed class ProductEligibilityRules
     public EligibilityCodeCriterion Branches { get; }
     public EligibilityCodeCriterion ResidencyCountries { get; }
     public EligibilityCodeCriterion Currencies { get; }
+    public ExistingAccountsCriterion ExistingAccounts { get; }
 
     public static ProductEligibilityRules Create(
         string ruleSetId,
@@ -185,7 +218,8 @@ public sealed class ProductEligibilityRules
         EligibilityAgeCriterion ages,
         EligibilityCodeCriterion branches,
         EligibilityCodeCriterion residencyCountries,
-        EligibilityCodeCriterion currencies)
+        EligibilityCodeCriterion currencies,
+        ExistingAccountsCriterion? existingAccounts = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ruleSetId);
         ArgumentOutOfRangeException.ThrowIfLessThan(version, 1);
@@ -199,25 +233,37 @@ public sealed class ProductEligibilityRules
         ArgumentNullException.ThrowIfNull(currencies);
         return new ProductEligibilityRules(
             ruleSetId.Trim(), version, customerTypes, kycTiers, segments, riskRatings,
-            ages, branches, residencyCountries, currencies);
+            ages, branches, residencyCountries, currencies,
+            existingAccounts ?? ExistingAccountsCriterion.Any());
     }
 
-    public ConfigurationContent ToConfigurationContent() => ConfigurationContent.Create(JsonSerializer.Serialize(new
+    public ConfigurationContent ToConfigurationContent()
     {
-        schema = "product_eligibility.v1",
-        ruleSetId = RuleSetId,
-        version = Version,
-        customerTypes = CustomerTypes.ToContract(),
-        kycTiers = KycTiers.ToContract(),
-        segments = Segments.ToContract(),
-        riskRatings = RiskRatings.ToContract(),
-        ages = Ages.AllowsAny
-            ? new { mode = "any", minimumYears = (int?)null, maximumYears = (int?)null }
-            : new { mode = "range", minimumYears = Ages.MinimumYears, maximumYears = Ages.MaximumYears },
-        branches = Branches.ToContract(),
-        residencyCountries = ResidencyCountries.ToContract(),
-        currencies = Currencies.ToContract(),
-    }));
+        Dictionary<string, object?> document = new(StringComparer.Ordinal)
+        {
+            ["schema"] = "product_eligibility.v1",
+            ["ruleSetId"] = RuleSetId,
+            ["version"] = Version,
+            ["customerTypes"] = CustomerTypes.ToContract(),
+            ["kycTiers"] = KycTiers.ToContract(),
+            ["segments"] = Segments.ToContract(),
+            ["riskRatings"] = RiskRatings.ToContract(),
+            ["ages"] = Ages.AllowsAny
+                ? new { mode = "any", minimumYears = (int?)null, maximumYears = (int?)null }
+                : new { mode = "range", minimumYears = Ages.MinimumYears, maximumYears = Ages.MaximumYears },
+            ["branches"] = Branches.ToContract(),
+            ["residencyCountries"] = ResidencyCountries.ToContract(),
+            ["currencies"] = Currencies.ToContract(),
+        };
+
+        // Omitted when unrestricted so existing published versions keep their exact content hash.
+        if (!ExistingAccounts.AllowsAny)
+        {
+            document["existingAccounts"] = ExistingAccounts.ToContract();
+        }
+
+        return ConfigurationContent.Create(JsonSerializer.Serialize(document));
+    }
 
     public static ProductEligibilityRules FromConfigurationContent(ConfigurationContent content)
     {
@@ -239,12 +285,30 @@ public sealed class ProductEligibilityRules
                 ParseAgeCriterion(root.GetProperty("ages")),
                 ParseCodeCriterion(root.GetProperty("branches"), "branches"),
                 ParseCodeCriterion(root.GetProperty("residencyCountries"), "residencyCountries"),
-                ParseCodeCriterion(root.GetProperty("currencies"), "currencies"));
+                ParseCodeCriterion(root.GetProperty("currencies"), "currencies"),
+                root.TryGetProperty("existingAccounts", out JsonElement existingAccounts)
+                    ? ParseExistingAccountsCriterion(existingAccounts)
+                    : ExistingAccountsCriterion.Any());
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
         {
             throw new ArgumentException("Configuration content is not a valid product_eligibility.v1 document.", nameof(content), exception);
         }
+    }
+
+    private static ExistingAccountsCriterion ParseExistingAccountsCriterion(JsonElement element)
+    {
+        EnsureOnlyProperties(element, ExistingAccountsProperties, "existingAccounts");
+        string mode = RequiredString(element, "mode");
+        return mode switch
+        {
+            "any" when !element.TryGetProperty("maximumAccounts", out _) && !element.TryGetProperty("limitKey", out _) =>
+                ExistingAccountsCriterion.Any(),
+            "limit" => ExistingAccountsCriterion.Limit(
+                element.GetProperty("maximumAccounts").GetInt32(),
+                AccountOpeningPolicy.ParseLimitKey(RequiredString(element, "limitKey"))),
+            _ => throw new ArgumentException("The existingAccounts mode or values are invalid.", nameof(element)),
+        };
     }
 
     private static EligibilityCodeCriterion ParseCodeCriterion(JsonElement element, string name)

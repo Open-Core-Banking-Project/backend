@@ -12,6 +12,15 @@ public sealed record EligibilityAgeCriterionV1(
     int? MinimumYears,
     int? MaximumYears);
 
+/// <summary>
+/// The optional multiple-account rule of a product version. Mode "any" imposes no product limit;
+/// mode "limit" must not exceed the institution ceiling. Decision: P1-E04-D07.
+/// </summary>
+public sealed record ExistingAccountsCriterionV1(
+    string Mode,
+    int? MaximumAccounts,
+    string? LimitKey);
+
 public sealed record SavingsEligibilityRulesV1(
     string RuleSetId,
     int Version,
@@ -22,7 +31,8 @@ public sealed record SavingsEligibilityRulesV1(
     EligibilityAgeCriterionV1 Ages,
     EligibilityCodeCriterionV1 Branches,
     EligibilityCodeCriterionV1 ResidencyCountries,
-    EligibilityCodeCriterionV1 Currencies);
+    EligibilityCodeCriterionV1 Currencies,
+    ExistingAccountsCriterionV1? ExistingAccounts = null);
 
 public sealed record CreateSavingsEligibilityDraftRequestV1(
     string ProductCode,

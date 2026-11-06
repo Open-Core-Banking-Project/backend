@@ -12,12 +12,15 @@ using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Security;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.CoreLedger.Api.Authorisation;
+using CoreBanking.CoreLedger.Application.Accounts;
 using CoreBanking.CoreLedger.Application.Institutions;
 using CoreBanking.CoreLedger.Application.Products;
 using CoreBanking.CoreLedger.Application.Provisioning;
 using CoreBanking.CoreLedger.Contracts;
+using CoreBanking.CoreLedger.Domain.Accounts;
 using CoreBanking.CoreLedger.Domain.Institutions;
 using CoreBanking.CoreLedger.Domain.Products;
+using CoreBanking.CoreLedger.Infrastructure.Accounts;
 using CoreBanking.CoreLedger.Infrastructure.Institutions;
 using CoreBanking.CoreLedger.Infrastructure.Persistence;
 using CoreBanking.CoreLedger.Infrastructure.Products;
@@ -163,6 +166,10 @@ if (useRelationalStore)
     builder.Services.AddScoped<ICurrencyReferenceSource, CurrencyReferenceSource>();
     builder.Services.AddScoped<AuthoritativeEligibilityFactsResolver>();
     builder.Services.AddScoped<ISavingsEligibilityEvaluationService, SavingsEligibilityEvaluationService>();
+    builder.Services.AddScoped<IAccountOpeningPolicyConfigurationService, AccountOpeningPolicyConfigurationService>();
+    builder.Services.AddScoped<IAccountOpeningPolicySource, AccountOpeningPolicySource>();
+    builder.Services.AddScoped<IAccountHoldingsReader, AccountHoldingsReader>();
+    builder.Services.AddScoped<IAccountApplicationService, AccountApplicationService>();
 }
 
 CoreBanking.BuildingBlocks.Observability.CoreBankingObservability.AddCoreBankingObservability(
@@ -392,6 +399,7 @@ if (useRelationalStore)
     MapOrganisationLifecycleEndpoints(app);
     MapBusinessCalendarEndpoints(app);
     MapSavingsProductEndpoints(app);
+    MapAccountEndpoints(app);
     MapInstitutionProvisioningRepairEndpoints(app);
 }
 
@@ -902,6 +910,311 @@ static void MapSavingsProductEndpoints(WebApplication app)
         "product.savings.eligibility.publish"));
 }
 
+static void MapAccountEndpoints(WebApplication app)
+{
+    // Institution account-opening policy lifecycle (area institution.account-opening-policy).
+    // Decision: P1-E04-D07.
+    app.MapPost("/api/v1/institutions/{institutionId}/configurations/institution.account-opening-policy/versions", async (
+        HttpContext http,
+        string institutionId,
+        CreateAccountOpeningPolicyDraftRequestV1 request,
+        IAccountOpeningPolicyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountOpeningPolicyDraftResult result = await service.CreateDraftAsync(
+                new CreateAccountOpeningPolicyDraftCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    request.VersionId,
+                    AccountOpeningPolicy.ParseLimitKey(request.LimitKey),
+                    request.MaximumOpenAccounts,
+                    request.OverrideAdditionalAccounts,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (AccountOpeningPolicyRejectedException exception)
+        {
+            return Problem(exception.Code, "Account-opening policy rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account-opening policy", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationCreateRequirement,
+        "institution.configuration.create"));
+
+    app.MapPost("/api/v1/configurations/account-opening-policy/{versionId}/simulate", async (
+        HttpContext http,
+        string versionId,
+        SimulateAccountOpeningPolicyRequestV1 request,
+        IAccountOpeningPolicyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountOpeningPolicySimulationResult result = await service.SimulateAsync(
+                new SimulateAccountOpeningPolicyCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    versionId,
+                    request.SimulationId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (AccountOpeningPolicyRejectedException exception)
+        {
+            return Problem(exception.Code, "Account-opening policy simulation rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account-opening policy simulation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSimulateRequirement,
+        "institution.configuration.simulate"));
+
+    app.MapPost("/api/v1/configurations/account-opening-policy/{versionId}/submit", async (
+        HttpContext http,
+        string versionId,
+        SubmitAccountOpeningPolicyRequestV1 request,
+        IAccountOpeningPolicyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountOpeningPolicySubmissionResult result = await service.SubmitForApprovalAsync(
+                new SubmitAccountOpeningPolicyCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    request.RequestId,
+                    request.SourceRequestKey,
+                    versionId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (AccountOpeningPolicyRejectedException exception)
+        {
+            return Problem(exception.Code, "Account-opening policy submission rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account-opening policy submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSubmitRequirement,
+        "institution.configuration.submit"));
+
+    app.MapPost("/api/v1/configurations/account-opening-policy/{versionId}/publish", async (
+        HttpContext http,
+        string versionId,
+        PublishAccountOpeningPolicyRequestV1 request,
+        IAccountOpeningPolicyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountOpeningPolicyPublicationResult result = await service.PublishAsync(
+                new PublishAccountOpeningPolicyCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    request.PublicationId,
+                    versionId,
+                    request.ContentHash,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (AccountOpeningPolicyRejectedException exception)
+        {
+            return Problem(exception.Code, "Account-opening policy publication rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account-opening policy publication", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationPublishRequirement,
+        "institution.configuration.publish"));
+
+    // Account applications: create a draft, then record one authoritative eligibility evaluation.
+    // Decisions: P1-E04-D07, P1-E04-D09, P1-E04-D17.
+    app.MapPost("/api/v1/institutions/{institutionId}/account-applications", async (
+        HttpContext http,
+        string institutionId,
+        CreateAccountApplicationRequestV1 request,
+        IAccountApplicationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountApplicationCreatedResult result = await service.CreateAsync(
+                new CreateAccountApplicationCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    Guid.NewGuid().ToString("N"),
+                    request.RequestId,
+                    request.CustomerId,
+                    request.ProductId,
+                    request.BranchId,
+                    request.Currency,
+                    request.AccountPurposeCode,
+                    request.OwnershipTypeCode,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new AccountApplicationResponseV1(
+                institutionId,
+                result.ApplicationId,
+                result.RequestId,
+                result.CustomerId,
+                result.ProductId,
+                result.ProductVersionId,
+                result.BranchId,
+                result.CurrencyCode,
+                result.Status.ToString(),
+                string.Empty,
+                result.Version,
+                result.CreatedAt,
+                result.Replayed));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Account application rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account application", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ApplicationCreateRequirement,
+        "account.application.create"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/account-applications/{applicationId}/submit", async (
+        HttpContext http,
+        string institutionId,
+        string applicationId,
+        SubmitAccountApplicationRequestV1 request,
+        IAccountApplicationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountEligibilityResult result = await service.EvaluateAsync(
+                new EvaluateAccountEligibilityCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    applicationId,
+                    request.ExpectedVersion,
+                    request.ReasonCode,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToEvaluationResponse(institutionId, result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Account eligibility rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ApplicationCreateRequirement,
+        "account.application.create"));
+
+    app.MapGet("/api/v1/institutions/{institutionId}/account-applications/{applicationId}/eligibility", async (
+        HttpContext http,
+        string institutionId,
+        string applicationId,
+        IAccountApplicationService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            AccountEligibilityResult? result = await service.GetLatestEvaluationAsync(
+                new GetAccountApplicationQuery(InstitutionId.From(institutionId), applicationId),
+                cancellationToken);
+            if (result is null)
+            {
+                return Problem(
+                    "account_evaluation_not_found",
+                    "Eligibility evidence not found",
+                    "The application has no recorded eligibility evaluation.",
+                    StatusCodes.Status404NotFound);
+            }
+
+            return Results.Ok(ToEvaluationResponse(institutionId, result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Eligibility evidence rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid eligibility query", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ApplicationViewRequirement,
+        "account.application.view"));
+}
+
+static AccountEligibilityEvaluationResponseV1 ToEvaluationResponse(string institutionId, AccountEligibilityResult result) =>
+    new(
+        institutionId,
+        result.ApplicationId,
+        result.EvaluationId,
+        result.ProductVersionId,
+        result.ProductContentHash,
+        result.CustomerFactsVersion,
+        result.BranchReferenceVersion,
+        result.CurrencyReferenceVersion,
+        result.Eligible,
+        result.FactsCurrent,
+        result.DecisionCode,
+        result.Limit?.LimitKey,
+        result.Limit?.Counted,
+        result.Limit?.EffectiveMaximum,
+        result.Limit?.CountedHoldingIds ?? [],
+        result.Trace.Select(trace => new EligibilityRuleTraceV1(trace.Rule, trace.Input, trace.Passed)).ToArray(),
+        result.Status.ToString(),
+        result.Version,
+        result.EvaluatedAt,
+        result.Replayed);
+
 static ProductEligibilityRules ToRules(SavingsEligibilityRulesV1 rules) => ProductEligibilityRules.Create(
     rules.RuleSetId,
     rules.Version,
@@ -912,7 +1225,26 @@ static ProductEligibilityRules ToRules(SavingsEligibilityRulesV1 rules) => Produ
     ToAgeCriterion(rules.Ages),
     ToCodeCriterion(rules.Branches, nameof(rules.Branches)),
     ToCodeCriterion(rules.ResidencyCountries, nameof(rules.ResidencyCountries)),
-    ToCodeCriterion(rules.Currencies, nameof(rules.Currencies)));
+    ToCodeCriterion(rules.Currencies, nameof(rules.Currencies)),
+    ToExistingAccountsCriterion(rules.ExistingAccounts));
+
+static ExistingAccountsCriterion ToExistingAccountsCriterion(ExistingAccountsCriterionV1? criterion)
+{
+    if (criterion is null)
+    {
+        return ExistingAccountsCriterion.Any();
+    }
+
+    return criterion.Mode?.Trim().ToLowerInvariant() switch
+    {
+        "any" => ExistingAccountsCriterion.Any(),
+        "limit" => ExistingAccountsCriterion.Limit(
+            criterion.MaximumAccounts
+                ?? throw new ArgumentException("A multiple-account limit requires maximumAccounts.", nameof(criterion)),
+            AccountOpeningPolicy.ParseLimitKey(criterion.LimitKey)),
+        _ => throw new ArgumentException("existingAccounts must use mode 'any' or mode 'limit'.", nameof(criterion)),
+    };
+}
 
 static EligibilityCodeCriterion ToCodeCriterion(EligibilityCodeCriterionV1 criterion, string name)
 {

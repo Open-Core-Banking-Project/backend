@@ -16,6 +16,7 @@ namespace CoreBanking.CoreLedger.Infrastructure.Products;
 public static class ProductAccountGauges
 {
     private const string ProductSchema = "product_eligibility.v1";
+    private const string AccountOpeningPolicySchema = "institution.account-opening-policy.v1";
 
     public static void Register(IServiceScopeFactory scopeFactory, TimeProvider timeProvider)
     {
@@ -51,12 +52,16 @@ public static class ProductAccountGauges
             long published = context.ConfigurationVersions
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .LongCount(record => (record.Schema == ProductSchema || record.Schema == InstitutionCurrencySet.Schema)
+                .LongCount(record => (record.Schema == ProductSchema
+                        || record.Schema == InstitutionCurrencySet.Schema
+                        || record.Schema == AccountOpeningPolicySchema)
                     && record.Status == "published");
             long awaiting = context.ConfigurationVersions
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .LongCount(record => (record.Schema == ProductSchema || record.Schema == InstitutionCurrencySet.Schema)
+                .LongCount(record => (record.Schema == ProductSchema
+                        || record.Schema == InstitutionCurrencySet.Schema
+                        || record.Schema == AccountOpeningPolicySchema)
                     && record.Status == "approved");
             DateTimeOffset[] pending = [.. context.OutboxMessages
                 .IgnoreQueryFilters()
