@@ -65,6 +65,7 @@ public static partial class Program
             provider.GetRequiredService<TimeProvider>()));
         builder.Services.AddScoped<InstitutionBoundaryAcknowledgementConsumer>();
         builder.Services.AddScoped<SavingsEligibilityApprovalDecidedConsumer>();
+        builder.Services.AddScoped<InstitutionConfigurationApprovalDecidedConsumer>();
         builder.Services.AddScoped<IIntegrationEventConsumer, CoreLedgerIntegrationEventConsumer>();
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
@@ -80,6 +81,7 @@ public static partial class Program
             Topics = acknowledgementServices
                 .Select(InstitutionBoundaryAcknowledgementConsumer.TopicForService)
                 .Append(SavingsEligibilityApprovalDecidedConsumer.TopicName)
+                .Append(InstitutionConfigurationApprovalDecidedConsumer.TopicName)
                 .ToArray(),
         });
 

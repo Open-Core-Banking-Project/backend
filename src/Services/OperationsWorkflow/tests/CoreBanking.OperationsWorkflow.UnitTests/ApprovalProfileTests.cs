@@ -30,13 +30,30 @@ public sealed class ApprovalProfileTests
         Assert.Equal(
             "b2698b7a16fe0e43a8341a5d8311484ce9943f21171cf38b73a697de20e3d3ae",
             ApprovalProfiles.IdentityRolePublication.DefinitionHash);
+        Assert.Equal(
+            "9438680d220904f00a9e0d18f3fce2c2e4408a1a8a4800648dceff5f2e6c686a",
+            ApprovalProfiles.InstitutionConfigurationPublication.DefinitionHash);
+    }
+
+    [Fact]
+    public void The_institution_configuration_profile_is_registered_with_the_approved_capability()
+    {
+        ApprovalProfile? profile = ApprovalProfiles.Find(InstitutionConfigurationPublicationProfile.WorkflowKey);
+
+        Assert.NotNull(profile);
+        Assert.Same(ApprovalProfiles.InstitutionConfigurationPublication, profile);
+        Assert.Equal(InstitutionConfigurationPublicationProfile.SubjectType, profile!.SubjectType);
+        Assert.Equal(InstitutionConfigurationPublicationProfile.SourceService, profile.SourceService);
+        Assert.Equal(InstitutionConfigurationPublicationProfile.RequiredPermission, profile.RequiredPermission);
+        Assert.Equal(InstitutionConfigurationPublicationProfile.DefinitionHash, profile.DefinitionHash);
+        Assert.Contains(profile, ApprovalProfiles.All);
     }
 
     [Fact]
     public void The_source_services_are_derived_from_the_catalogue()
     {
         Assert.Equal(["core-ledger", "customer-onboarding", "identity-access"], ApprovalProfiles.SourceServices.ToArray());
-        Assert.Equal(4, ApprovalProfiles.All.Count);
+        Assert.Equal(5, ApprovalProfiles.All.Count);
         Assert.Equal(
             ApprovalProfiles.SavingsEligibilityPublication.DefinitionHash,
             SavingsEligibilityPublicationProfile.DefinitionHash);

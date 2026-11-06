@@ -24,6 +24,14 @@ public static class InstitutionPermissions
 
     public static PermissionIdentifier ProvisioningRepair { get; } = PermissionIdentifier.Parse("platform.provisioning.repair");
 
+    public static PermissionIdentifier ConfigurationCreate { get; } = PermissionIdentifier.Parse("institution.configuration.create");
+
+    public static PermissionIdentifier ConfigurationSimulate { get; } = PermissionIdentifier.Parse("institution.configuration.simulate");
+
+    public static PermissionIdentifier ConfigurationSubmit { get; } = PermissionIdentifier.Parse("institution.configuration.submit");
+
+    public static PermissionIdentifier ConfigurationPublish { get; } = PermissionIdentifier.Parse("institution.configuration.publish");
+
     public static PermissionRequirement CreateRequirement { get; } = new()
     {
         Permission = Create,
@@ -52,4 +60,9 @@ public static class InstitutionPermissions
     public static PermissionRequirement CalendarPublishRequirement { get; } = new() { Permission = CalendarManage, RequiresStepUp = true, IsRestrictedApproval = true };
     public static PermissionRequirement BusinessDateAdvanceRequirement { get; } = new() { Permission = BusinessDateAdvance, RequiresStepUp = true, IsRestrictedApproval = true };
     public static PermissionRequirement ProvisioningRepairRequirement { get; } = new() { Permission = ProvisioningRepair, RequiresStepUp = true };
+
+    public static PermissionRequirement ConfigurationCreateRequirement { get; } = new() { Permission = ConfigurationCreate, RequiresStepUp = true };
+    public static PermissionRequirement ConfigurationSimulateRequirement { get; } = new() { Permission = ConfigurationSimulate, RequiresStepUp = true };
+    public static PermissionRequirement ConfigurationSubmitRequirement { get; } = new() { Permission = ConfigurationSubmit, RequiresStepUp = true, IsRestrictedApproval = true };
+    public static PermissionRequirement ConfigurationPublishRequirement { get; } = new() { Permission = ConfigurationPublish, RequiresStepUp = true, IsRestrictedApproval = true };
 }

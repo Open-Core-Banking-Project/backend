@@ -126,6 +126,49 @@ configuration, logs or evidence. Partial configuration, a non-HTTPS token endpoi
 a rejected token request or a token lifetime outside 31 to 3600 seconds fails closed. Access tokens
 are cached only until 30 seconds before expiry. No token is persisted or logged.
 
+## Customer eligibility facts (service-to-service)
+
+Core Ledger reads authoritative customer facts from Customer and Onboarding over one internal route.
+Decision: P1-E04-D17.
+
+| Item | Value |
+| --- | --- |
+| Route | `GET /internal/v1/customers/{customerId}/eligibility-facts?asOf=<iso8601>` |
+| Audience | `corebanking-customer-api` |
+| Capability (token scope) | `service.customer.eligibility_facts_read` |
+| Allow-listed caller | `CustomerFacts:AllowedServiceClientIds` on Customer and Onboarding |
+
+Register one confidential Keycloak client for each calling service (for example `core-ledger`) with an audience mapper
+that emits exactly `corebanking-customer-api`, and assign a client scope whose name includes
+`service.customer.eligibility_facts_read` so the token `scope` claim carries it. The service token also needs the
+trusted `institution_id` claim the platform uses for every actor; the caller sends `X-Institution-Id` for traceability
+but the service never trusts it over the claim.
+
+Configure Customer and Onboarding:
+
+```text
+Authentication__Keycloak__Authority=https://identity.example.com/realms/core-banking
+Authentication__Keycloak__Audience=corebanking-customer-api
+CustomerFacts__AllowedServiceClientIds__0=core-ledger
+Privacy__Protection__EncryptionKey=<secret reference resolved outside configuration>
+Privacy__Protection__LookupKey=<distinct secret reference>
+ConnectionStrings__CustomerOnboarding=<application principal connection string>
+```
+
+Configure the caller:
+
+```text
+CustomerFacts__BaseUrl=https://customer-onboarding.example.com
+IdentityAccess__WorkloadIdentity__TokenEndpoint=https://identity.example.com/realms/core-banking/protocol/openid-connect/token
+IdentityAccess__WorkloadIdentity__ClientId=core-ledger
+IdentityAccess__WorkloadIdentity__ClientSecretReference=identity.core-ledger.client-secret
+```
+
+The route fails closed: an unconfigured authority answers `503 service_authentication_unconfigured`; a missing,
+non-service, unlisted, wrong-audience, capability-less or institution-less caller answers `401`/`403` with a bounded
+code; missing facts, no effective classification, an inactive branch or an unsupported currency deny the eligibility
+decision. An empty allow-list denies every caller, so omitting the setting can never widen access.
+
 ## Verification gate
 
 Before enabling traffic, prove all of the following with synthetic identities:

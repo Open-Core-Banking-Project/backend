@@ -155,6 +155,7 @@ if (useRelationalStore)
     builder.Services.AddScoped<IOrganisationLifecycleService, OrganisationLifecycleService>();
     builder.Services.AddScoped<IBusinessCalendarService, BusinessCalendarService>();
     builder.Services.AddScoped<ISavingsProductConfigurationService, SavingsProductConfigurationService>();
+    builder.Services.AddScoped<IInstitutionCurrencyConfigurationService, InstitutionCurrencyConfigurationService>();
     builder.Services.AddScoped<IBranchReferenceSource, BranchReferenceSource>();
     builder.Services.AddScoped<ICurrencyReferenceSource, CurrencyReferenceSource>();
     builder.Services.AddScoped<AuthoritativeEligibilityFactsResolver>();
@@ -515,6 +516,155 @@ static void MapInstitutionProvisioningRepairEndpoints(WebApplication app)
 
 static void MapSavingsProductEndpoints(WebApplication app)
 {
+    // Institution currency configuration lifecycle (area institution.currencies).
+    // Decision: P1-E04-D17.
+    app.MapPost("/api/v1/institutions/{institutionId}/configurations/institution.currencies/versions", async (
+        HttpContext http,
+        string institutionId,
+        CreateCurrencyConfigurationRequestV1 request,
+        IInstitutionCurrencyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            CurrencyDraftResult result = await service.CreateDraftAsync(
+                new CreateCurrencyDraftCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    request.VersionId,
+                    request.BaseCurrency,
+                    request.SupportedCurrencies,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionCurrencyConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Currency configuration rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid currency configuration", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationCreateRequirement,
+        "institution.configuration.create"));
+
+    app.MapPost("/api/v1/configurations/{versionId}/simulate", async (
+        HttpContext http,
+        string versionId,
+        SimulateCurrencyConfigurationRequestV1 request,
+        IInstitutionCurrencyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            CurrencySimulationResult result = await service.SimulateAsync(
+                new SimulateCurrencyVersionCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    versionId,
+                    request.SimulationId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionCurrencyConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Currency simulation rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid currency simulation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSimulateRequirement,
+        "institution.configuration.simulate"));
+
+    app.MapPost("/api/v1/configurations/{versionId}/submit", async (
+        HttpContext http,
+        string versionId,
+        SubmitCurrencyConfigurationRequestV1 request,
+        IInstitutionCurrencyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            CurrencySubmissionResult result = await service.SubmitForApprovalAsync(
+                new SubmitCurrencyVersionCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    request.RequestId,
+                    request.SourceRequestKey,
+                    versionId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionCurrencyConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Currency submission rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid currency submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSubmitRequirement,
+        "institution.configuration.submit"));
+
+    app.MapPost("/api/v1/configurations/{versionId}/publish", async (
+        HttpContext http,
+        string versionId,
+        PublishCurrencyConfigurationRequestV1 request,
+        IInstitutionCurrencyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            CurrencyPublicationResult result = await service.PublishAsync(
+                new PublishCurrencyVersionCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    request.PublicationId,
+                    versionId,
+                    request.ContentHash,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionCurrencyConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Currency publication rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid currency publication", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationPublishRequirement,
+        "institution.configuration.publish"));
+
     app.MapPost("/api/v1/institutions/{institutionId}/products/{productId}/savings-eligibility/versions", async (
         HttpContext http,
         string institutionId,

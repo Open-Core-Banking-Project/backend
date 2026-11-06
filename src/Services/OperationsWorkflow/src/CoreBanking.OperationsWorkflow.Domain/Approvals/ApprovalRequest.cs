@@ -19,6 +19,22 @@ public static class SavingsEligibilityPublicationProfile
     public static string DefinitionHash => ApprovalProfiles.SavingsEligibilityPublication.DefinitionHash;
 }
 
+/// <summary>
+/// The institution configuration publication profile, used by the currency configuration area. The
+/// approver permission is the Configuration Approver capability approved in Epic 1 section 5.
+/// Decision: P1-E04-D17.
+/// </summary>
+public static class InstitutionConfigurationPublicationProfile
+{
+    public const string WorkflowKey = "institution.configuration.publish.v1";
+    public const string WorkflowVersionId = "institution-configuration-publication-v1";
+    public const string SubjectType = "institution.configuration.version";
+    public const string SourceService = "core-ledger";
+    public const string RequiredPermission = "institution.configuration.approve";
+
+    public static string DefinitionHash => ApprovalProfiles.InstitutionConfigurationPublication.DefinitionHash;
+}
+
 public enum ApprovalRequestStatus
 {
     Submitted,

@@ -61,8 +61,20 @@ public static class ApprovalProfiles
         "identity.role.version",
         "identity.permission.assign");
 
+    /// <summary>
+    /// Institution configuration publication, including the <c>institution.currencies</c> area. The
+    /// approver permission is the Configuration Approver capability approved in Epic 1 section 5.
+    /// Decision: P1-E04-D17.
+    /// </summary>
+    public static ApprovalProfile InstitutionConfigurationPublication { get; } = Create(
+        "institution.configuration.publish.v1",
+        "institution-configuration-publication-v1",
+        "core-ledger",
+        "institution.configuration.version",
+        "institution.configuration.approve");
+
     public static IReadOnlyList<ApprovalProfile> All { get; } =
-        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge, IdentityRolePublication];
+        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge, IdentityRolePublication, InstitutionConfigurationPublication];
 
     /// <summary>The source services that may submit a request, derived from the approved profiles.</summary>
     public static IReadOnlyList<string> SourceServices { get; } =
