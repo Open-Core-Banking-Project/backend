@@ -19,7 +19,7 @@ modules:
   - Accounting Periods
   - End-of-Day and Period Processing
   - Transaction History and Statement Data
-status: Draft
+status: Approved
 requirements: [LED-001, LED-002, LED-003, LED-004, LED-005, LED-006, LED-007, LED-008, LED-009, LED-010, LED-011, LED-012, LED-013, ACC-005, ACC-007, DAT-001, DAT-002, DAT-003, DAT-004, DAT-005, DAT-008, NFR-PERF-002, NFR-SCAL-001, NFR-RES-002, NFR-DR-001, NFR-DR-002, NFR-OBS-001, NFR-OBS-002, NFR-MNT-001, SEC-009, SEC-010, SEC-011, SEC-013, AUD-001, AUD-002, AUD-003, AUD-004, BR-001, BR-002, BR-003, BR-004, BR-005, BR-006, BR-007, BR-008, BR-010, BR-013, BR-014, BR-015]
 stories: [US-018, US-019, US-020, US-021, US-022, US-023]
 dependencies:

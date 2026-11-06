@@ -3,7 +3,7 @@ phase: "Phase 1 - Banking Foundation"
 artifact: Slice and decision ledger
 status: Active
 approval_model: Human approves each slice
-snapshot: 2026-10-28
+snapshot: 2026-11-01
 source_documents: 01..12 epic implementation documents
 ---
 
@@ -11,6 +11,8 @@ source_documents: 01..12 epic implementation documents
 
 Tracks every implementation slice in Phase 1, the status claimed for it, the human approval it needs and the open decisions that block it.
 The epic documents define scope; this ledger is the single place that records execution and approval state.
+
+On 2026-11-01 the user granted phase-wide approval to implement every Phase 1 epic and slice. In the CSV source this is recorded as `phase-wide implementation approved 2026-11-01`. It authorises implementation but does not fabricate acceptance evidence for unfinished work or resolve decision records whose exact policy remains unspecified.
 
 ## Status and approval model
 
@@ -29,6 +31,7 @@ A slice is never auto-approved, and an epic never advances because its slices we
 | empty | No implementation to review |
 | `pending` | Implemented or partly implemented, review not done |
 | `approved <date>` | A human reviewer accepted the slice and its evidence on that date |
+| `phase-wide implementation approved <date>` | A human authorised implementation of the slice; evidence-based completion review still follows implementation |
 
 A decision id in a slice row means the epic document still carries an unresolved decision that applies to that slice;
 it is not proof the slice is unimplemented, and an implemented slice can still be gated for production use by one.
@@ -36,13 +39,13 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 ## Snapshot
 
 - Slices: **176** across **12** epics.
-- Implemented and awaiting review: **14**.
-- Approved by a human reviewer: **26** (P1-E01 slices 2-12 on 2026-10-28; P1-E03 slices 1-15 on 2026-10-31).
-- In progress: **30**. Not started: **108**. Blocked approvals: **10**.
+- Implemented and awaiting review: **18**.
+- Approved by a human reviewer: **28** (including P1-E02-S13 and P1-E02-S14 on 2026-11-02).
+- In progress: **23**. Not started: **108**. Blocked approvals: **10**.
 - Decisions: **188** total — 134 open, 4 partially approved, 19 with no recorded status, 31 resolved.
 - Slices that may start right now without a new human decision: **0**.
 
-Statuses are transcribed from the epic documents on 2026-10-28. Verification is recorded separately in the
+Statuses were reconciled from `slice-ledger.csv` on 2026-11-02. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
 
 ## Epic summary
@@ -50,23 +53,23 @@ Statuses are transcribed from the epic documents on 2026-10-28. Verification is 
 | Epic | Document status | Slices | Approved | Implemented | In progress | Blocked | Not started | Unresolved decisions |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | P1-E01 Institution and Tenancy | Implemented | 12 | 11 | 11 | 0 | 1 | 0 | 9 |
-| P1-E02 Identity, Roles and Permissions | In Progress | 15 | 0 | 7 | 8 | 0 | 0 | 3 |
+| P1-E02 Identity, Roles and Permissions | In Progress | 15 | 2 | 13 | 2 | 0 | 0 | 3 |
 | P1-E03 Customer and Onboarding | Implemented | 15 | 15 | 3 | 12 | 0 | 0 | 0 |
-| P1-E04 Products and Accounts | Draft | 15 | 0 | 3 | 2 | 1 | 9 | 13 |
-| P1-E05 Core Ledger and Financial Posting | Draft | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
-| P1-E06 Workflow and Maker-Checker | Draft | 13 | 0 | 4 | 0 | 1 | 8 | 12 |
-| P1-E07 Payments, Collections and VTU | Draft | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
-| P1-E08 Integration Hub and Providers | Draft | 15 | 0 | 0 | 3 | 1 | 11 | 16 |
-| P1-E09 Channels, CMS and Communications | Draft | 17 | 0 | 0 | 1 | 1 | 15 | 19 |
-| P1-E10 Documents and Statements | Draft | 15 | 0 | 0 | 1 | 1 | 13 | 19 |
-| P1-E11 Audit, Traceability and Recovery | Draft | 15 | 0 | 0 | 1 | 1 | 13 | 17 |
-| P1-E12 Operations and Release Readiness | Draft | 14 | 0 | 0 | 2 | 1 | 11 | 15 |
+| P1-E04 Products and Accounts | Approved | 15 | 0 | 4 | 1 | 1 | 9 | 13 |
+| P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
+| P1-E06 Workflow and Maker-Checker | Approved | 13 | 0 | 4 | 0 | 1 | 8 | 12 |
+| P1-E07 Payments, Collections and VTU | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
+| P1-E08 Integration Hub and Providers | Approved | 15 | 0 | 0 | 3 | 1 | 11 | 16 |
+| P1-E09 Channels, CMS and Communications | Approved | 17 | 0 | 0 | 1 | 1 | 15 | 19 |
+| P1-E10 Documents and Statements | Approved | 15 | 0 | 0 | 1 | 1 | 13 | 19 |
+| P1-E11 Audit, Traceability and Recovery | Approved | 15 | 0 | 0 | 1 | 1 | 13 | 17 |
+| P1-E12 Operations and Release Readiness | Approved | 14 | 0 | 0 | 2 | 1 | 11 | 15 |
 
 ## Ready queue
 
-**No slice is startable without a human decision.** Every epic still ahead is gated by its own approval slice,
-and P1-E02's next slice (6) is itself blocked by an open MFA decision. This is the correct stopping point for an
-autonomous loop, not a defect.
+No further slice is startable without a decision. The controller selects `P1-E02-S5`, whose remaining platform
+security floors and provider integration are blocked by `P1-E02-D07`. The implemented local session lifecycle stays
+fail closed while that decision remains open.
 
 ## Human gates before the loop can advance
 
@@ -88,7 +91,7 @@ backup-restore evidence that no agent can produce. See [00-phase-overview.md](00
 
 ## Review queue
 
-14 of the 28 implemented slices are awaiting review; 26 are approved.
+18 of the 35 implemented slices are awaiting evidence review; 28 slices have a recorded human approval.
 
 ## Verification runs
 
@@ -103,7 +106,19 @@ backup-restore evidence that no agent can produce. See [00-phase-overview.md](00
 | 2026-10-28 | P1-E02 slice 7 role drafting | `dotnet test` IdentityAccess unit and database suites | 138 unit tests and 70 identity database/integration tests pass; catalogue seed, draft inertness, duplicate and unknown-permission refusal, self-conflict refusal, simulation and tenant isolation verified |
 | 2026-10-28 | P1-E02 slice 9 entitlement distribution | `dotnet test` IdentityAccess unit, plus live Development API calls | 145 unit tests pass; self snapshot returned three grants at version 3, actor mismatch 403, institution mismatch 403 and regressed minimum version 409 verified |
 | 2026-10-28 | P1-E02 slice 13 service clients | `dotnet test` IdentityAccess unit and database suites | 157 unit tests and 75 identity database/integration tests pass; registration, rotation overlap, expiry, revocation and tenant isolation verified |
+| 2026-11-01 | P1-E02 slice 13 service entitlement distribution | IdentityAccess unit tests, migration application and focused service-client/entitlement database tests | 166 unit and 12 focused database tests pass; service-only grammar, human/service separation, independent version resolution and tenant-scoped internal distribution verified |
 | 2026-10-28 | P1-E02 slice 14 reconciliation | `dotnet test` IdentityAccess database suite | 76 identity database/integration tests pass; the pass detected all four finding types with delta assertions |
+| 2026-11-01 | P1-E02 slice 5 refresh/revocation coordination | IdentityAccess build, unit tests, focused session-security database tests and `dotnet format --verify-no-changes` | Build passed with 0 warnings/errors; 174 unit and 23 database tests passed; provider-confirmed refresh evidence and atomic reuse-detection revocation work verified |
+| 2026-11-01 | P1-E02 slice 6 step-up, audit and factor revocation | IdentityAccess build, unit tests, full Identity database/integration suite, migration application and affected-file format gate | Build passed with 0 warnings/errors; 176 unit and 95 database/integration tests passed; concurrent consumption, privacy-minimised evidence, actor-scoped revocation, unused-evidence invalidation, reconciliation and re-enrolment verified |
+| 2026-11-01 | P1-E02 slice 7 frozen role submission | IdentityAccess build, non-database regression suite, focused role database suite, migration application, model-drift and format gates | Build passed with 0 warnings/errors; 177 non-database and 10 focused database tests passed; one replay-safe Workflow request, deterministic content hash, pending-decision edit freeze and append-only submission evidence verified |
+| 2026-11-01 | P1-E02 slice 7 Workflow decision and publication | IdentityAccess/OperationsWorkflow builds, non-database and focused database suites, migration application, model-drift and format gates | Identity: 177 non-database and 13 focused role database tests; Workflow: 22 non-database and 4 database tests; exact decision binding, maker denial, rejection correction, inbox deduplication, activation, publication event and application acknowledgement verified |
+| 2026-11-01 | P1-E02 slice 7 immutable role versions | IdentityAccess build, full non-database/database/integration suites, targeted versioning suite, migration application/backfill, model-drift and format gates | 177 non-database, 97 database and 4 integration tests passed; 26 targeted publication/grant/entitlement cases prove immutable snapshots, grant version pinning and stable older entitlements after a later publication |
+| 2026-11-01 | P1-E02 slice 7 role contention protection | IdentityAccess build, non-database regression and focused PostgreSQL role suite, migration application, model-drift and format gates | 177 non-database and 14 focused role tests passed; simultaneous submissions converged on one request/hash and one approval outbox fact through optimistic concurrency |
+| 2026-11-01 | P1-E02 slice 7 access review | IdentityAccess API/test builds, focused PostgreSQL grant/review suite and format gate | 7 focused tests passed; version-pinned role permissions, scopes, temporary grants, bounded output and append-only review evidence verified |
+| 2026-11-02 | P1-E02 slice 11 trusted-device final increment | IdentityAccess test-project build, non-database suite, focused PostgreSQL trusted-device suite, format and diff gates | Build passed; 188 non-database and 8 focused database tests passed; authorised cross-identity reads append privacy-minimised operator evidence without device metadata |
+| 2026-11-02 | P1-E02 slice 13 service identity final increment | Identity/Core Ledger/Workflow builds, focused workload/audience tests, focused PostgreSQL service-client suite, affected non-database suites and format gates | Builds passed; 24 focused unit, 6 focused database, 197 Identity, 102 Core Ledger and 26 Workflow tests passed; exact audience binding and fail-closed client-credentials propagation verified |
+| 2026-11-02 | P1-E02 slice 14 identity observability final increment | Identity test/worker builds, focused meter test, Identity non-database suite and format gate | Builds passed; 1 focused meter and 198 non-database tests passed; the four bounded reconciliation counters are registered on the shared OTLP collector path |
+| 2026-11-03 | P1-E04 slice 2 Products and Accounts contracts | Focused contract/architecture tests, complete Core Ledger unit suite, repository architecture suite and affected-file format gate | 5 focused, 107 Core Ledger and 15 architecture tests passed; Account commands exclude trusted state, summary balances remain distinct and Ledger sourced, and statement handoff carries no financial history |
 
 Gaps found by the verification run: CoreLedger exposes no `Category=Database` or `Category=Integration` tests, so
 runtime concurrency evidence (INS-002 concurrent duplicate institution code, INS-004 provisioning acknowledgement,
@@ -135,7 +150,7 @@ Owning service: Core Banking and Ledger · document status `Implemented` · 11 i
 
 ### P1-E02 — Identity, Roles and Permissions
 
-Owning service: Identity and Access · document status `In Progress` · 7 implemented, 8 in progress, 0 blocked, 0 not started.
+Owning service: Identity and Access · document status `In Progress` · 13 implemented, 2 in progress, 0 blocked, 0 not started.
 
 | Slice | Scope | Status | Approval | Unresolved decisions attached | Evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -143,16 +158,16 @@ Owning service: Identity and Access · document status `In Progress` · 7 implem
 | 2 | Promote Phase 0 actor, tenant, permission, scope, decision and entitlement contracts to versioned production… | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-26 |
 | 3 | Implement identity, membership and provider-link lifecycle with institution provisioning events and cross-ten… | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-26 |
 | 4 | Implement authentication-policy versions and the approved provider adapter using synthetic/non-production cre… | ✔ implemented (claim) | pending | P1-E02-D07 | Epic doc progress note 2026-10-26 |
-| 5 | Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence. In pro… | ◐ in progress | pending | — | Epic doc: session lifecycle, lockouts, authentication evidence |
-| 6 | Implement MFA enrolment/challenges and step-up evidence for one approved customer channel and one staff/privi… | ◐ in progress | pending | — | TOTP enrolment, provider-verified challenges and purpose/session/devi… |
-| 7 | Implement permission catalogue plus role draft, simulation, approval and publication lifecycle. Status: in pr… | ◐ in progress | pending | — | Catalogue seeded by migration; role draft create/update/read and simu… |
+| 5 | Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence. | ◐ in progress | pending | P1-E02-D07 | Provider-confirmed refresh evidence; atomic refresh-reuse compromise and durable provider-revocation work; optimistic concurrency |
+| 6 | Implement MFA enrolment/challenges and step-up evidence for one approved customer channel and one staff/privileged flow. | ◐ in progress | approved with named gaps (2026-11-01) | — | TOTP enrolment, atomic single-use step-up, outcome evidence, and step-up-protected self-revocation with transactional evidence invalidation |
+| 7 | Implement permission catalogue plus role draft, simulation, approval and publication lifecycle. | ✔ implemented (claim) | approved with named gates (2026-11-01) | — | Full lifecycle plus immutable versions, version-pinned grants, contention protection and audited access review; named production confirmations remain |
 | 8 | Implement scoped grants, conflict-of-duty evaluation, temporary expiry and entitlement version advancement. S… | ✔ implemented (claim) | pending | — | Scoped role assignment, temporary grants, conflict evaluation, revoca… |
-| 9 | Implement entitlement distribution/invalidation and integrate one financial and one non-financial protected b… | ◐ in progress | pending | — | Self-scoped entitlement snapshot with version handshake and fail-clos… |
-| 10 | Implement maker identity/approver eligibility contracts with Workflow; prove self-approval denial across role… | ◐ in progress | pending | — | Approval eligibility contract, service, endpoint and eight segregatio… |
-| 11 | Implement trusted-device registration, listing, step-up, revocation and bound-session termination. Status: in… | ◐ in progress | pending | — | TrustedDevice stores only a public-key thumbprint, untrusted display… |
+| 9 | Implement entitlement distribution/invalidation and integrate one financial and one non-financial protected b… | ✔ implemented (claim) | phase-wide implementation approved 2026-11-01 | — | Current-source enforcement in Core Ledger and Operations Workflow; source failure or mismatch evicts and denies |
+| 10 | Implement maker identity/approver eligibility contracts with Workflow; prove self-approval denial across role… | ✔ implemented (claim) | phase-wide implementation approved 2026-11-01 | — | Service-authenticated eligibility; Workflow fail-closed consumption; self-approval database proof; 188 Identity and 26 Workflow non-database tests |
+| 11 | Implement trusted-device registration, listing, step-up, revocation and bound-session termination. | ✔ implemented (claim) | phase-wide implementation approved 2026-11-01 | — | Complete public-key-thumbprint lifecycle plus audited cross-identity reads; 11 unit, 8 focused database and 188 non-database tests |
 | 12 | Approve the payload-encryption design; implement public-key discovery and one authentication-field envelope f… | ✔ implemented (claim) | pending | — | One approved envelope suite (RSA-OAEP-256+A256GCM) with ciphertext bo… |
-| 13 | Implement service identity authentication, audience restrictions, rotation and one service-to-service integra… | ◐ in progress | pending | — | Service client registration, rotation metadata, revocation and pre-au… |
-| 14 | Add SIEM/audit adapters, dashboards, alerts, reconciliation jobs and runbooks. Status: in progress — an hourl… | ◐ in progress | pending | — | Hourly reconciliation pass with bounded counters, on-demand operator… |
+| 13 | Implement service identity authentication, audience restrictions, rotation and one service-to-service integration. | ✔ implemented (claim) | approved 2026-11-02 | — | Exact registered/token audience binding; fail-closed client-credentials bearer propagation in Core Ledger and Workflow; 197 Identity, 102 Core Ledger, 26 Workflow and 6 focused database tests |
+| 14 | Add SIEM/audit adapters, dashboards, alerts, reconciliation jobs and runbooks. | ✔ implemented (claim) | approved 2026-11-02 | — | Four bounded reconciliation counters on the registered Identity OTLP meter; provider-neutral dashboard/alert contract; 198 non-database tests |
 | 15 | Complete security, contract, integration, concurrency, recovery and end-to-end evidence before enabling produ… | ✔ implemented (claim) | pending | — | Acceptance evidence pass recorded in docs/operations/phase-1-identity… |
 
 ### P1-E03 — Customer and Onboarding
@@ -179,12 +194,12 @@ Owning service: Customer and Onboarding · document status `Implemented` · 3 im
 
 ### P1-E04 — Products and Accounts
 
-Owning service: Core Banking and Ledger · document status `Draft` · 3 implemented, 2 in progress, 1 blocked, 9 not started.
+Owning service: Core Banking and Ledger · document status `Approved` · 4 implemented, 1 in progress, 1 blocked, 9 not started.
 
 | Slice | Scope | Status | Approval | Unresolved decisions attached | Evidence |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Approve product taxonomy, account-number, rounding/calculation, restriction/lien, dormancy and statement owne… | ⛔ blocked | — | P1-E04-D03, P1-E04-D04, P1-E04-D05, P1-E04-D06, P1-E04-D07, P1-E04-D09, P1-E04-D10, P1-E04-D11, P1-E04-D12, P1-E04-D13, P1-E04-D14, P1-E04-D15, P1-E04-D16 | 13 unresolved decisions in the epic document |
-| 2 | Define versioned Product, Account, Control and Statement contracts plus module architecture tests. | ◐ in progress | pending | — | Product/Control contracts exist |
+| 2 | Define versioned Product, Account, Control and Statement contracts plus module architecture tests. | ✔ implemented (claim) | pending | — | V1 Product, Account, Control and Statement contracts; mass-assignment, financial-boundary and transport-only architecture tests |
 | 3 | Implement product identity/version lifecycle and typed rule persistence with migration tests. | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-21 |
 | 4 | Implement deterministic rule evaluation and simulation with boundary/golden tests and content hashing. | ✔ implemented (claim) | pending | P1-E04-D03, P1-E04-D04, P1-E04-D05 | Epic doc progress note 2026-10-21 |
 | 5 | Integrate product approval/publication with Workflow using exact version/hash and outbox events. | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-21 |
@@ -403,7 +418,7 @@ Every decision the epic documents still require, with its owner and the slice it
 | P1-E02-D04 | Service-to-service authentication mechanism | Security/Platform | Slice 1 | resolved | — |
 | P1-E02-D05 | Entitlement distribution/read-model strategy | Architecture/Security | Slice 1 | resolved | — |
 | P1-E02-D06 | Maximum entitlement/revocation propagation window | Security/Risk | Slice 1 | resolved | — |
-| P1-E02-D07 | Platform security floors for passwords, lockout and MFA | Security | Slice 4 | open | — |
+| P1-E02-D07 | Platform security floors for passwords, lockout and MFA | Security | Slice 4 | open | [brief](decisions/P1-E02-D07-platform-security-floors.md) |
 | P1-E02-D08 | Approved MFA and recovery methods per actor/channel | Security/Product | Slice 6 | resolved | [brief](decisions/P1-E02-D08-mfa-and-recovery-methods.md) |
 | P1-E02-D09 | Initial system permission catalogue and role templates | Domain owners/Security | Slice 7 | resolved | [brief](decisions/P1-E02-D09-permission-catalogue-and-role-templates.md) |
 | P1-E02-D10 | Role/grant approval thresholds and conflicts | Security/Operations | Slice 7 | resolved | [brief](decisions/P1-E02-D10-role-and-grant-approval-thresholds-and-conflicts.md) |

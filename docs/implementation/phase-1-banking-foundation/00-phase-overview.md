@@ -1,6 +1,6 @@
 ---
 phase: "Phase 1 - Banking Foundation"
-status: Draft
+status: Approved
 owning_services:
   - Core Banking and Ledger
   - Customer and Onboarding
