@@ -30,6 +30,8 @@ public sealed class IdentityAccessModelTests
         "access.permissions",
         "access.resource_scopes",
         "access.role_permissions",
+        "access.role_version_permissions",
+        "access.role_versions",
         "access.roles",
         "access.temporary_grants",
         "audit.authorisation_events",

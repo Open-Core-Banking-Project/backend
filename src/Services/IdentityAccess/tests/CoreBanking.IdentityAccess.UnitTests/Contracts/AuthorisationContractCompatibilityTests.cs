@@ -117,6 +117,29 @@ public sealed class AuthorisationContractCompatibilityTests
     }
 
     [Fact]
+    public void Service_approval_eligibility_request_carries_actor_references_without_grants()
+    {
+        ServiceApprovalEligibilityRequestV1 request = new()
+        {
+            InstitutionId = "institution-001",
+            SourceSystem = "operations-workflow",
+            SourceRequestId = "approval-001",
+            RequiredPermission = "product.version.approve",
+            MakerActorId = "maker-001",
+            CandidateActorId = "approver-001",
+        };
+
+        string json = EventContract.Serialize(request);
+        using JsonDocument document = JsonDocument.Parse(json);
+
+        Assert.Equal(1, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal("maker-001", document.RootElement.GetProperty("makerActorId").GetString());
+        Assert.Equal("approver-001", document.RootElement.GetProperty("candidateActorId").GetString());
+        Assert.False(document.RootElement.TryGetProperty("grants", out _));
+        Assert.False(document.RootElement.TryGetProperty("roles", out _));
+    }
+
+    [Fact]
     public void Decision_contract_uses_stable_safe_codes_without_resource_existence_detail()
     {
         AuthorisationDecisionV1 decision = new()
@@ -157,6 +180,35 @@ public sealed class AuthorisationContractCompatibilityTests
         Assert.Equal(21, document.RootElement.GetProperty("newVersion").GetInt64());
         Assert.False(document.RootElement.TryGetProperty("grants", out _));
         Assert.False(document.RootElement.TryGetProperty("permissions", out _));
+    }
+
+    [Fact]
+    public void Role_publication_profile_is_frozen_and_workflow_compatible()
+    {
+        Assert.Equal("identity.role.publish.v1", RolePublicationApprovalV1.WorkflowKey);
+        Assert.Equal("identity-role-publication-v1", RolePublicationApprovalV1.WorkflowVersionId);
+        Assert.Equal("identity.permission.assign", RolePublicationApprovalV1.RequiredPermission);
+        Assert.Equal(
+            "b2698b7a16fe0e43a8341a5d8311484ce9943f21171cf38b73a697de20e3d3ae",
+            RolePublicationApprovalV1.DefinitionHash);
+    }
+
+    [Fact]
+    public void Mfa_revocation_contract_uses_a_stable_reason_without_provider_material()
+    {
+        MfaRevocationRequestV1 request = new()
+        {
+            ReasonCode = MfaContractV1.RevocationDeviceLost,
+        };
+
+        string json = EventContract.Serialize(request);
+        using JsonDocument document = JsonDocument.Parse(json);
+
+        Assert.Equal(1, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal("device_lost", document.RootElement.GetProperty("reasonCode").GetString());
+        Assert.DoesNotContain("provider", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("response", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

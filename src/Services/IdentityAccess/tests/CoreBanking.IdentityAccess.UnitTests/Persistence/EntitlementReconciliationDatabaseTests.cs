@@ -65,6 +65,35 @@ public sealed class EntitlementReconciliationDatabaseTests : IDisposable
         Assert.False(after.IsClean);
     }
 
+    [Fact]
+    public async Task Invalidated_step_up_evidence_is_not_reported_as_stale()
+    {
+        EntitlementReconciliationFindings before = await ReconcileAsync();
+
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            context.StepUpEvidence.Add(new StepUpEvidenceRecord
+            {
+                InstitutionId = _institution.Value,
+                EvidenceId = Guid.NewGuid().ToString("N"),
+                IdentityId = _identity.Value,
+                SessionId = "session-invalidated",
+                Purpose = "identity.mfa.revoke",
+                FactorKind = "totp",
+                CorrelationId = "correlation-invalidated",
+                IssuedAt = _time.GetUtcNow().AddMinutes(-10),
+                ExpiresAt = _time.GetUtcNow().AddMinutes(-5),
+                InvalidatedAt = _time.GetUtcNow().AddMinutes(-6),
+                InvalidationReasonCode = "device_lost",
+            });
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+
+        EntitlementReconciliationFindings after = await ReconcileAsync();
+
+        Assert.Equal(before.StaleStepUpEvidence, after.StaleStepUpEvidence);
+    }
+
     public void Dispose()
     {
         using IdentityAccessDbContext context = CreateContext(_institution);
@@ -72,6 +101,8 @@ public sealed class EntitlementReconciliationDatabaseTests : IDisposable
         context.TemporaryGrants.ExecuteDelete();
         context.ServiceClients.ExecuteDelete();
         context.IdentityRoles.ExecuteDelete();
+        context.RoleVersionPermissions.ExecuteDelete();
+        context.RoleVersions.ExecuteDelete();
         context.RolePermissions.ExecuteDelete();
         context.Roles.ExecuteDelete();
         context.EntitlementVersions.ExecuteDelete();
@@ -120,11 +151,32 @@ public sealed class EntitlementReconciliationDatabaseTests : IDisposable
             RoleId = "recon-role",
             PermissionCode = "audit.event.view",
         });
+        context.RoleVersions.Add(new RoleVersionRecord
+        {
+            InstitutionId = _institution.Value,
+            RoleId = "recon-role",
+            Version = 1,
+            RoleCode = "recon-role",
+            RoleName = "Reconciliation role",
+            ContentHash = new string('a', 64),
+            ApprovalRequestId = "recon-request",
+            WorkflowDecisionReference = "recon-decision",
+            PublishedBy = "seed",
+            PublishedAt = _time.GetUtcNow(),
+        });
+        context.RoleVersionPermissions.Add(new RoleVersionPermissionRecord
+        {
+            InstitutionId = _institution.Value,
+            RoleId = "recon-role",
+            RoleVersion = 1,
+            PermissionCode = "audit.event.view",
+        });
         context.IdentityRoles.Add(new IdentityRoleRecord
         {
             InstitutionId = _institution.Value,
             IdentityId = _identity.Value,
             RoleId = "recon-role",
+            RoleVersion = 1,
             ValidFrom = _time.GetUtcNow().AddMinutes(-5),
             AssignedBy = "seed",
         });

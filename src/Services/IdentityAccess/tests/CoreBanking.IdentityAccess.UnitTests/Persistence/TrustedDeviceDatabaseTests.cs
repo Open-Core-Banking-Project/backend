@@ -204,6 +204,34 @@ public sealed class TrustedDeviceDatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task An_officer_read_of_another_identity_is_audited_without_device_detail()
+    {
+        await using IdentityAccessDbContext context = CreateContext(_institution);
+        TrustedDeviceService devices = CreateService(context);
+        await devices.StartRegistrationAsync(Start(_customer, _customer.Value, "Customer phone"), CancellationToken.None);
+
+        IReadOnlyList<TrustedDeviceView> result = await devices.ListAsync(
+            new ListDevicesQuery(
+                Actor(_staff, "officer-session", null),
+                _customer.Value,
+                OtherIdentityRequested: true,
+                CorrelationId: "correlation-sensitive-read"),
+            CancellationToken.None);
+
+        Assert.Single(result);
+        OperatorActionAuditRecord evidence = await context.OperatorActionAuditEvents.SingleAsync(
+            candidate => candidate.Action == "identity_devices_viewed");
+        Assert.Equal(_staff.Value, evidence.ActorId);
+        Assert.Equal(_customer.Value, evidence.ResourceId);
+        Assert.Equal("identity_devices", evidence.ResourceType);
+        Assert.Equal("authorised_sensitive_device_read", evidence.Reason);
+        Assert.Equal("correlation-sensitive-read", evidence.CorrelationId);
+        string auditText = evidence.Action + evidence.ResourceType + evidence.ResourceId + evidence.Reason;
+        Assert.DoesNotContain(Thumbprint, auditText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Customer phone", auditText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Another_institution_sees_no_devices()
     {
         await using IdentityAccessDbContext context = CreateContext(_institution);
@@ -214,7 +242,11 @@ public sealed class TrustedDeviceDatabaseTests : IDisposable
         TrustedDeviceService otherDevices = CreateService(other);
 
         Assert.Empty(await otherDevices.ListAsync(
-            new ListDevicesQuery(Actor(_staff, "session-other", null), _staff.Value, OtherIdentityRequested: true),
+            new ListDevicesQuery(
+                Actor(_staff, "session-other", null) with { InstitutionId = _otherInstitution },
+                _staff.Value,
+                OtherIdentityRequested: true,
+                CorrelationId: "correlation-cross-tenant"),
             CancellationToken.None));
     }
 

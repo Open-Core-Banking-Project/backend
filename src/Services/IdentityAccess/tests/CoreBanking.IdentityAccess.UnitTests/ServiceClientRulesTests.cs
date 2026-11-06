@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using CoreBanking.IdentityAccess.Domain.Identities;
 using Xunit;
 
@@ -12,6 +13,10 @@ namespace CoreBanking.IdentityAccess.UnitTests;
 public sealed class ServiceClientRulesTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 28, 13, 0, 0, TimeSpan.Zero);
+    private static readonly string[] ExpectedPermissions =
+        ["service.audit.write", "service.identity.entitlements_read"];
+    private static readonly string[] UnnormalisedPermissions =
+        [" service.identity.entitlements_read ", "service.audit.write", "service.identity.entitlements_read"];
 
     [Fact]
     public void A_reference_is_trimmed() =>
@@ -38,6 +43,29 @@ public sealed class ServiceClientRulesTests
     [Fact]
     public void A_future_expiry_is_accepted() =>
         ServiceClientRules.ValidateExpiry(Now.AddDays(30), Now);
+
+    [Fact]
+    public void Service_permissions_are_trimmed_deduplicated_and_sorted()
+    {
+        string[] permissions = ServiceClientRules.NormalisePermissions(UnnormalisedPermissions).ToArray();
+
+        Assert.Equal(ExpectedPermissions, permissions);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("identity.identity.view")]
+    [InlineData("service.identity")]
+    [InlineData("service.identity.entitlements.read")]
+    [InlineData("service.identity.entitlements-read")]
+    public void Human_or_malformed_permissions_are_refused(string permission) =>
+        Assert.Throws<ArgumentException>(() => ServiceClientRules.NormalisePermissions([permission]));
+
+    [Fact]
+    public void An_excessive_permission_set_is_refused() =>
+        Assert.Throws<ArgumentException>(() => ServiceClientRules.NormalisePermissions(
+            Enumerable.Range(0, ServiceClientRules.MaximumPermissions + 1)
+                .Select(index => $"service.identity.action-{index}")));
 
     [Theory]
     [InlineData("Active", null, true)]

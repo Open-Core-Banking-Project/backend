@@ -26,6 +26,7 @@ public sealed class KeycloakActorContextResolverTests
         Assert.Equal("institution-1", actor.InstitutionId.Value);
         Assert.Equal("session-1", actor.SessionId);
         Assert.Equal("device-1", actor.DeviceId);
+        Assert.Equal("corebanking-identity-api", actor.Audience);
         Assert.Equal(7, actor.EntitlementVersion);
         Assert.Equal(AuthenticationStrength.MultiFactor, actor.Strength);
     }
@@ -43,6 +44,7 @@ public sealed class KeycloakActorContextResolverTests
     [InlineData("sid")]
     [InlineData("entitlement_version")]
     [InlineData("authentication_strength")]
+    [InlineData("aud")]
     public void Missing_required_claim_is_rejected(string missingClaim)
     {
         List<Claim> claims = ValidClaims();
@@ -103,5 +105,6 @@ public sealed class KeycloakActorContextResolverTests
         new Claim("device_id", "device-1"),
         new Claim("entitlement_version", "7"),
         new Claim("authentication_strength", "MultiFactor"),
+        new Claim("aud", "corebanking-identity-api"),
     ];
 }

@@ -80,14 +80,28 @@ public sealed class SessionSecurityDatabaseTests : IDisposable
         _time.Advance(TimeSpan.FromMinutes(5));
         DateTimeOffset newExpiry = _time.GetUtcNow().AddHours(2);
 
-        await service.ConfirmProviderRefreshAsync(_institution, _actor, details.SessionId, "provider-session-2", newExpiry, 1L, CancellationToken.None);
+        SessionDetailsV1 refreshed = await service.ConfirmProviderRefreshAsync(
+            _institution,
+            _actor,
+            details.SessionId,
+            "provider-session-2",
+            newExpiry,
+            1L,
+            "correlation-refresh",
+            CancellationToken.None);
 
         await using IdentityAccessDbContext verification = CreateContext(_institution);
         SessionRecord session = await verification.Sessions.SingleAsync(record => record.SessionId == details.SessionId);
         Assert.Equal(2L, session.ConcurrencyVersion);
         Assert.Equal(newExpiry, session.ExpiresAt);
         Assert.Equal(_time.GetUtcNow(), session.LastActivityAt);
-        Assert.Equal(SessionLifecycleState.Active, session.Status);
+        Assert.Equal(SessionLifecycleState.Refreshed, session.Status);
+        Assert.Equal("refreshed", refreshed.Status);
+        AuthenticationEventRecord evidence = Assert.Single(
+            verification.AuthenticationEvents.Where(record => record.EventType == "session_refreshed"));
+        Assert.Equal(AuthenticationOutcome.Succeeded, evidence.Outcome);
+        Assert.Equal("provider_confirmed", evidence.Detail);
+        Assert.Empty(verification.OutboxMessages);
     }
 
     [Fact]
@@ -99,7 +113,7 @@ public sealed class SessionSecurityDatabaseTests : IDisposable
         SessionSecurityService service = CreateService(context, _time);
 
         await Assert.ThrowsAsync<SessionSecurityException>(() => service.ConfirmProviderRefreshAsync(
-            _institution, _actor, details.SessionId, "provider-session-3", _time.GetUtcNow().AddHours(1), 99L, CancellationToken.None));
+            _institution, _actor, details.SessionId, "provider-session-3", _time.GetUtcNow().AddHours(1), 99L, "correlation-stale", CancellationToken.None));
 
         await using IdentityAccessDbContext verification = CreateContext(_institution);
         Assert.Equal(1L, (await verification.Sessions.SingleAsync(record => record.SessionId == details.SessionId)).ConcurrencyVersion);
@@ -113,14 +127,26 @@ public sealed class SessionSecurityDatabaseTests : IDisposable
         await using IdentityAccessDbContext context = CreateContext(_institution);
         SessionSecurityService service = CreateService(context, _time);
 
-        await Assert.ThrowsAsync<SessionSecurityException>(() => service.ConfirmProviderRefreshAsync(
-            _institution, _actor, details.SessionId, "provider-session-impostor", _time.GetUtcNow().AddHours(1), 1L, CancellationToken.None));
+        SessionSecurityException exception = await Assert.ThrowsAsync<SessionSecurityException>(() => service.ConfirmProviderRefreshAsync(
+            _institution, _actor, details.SessionId, "provider-session-impostor", _time.GetUtcNow().AddHours(1), 1L, "correlation-reuse", CancellationToken.None));
 
         await using IdentityAccessDbContext verification = CreateContext(_institution);
         SessionRecord session = await verification.Sessions.SingleAsync(record => record.SessionId == details.SessionId);
+        Assert.Equal("session_refresh_reuse_detected", exception.Code);
         Assert.Equal(SessionLifecycleState.Compromised, session.Status);
         Assert.NotNull(session.RevokedAt);
         Assert.NotNull(session.ProviderRevocationRequestedAt);
+        Assert.NotNull(session.RevocationEventId);
+        AuthenticationEventRecord evidence = Assert.Single(
+            verification.AuthenticationEvents.Where(record => record.EventType == "session_refresh_reuse_detected"));
+        Assert.Equal(AuthenticationOutcome.Failed, evidence.Outcome);
+        Assert.Equal("provider_session_reference_mismatch", evidence.Detail);
+        OutboxRecord revocation = Assert.Single(
+            verification.OutboxMessages.Where(record => record.EventType == "session_revoked"));
+        Assert.Equal(session.RevocationEventId, revocation.EventId);
+        Assert.Equal("correlation-reuse", revocation.CorrelationId);
+        Assert.Contains("refresh_reuse_detected", revocation.Envelope, StringComparison.Ordinal);
+        Assert.DoesNotContain("provider-session-impostor", revocation.Envelope, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -133,7 +159,7 @@ public sealed class SessionSecurityDatabaseTests : IDisposable
         _time.Advance(TimeSpan.FromHours(2));
 
         await Assert.ThrowsAsync<SessionSecurityException>(() => service.ConfirmProviderRefreshAsync(
-            _institution, _actor, details.SessionId, "provider-session-5", _time.GetUtcNow().AddHours(1), 1L, CancellationToken.None));
+            _institution, _actor, details.SessionId, "provider-session-5", _time.GetUtcNow().AddHours(1), 1L, "correlation-expired", CancellationToken.None));
     }
 
     [Fact]

@@ -260,6 +260,26 @@ public sealed class IdentityAccessEndToEndTests : IDisposable
             RoleId = "accept-role",
             PermissionCode = permission,
         });
+        context.RoleVersions.Add(new RoleVersionRecord
+        {
+            InstitutionId = _institution.Value,
+            RoleId = "accept-role",
+            Version = 1,
+            RoleCode = "accept_role",
+            RoleName = "Acceptance role",
+            ContentHash = new string('a', 64),
+            ApprovalRequestId = "accept-request",
+            WorkflowDecisionReference = "accept-decision",
+            PublishedBy = _administrator.Value,
+            PublishedAt = now,
+        });
+        context.RoleVersionPermissions.Add(new RoleVersionPermissionRecord
+        {
+            InstitutionId = _institution.Value,
+            RoleId = "accept-role",
+            RoleVersion = 1,
+            PermissionCode = permission,
+        });
 
         string identityId = "accept-actor-" + Guid.NewGuid().ToString("N")[..10];
         context.Identities.Add(new IdentityRecord
@@ -279,6 +299,7 @@ public sealed class IdentityAccessEndToEndTests : IDisposable
             InstitutionId = _institution.Value,
             IdentityId = identityId,
             RoleId = "accept-role",
+            RoleVersion = 1,
             ValidFrom = now.AddHours(-1),
             AssignedBy = _administrator.Value,
         });
@@ -426,6 +447,8 @@ public sealed class IdentityAccessEndToEndTests : IDisposable
         context.MfaEnrolments.ExecuteDelete();
         context.Sessions.ExecuteDelete();
         context.IdentityRoles.ExecuteDelete();
+        context.RoleVersionPermissions.ExecuteDelete();
+        context.RoleVersions.ExecuteDelete();
         context.RolePermissions.ExecuteDelete();
         context.Roles.ExecuteDelete();
         context.EntitlementVersions.ExecuteDelete();
