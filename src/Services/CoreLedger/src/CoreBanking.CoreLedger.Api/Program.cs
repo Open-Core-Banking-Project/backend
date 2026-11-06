@@ -52,6 +52,25 @@ provisioningPlan.Validate();
 builder.Services.AddSingleton(provisioningPlan);
 builder.Services.AddSingleton<ITenantContext, AmbientTenantContext>();
 builder.Services.AddSingleton(TimeProvider.System);
+RegisterWorkloadIdentity(builder.Services, builder.Configuration);
+
+// Authoritative customer facts are read from their owner. Without a configured endpoint the source
+// rejects every lookup, so an eligibility decision fails closed. Decision: P1-E04-D17.
+string? customerFactsBaseUrl = builder.Configuration["CustomerFacts:BaseUrl"];
+if (!string.IsNullOrWhiteSpace(customerFactsBaseUrl)
+    && Uri.TryCreate(customerFactsBaseUrl, UriKind.Absolute, out Uri? customerFactsAddress))
+{
+    builder.Services.AddHttpClient<ICustomerEligibilityFactsSource, RemoteCustomerEligibilityFactsSource>(client =>
+    {
+        client.BaseAddress = customerFactsAddress;
+        client.Timeout = TimeSpan.FromSeconds(2);
+    }).AddHttpMessageHandler<WorkloadBearerTokenHandler>();
+}
+else
+{
+    builder.Services.AddSingleton<ICustomerEligibilityFactsSource, UnconfiguredCustomerEligibilityFactsSource>();
+}
+
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<LocalEntitlementStore>();
@@ -61,7 +80,6 @@ if (builder.Environment.IsDevelopment())
 }
 else
 {
-    RegisterWorkloadIdentity(builder.Services, builder.Configuration);
     builder.Services.AddHttpClient<IEntitlementSnapshotProvider, IdentityEntitlementSnapshotProvider>(client =>
     {
         string? baseUrl = builder.Configuration["IdentityAccess:BaseUrl"];
@@ -137,6 +155,9 @@ if (useRelationalStore)
     builder.Services.AddScoped<IOrganisationLifecycleService, OrganisationLifecycleService>();
     builder.Services.AddScoped<IBusinessCalendarService, BusinessCalendarService>();
     builder.Services.AddScoped<ISavingsProductConfigurationService, SavingsProductConfigurationService>();
+    builder.Services.AddScoped<IBranchReferenceSource, BranchReferenceSource>();
+    builder.Services.AddScoped<ICurrencyReferenceSource, CurrencyReferenceSource>();
+    builder.Services.AddScoped<AuthoritativeEligibilityFactsResolver>();
     builder.Services.AddScoped<ISavingsEligibilityEvaluationService, SavingsEligibilityEvaluationService>();
 }
 

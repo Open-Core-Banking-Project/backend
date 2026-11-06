@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Messaging;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
@@ -102,24 +103,20 @@ public sealed class SavingsProductConfigurationServiceTests
         AmbientTenantContext tenantContext = new();
         tenantContext.Establish(InstitutionId.From("institution-trusted"));
         await using CoreLedgerDbContext context = CreateContext(tenantContext);
-        SavingsEligibilityEvaluationService service = new(context, tenantContext);
+        SavingsEligibilityEvaluationService service = new(
+            context,
+            tenantContext,
+            new AuthoritativeEligibilityFactsResolver(
+                new RejectingCustomerFactsSource(),
+                new MissingBranchReferenceSource(),
+                new MissingCurrencyReferenceSource()));
         DateTimeOffset evaluatedAt = new(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
         EvaluateSavingsEligibilityCommand command = new(
             InstitutionId.From("institution-untrusted"),
             "SAVINGS-001",
-            new AuthoritativeProductEligibilityFacts(
-                "customer-v1",
-                "branch-v1",
-                "currency-v1",
-                evaluatedAt.AddMinutes(1),
-                "INDIVIDUAL",
-                "KYC-2",
-                "RETAIL",
-                "LOW",
-                30,
-                "LAGOS-001",
-                "NG",
-                "NGN"),
+            "customer-1",
+            "branch-1",
+            "NGN",
             evaluatedAt);
 
         SavingsEligibilityEvaluationRejectedException exception = await Assert.ThrowsAsync<SavingsEligibilityEvaluationRejectedException>(
@@ -154,6 +151,34 @@ public sealed class SavingsProductConfigurationServiceTests
             () => service.CreateDraftAsync(command, CancellationToken.None));
 
         Assert.Equal("cross_tenant_access_denied", exception.Code);
+    }
+
+    private sealed class RejectingCustomerFactsSource : ICustomerEligibilityFactsSource
+    {
+        public Task<CustomerFactsLookup> GetAsync(
+            InstitutionId institutionId,
+            string customerId,
+            DateTimeOffset asOf,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(CustomerFactsLookup.Rejected("eligibility_facts_unavailable"));
+    }
+
+    private sealed class MissingBranchReferenceSource : IBranchReferenceSource
+    {
+        public Task<BranchReferenceSnapshot?> FindAsync(
+            InstitutionId institutionId,
+            string branchId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<BranchReferenceSnapshot?>(null);
+    }
+
+    private sealed class MissingCurrencyReferenceSource : ICurrencyReferenceSource
+    {
+        public Task<CurrencyReferenceSnapshot?> GetAsync(
+            InstitutionId institutionId,
+            DateTimeOffset asOf,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<CurrencyReferenceSnapshot?>(null);
     }
 
     private static ProductEligibilityRules Rules() => ProductEligibilityRules.Create(

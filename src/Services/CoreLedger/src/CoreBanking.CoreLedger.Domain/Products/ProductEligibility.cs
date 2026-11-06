@@ -323,7 +323,7 @@ public sealed record AuthoritativeProductEligibilityFacts(
     string RiskRating,
     int AgeYears,
     string BranchCode,
-    string ResidencyCountryCode,
+    string? ResidencyCountryCode,
     string CurrencyCode);
 
 public sealed record FinalEligibilityDecision(
@@ -352,6 +352,16 @@ public static class ProductEligibilityApprovalPolicy
                 facts.CurrencyReferenceVersion, [], "eligibility_facts_stale");
         }
 
+        // Residency is not stored by the owning service, so a rule set that needs it cannot be
+        // evaluated. Publication already refuses such rules; this is the second, fail-closed guard.
+        // Decision: P1-E04-D17.
+        if (!rules.ResidencyCountries.AllowsAny && facts.ResidencyCountryCode is null)
+        {
+            return new FinalEligibilityDecision(
+                false, true, facts.CustomerFactsVersion, facts.BranchReferenceVersion,
+                facts.CurrencyReferenceVersion, [], "residency_fact_unavailable");
+        }
+
         EligibilityRuleTrace[] trace = ProductEligibilityEvaluator.Evaluate(
             rules,
             facts.CustomerType,
@@ -360,7 +370,7 @@ public static class ProductEligibilityApprovalPolicy
             facts.RiskRating,
             facts.AgeYears,
             facts.BranchCode,
-            facts.ResidencyCountryCode,
+            facts.ResidencyCountryCode ?? string.Empty,
             facts.CurrencyCode);
         bool eligible = trace.All(x => x.Passed);
         return new FinalEligibilityDecision(
@@ -380,7 +390,6 @@ public static class ProductEligibilityApprovalPolicy
         ArgumentException.ThrowIfNullOrWhiteSpace(facts.RiskRating);
         ArgumentOutOfRangeException.ThrowIfNegative(facts.AgeYears);
         ArgumentException.ThrowIfNullOrWhiteSpace(facts.BranchCode);
-        ArgumentException.ThrowIfNullOrWhiteSpace(facts.ResidencyCountryCode);
         ArgumentException.ThrowIfNullOrWhiteSpace(facts.CurrencyCode);
     }
 }
@@ -395,7 +404,7 @@ internal static class ProductEligibilityEvaluator
         string riskRating,
         int ageYears,
         string branchCode,
-        string residencyCountryCode,
+        string? residencyCountryCode,
         string currencyCode) =>
     [
         new("customer_type", customerType, rules.CustomerTypes.Allows(customerType)),
@@ -404,7 +413,7 @@ internal static class ProductEligibilityEvaluator
         new("risk_rating", riskRating, rules.RiskRatings.Allows(riskRating)),
         new("age_years", ageYears.ToString(System.Globalization.CultureInfo.InvariantCulture), rules.Ages.Allows(ageYears)),
         new("branch", branchCode, rules.Branches.Allows(branchCode)),
-        new("residency_country", residencyCountryCode, rules.ResidencyCountries.Allows(residencyCountryCode)),
+        new("residency_country", residencyCountryCode ?? string.Empty, rules.ResidencyCountries.Allows(residencyCountryCode ?? string.Empty)),
         new("currency", currencyCode, rules.Currencies.Allows(currencyCode)),
     ];
 }

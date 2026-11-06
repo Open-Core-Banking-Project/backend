@@ -203,7 +203,7 @@ Owning service: Core Banking and Ledger · document status `Approved` · 4 imple
 | 3 | Implement product identity/version lifecycle and typed rule persistence with migration tests. | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-21 |
 | 4 | Implement deterministic rule evaluation and simulation with boundary/golden tests and content hashing. | ✔ implemented (claim) | pending | P1-E04-D03, P1-E04-D04, P1-E04-D05 | Epic doc progress note 2026-10-21 |
 | 5 | Integrate product approval/publication with Workflow using exact version/hash and outbox events. | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-21 |
-| 6 | Build customer/branch/classification reference consumers and freshness handling. | ◐ in progress | pending | — | Internal eligibility boundary resolves published version and authorit… |
+| 6 | Build customer/branch/classification reference consumers and freshness handling. | ◐ in progress | pending | — | Customer-facts route with service auth and a 60-second ceiling; branch and currency reference sources; fail-closed resolver; residency refused; institution.currencies publisher remains |
 | 7 | Implement account application and eligibility snapshots with negative scope tests. | · not started | — | P1-E04-D07 | — |
 | 8 | Implement atomic account-number reservation, account creation and retry/concurrency tests. | · not started | — | P1-E04-D06 | — |
 | 9 | Implement approval/activation and ledger-initialization handoff, proving no opening balance/posting. | · not started | — | P1-E04-D09 | — |
@@ -645,6 +645,9 @@ Every decision the epic documents still require, with its owner and the slice it
 | 2026-11-06 | Formatting gate | `dotnet format --verify-no-changes` | Pass, no changes required |
 | 2026-11-06 | Migration drift (IdentityAccess, CoreLedger, OperationsWorkflow) | `scripts/migrations-verify.ps1 -Configuration Release -NoBuild` | Consistent model snapshot in all three contexts |
 | 2026-11-06 | Non-database suites | `dotnet test --filter "Category!=Database&Category!=Integration"` Release | Pass: 198 Identity, 107 Core Ledger, 146 Customer Onboarding, 26 Workflow, 15 Architecture and the smaller suites |
+| 2026-11-06 | P1-E04 slice 6 reference consumers | `dotnet test` Core Ledger and Customer Onboarding unit suites | 122 Core Ledger and 169 Customer Onboarding tests pass; stale, window, mismatch, branch, currency, residency, tamper and service-authorisation cases verified |
+| 2026-11-06 | Slice 6 build, format and drift | Release solution build, `dotnet format --verify-no-changes`, `scripts/migrations-verify.ps1` Core Ledger and Customer Onboarding | Build 0 warnings/0 errors; formatting clean; both model snapshots consistent |
+| 2026-11-06 | Full non-database suite after slice 6 | `dotnet test --filter "Category!=Database&Category!=Integration"` Release | Pass: 198 Identity, 169 Customer Onboarding, 122 Core Ledger, 26 Workflow, 15 Architecture and the smaller suites |
 
 ## Maintenance
 

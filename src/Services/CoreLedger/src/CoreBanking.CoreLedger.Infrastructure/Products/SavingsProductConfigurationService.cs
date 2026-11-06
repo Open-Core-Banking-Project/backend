@@ -370,7 +370,15 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
             throw Reject("product_content_integrity_failed", "The stored product content does not match its recorded hash.");
         try
         {
-            ProductEligibilityRules.FromConfigurationContent(storedContent);
+            ProductEligibilityRules rules = ProductEligibilityRules.FromConfigurationContent(storedContent);
+            // The platform cannot resolve residency, so a rule that needs it must never be published.
+            // Decision: P1-E04-D17.
+            if (!rules.ResidencyCountries.AllowsAny)
+            {
+                throw new SavingsProductConfigurationRejectedException(
+                    "eligibility_criterion_unavailable",
+                    "The approved rules require a residency fact the platform cannot resolve.");
+            }
         }
         catch (ArgumentException exception)
         {

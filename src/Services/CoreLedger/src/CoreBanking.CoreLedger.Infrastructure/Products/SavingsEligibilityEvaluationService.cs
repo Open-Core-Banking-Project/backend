@@ -17,13 +17,16 @@ public sealed class SavingsEligibilityEvaluationService : ISavingsEligibilityEva
 
     private readonly CoreLedgerDbContext _context;
     private readonly ITenantContext _tenantContext;
+    private readonly AuthoritativeEligibilityFactsResolver _factsResolver;
 
     public SavingsEligibilityEvaluationService(
         CoreLedgerDbContext context,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        AuthoritativeEligibilityFactsResolver factsResolver)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
+        _factsResolver = factsResolver ?? throw new ArgumentNullException(nameof(factsResolver));
     }
 
     public async Task<SavingsEligibilityEvaluationResult> EvaluateAsync(
@@ -32,7 +35,8 @@ public sealed class SavingsEligibilityEvaluationService : ISavingsEligibilityEva
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(command.InstitutionId);
-        ArgumentNullException.ThrowIfNull(command.Facts);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.CustomerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.CurrencyCode);
         if (_tenantContext.CurrentInstitution != command.InstitutionId)
             throw Reject("cross_tenant_access_denied", "The authenticated institution does not match the eligibility target.");
 
@@ -83,9 +87,23 @@ public sealed class SavingsEligibilityEvaluationService : ISavingsEligibilityEva
                 "product_rule_invalid", "The effective Savings eligibility rules are invalid.", exception);
         }
 
+        ResolvedEligibilityFacts facts = await _factsResolver
+            .ResolveAsync(
+                command.InstitutionId,
+                command.CustomerId,
+                command.BranchId,
+                command.CurrencyCode,
+                command.EvaluatedAt,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (facts.Facts is null)
+            throw Reject(
+                facts.RejectionCode ?? "eligibility_facts_unavailable",
+                "The authoritative customer, branch or currency facts are unavailable.");
+
         FinalEligibilityDecision decision = ProductEligibilityApprovalPolicy.RecheckForFinalApproval(
             rules,
-            command.Facts,
+            facts.Facts,
             command.EvaluatedAt);
         return new SavingsEligibilityEvaluationResult(
             command.InstitutionId.Value,
