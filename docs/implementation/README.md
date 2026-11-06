@@ -127,6 +127,8 @@ Before implementation, a coding agent must:
 
 Agents must not infer accounting rules, provider semantics, permission grants, regulatory policy, or production targets from examples.
 
+For recurring implementation, follow [`AUTOMATION.md`](AUTOMATION.md) and use `scripts/implementation-status.ps1` to select the next candidate. The controller is advisory: the agent must still verify dependencies, decisions, repository state and evidence before editing. Automation never grants itself approval or verification authority.
+
 ## Phase overview expectations
 
 A phase overview defines:
