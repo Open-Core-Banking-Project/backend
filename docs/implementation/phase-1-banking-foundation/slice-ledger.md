@@ -68,9 +68,11 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 
 The controller now advances past the account-opening slices. `P1-E04-S6` closed on the approved `P1-E04-D17`
 contracts, `P1-E02-S5` on the approved `P1-E02-D07` floors and `P1-E04-S14` on the operational evidence it added
-without a new decision. Slices 7 to 13 await product policy decisions
-(`P1-E04-D06`, `D07`, `D09`, `D10`, `D11`, `D12`, `D13`, `D15`), so the next candidate without a decision blocker is
-`P1-E04-S15` (security, performance, backup/restore and Phase 1 end-to-end evidence).
+without a new decision. Slices 7 to 13 still await product policy decisions (`P1-E04-D06`, `D07`, `D09`, `D10`, `D11`,
+`D12`, `D13`, `D15`), but every one of those decisions now has a ready-for-review brief under
+[`decisions/`](decisions) with a recommended position, the current implementation state and a sign-off table. The next
+candidate without a decision blocker remains `P1-E04-S15` (security, performance, backup/restore and Phase 1
+end-to-end evidence), which needs the live stack.
 
 ## Human gates before the loop can advance
 

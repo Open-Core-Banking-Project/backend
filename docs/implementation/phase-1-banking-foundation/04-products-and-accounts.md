@@ -642,16 +642,16 @@ Performance tests use approved product/account volumes and contention profiles. 
 | Decimal precision, rate scale and rounding points | Financial correctness | Finance/Product | Slice 4 | Open |
 | Interest/day-count/accrual/capitalisation rules | Simulation and later EOD | Finance/Product | Slice 4 | Open |
 | Fee/tax definitions and legal approval | Pricing correctness | Finance/Tax/Compliance | Slice 4 | Open |
-| Account-number format, scope, check digit and exhaustion | Allocation and migration | Institution/Core operations | Slice 8 | Open |
-| Multiple-account-per-product/customer rules | Duplicate opening behaviour | Product/Risk | Slice 7 | Open |
+| Account-number format, scope, check digit and exhaustion | Allocation and migration | Institution/Core operations | Slice 8 | Open - [brief](decisions/P1-E04-D06-account-number-scheme.md) drafted 2026-11-06 with recommended positions awaiting sign-off |
+| Multiple-account-per-product/customer rules | Duplicate opening behaviour | Product/Risk | Slice 7 | Open - [brief](decisions/P1-E04-D07-multiple-account-rules.md) drafted 2026-11-06 with recommended positions awaiting sign-off |
 | Eligibility freshness/final recheck point | Race and customer-state risk | Product/Compliance | Slice 7 | Recheck current authoritative facts at final approval per ADR-0015 |
-| Account approval/activation sequence | Number exposure and workflow | Operations/Product | Slice 9 | Open |
-| Restriction/freeze/block precedence | Ledger allow/deny outcome | Legal/Risk/Core | Slice 10 | Open |
-| Lien priority, partial use and release authority | Available balance/legal control | Legal/Finance/Core | Slice 11 | Open |
-| Dormancy qualifying activity and business-date policy | Status correctness | Compliance/Product | Slice 12 | Open |
-| Closure prerequisites and permitted post-close events | Financial/legal safety | Finance/Operations | Slice 12 | Open |
+| Account approval/activation sequence | Number exposure and workflow | Operations/Product | Slice 9 | Open - [brief](decisions/P1-E04-D09-account-approval-activation-sequence.md) drafted 2026-11-06 with recommended positions awaiting sign-off |
+| Restriction/freeze/block precedence | Ledger allow/deny outcome | Legal/Risk/Core | Slice 10 | Open - [brief](decisions/P1-E04-D10-control-precedence.md) drafted 2026-11-06 with recommended positions awaiting sign-off |
+| Lien priority, partial use and release authority | Available balance/legal control | Legal/Finance/Core | Slice 11 | Open - [brief](decisions/P1-E04-D11-lien-priority-and-release.md) drafted 2026-11-06 with recommended positions awaiting sign-off |
+| Dormancy qualifying activity and business-date policy | Status correctness | Compliance/Product | Slice 12 | Open - [brief](decisions/P1-E04-D12-dormancy-and-business-date.md) drafted 2026-11-06 with recommended positions awaiting sign-off |
+| Closure prerequisites and permitted post-close events | Financial/legal safety | Finance/Operations | Slice 12 | Open - [brief](decisions/P1-E04-D13-closure-prerequisites.md) drafted 2026-11-06 with recommended positions awaiting sign-off |
 | Existing-account product migration policy | Customer terms and version binding | Product/Legal | Before migration feature |
-| Statement periods, formats, retention and delivery | US-023 and document integration | Product/Compliance | Slice 13 | Open |
+| Statement periods, formats, retention and delivery | US-023 and document integration | Product/Compliance | Slice 13 | Open - [brief](decisions/P1-E04-D15-statement-periods-and-retention.md) drafted 2026-11-06 with recommended positions awaiting sign-off |
 | Capacity, latency, RTO and RPO targets | Test/release gates | Product/Platform | Before release testing | Open |
 | Authoritative customer, branch and currency fact transport contracts | Decision trust boundary and contract shape | Architecture/Product/Security | Slice 6 | Approved 2026-11-06 for a service-authenticated internal customer-facts read with events as invalidation hints only, caller-supplied facts excluded from authoritative decisions, a 60-second validity ceiling with fail-closed staleness, residency criteria refused until the fact is stored, and a new `institution.currencies` configuration area; [brief](decisions/P1-E04-D17-reference-fact-transport-contracts.md) |
 
