@@ -1,4 +1,4 @@
-﻿---
+---
 phase: "Phase 1 - Banking Foundation"
 epic: "Identity, Roles and Permissions"
 owning_service: "Identity and Access"
@@ -26,7 +26,7 @@ dependencies:
   - Phase 0 - Observability and CI
   - Phase 1 - Institution and Tenancy
 adrs: [ADR-0008, ADR-0009]
-last_updated: 2026-11-02
+last_updated: 2026-11-06
 ---
 
 # Epic: Identity, Roles and Permissions
@@ -611,6 +611,8 @@ Backups are encrypted and restored in exercises. Restore verification must prove
 | Authentication rate limits | Platform/institution security | No | Per channel/actor/network safe dimensions | Dynamic within approved bounds |
 | Security-event/SIEM destination | Platform security | Credential ref only | Connectivity, redaction and durability | Controlled |
 
+Password, failed-attempt/lockout and MFA floors are approved platform constants in [P1-E02-D07](decisions/P1-E02-D07-platform-security-floors.md); institution policy may only strengthen them, and a weakening value is rejected.
+
 All security-affecting configuration is versioned, approved, effective-dated and audited. A missing or invalid security configuration fails closed; it does not fall back to permissive defaults.
 
 ## 16. Implementation slices
@@ -623,7 +625,7 @@ Implementation progress as of 2026-10-26: Slice 1 is complete as an architecture
 2. Promote Phase 0 actor, tenant, permission, scope, decision and entitlement contracts to versioned production contracts with compatibility tests.
 3. Implement identity, membership and provider-link lifecycle with institution provisioning events and cross-tenant tests.
 4. Implement authentication-policy versions and the approved provider adapter using synthetic/non-production credentials. **Complete:** effective-dated, immutable policy metadata is tenant-scoped and does not invent the still-open password/MFA/lockout floors. The Keycloak adapter refuses direct platform credential grants, while Development registers a separately configured synthetic fixture adapter that returns only a provider subject. No production enrolment, policy administration, session, lockout or MFA flow is enabled by this slice.
-5. Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence. **In progress:** local session lifecycle state fails closed on idempotent self-revocation, persists only a provider-session fingerprint, emits durable revocation work, and records append-only authentication evidence. On 2026-11-01, provider-confirmed refreshes began recording successful evidence and the `Refreshed` lifecycle state; a mismatched provider session reference now atomically marks the local session `Compromised`, records failed reuse-detection evidence, and queues provider revocation work carrying no provider reference or token. The focused database suite proves both paths together with optimistic session concurrency. Security locks remain tenant-scoped evidence records. Platform security floors in P1-E02-D07 and the real Keycloak refresh/revocation integration remain human/provider gates and are not invented here.
+5. Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence. **Implemented pending review:** local session lifecycle state fails closed on idempotent self-revocation, persists only a provider-session fingerprint, emits durable revocation work, and records append-only authentication evidence. On 2026-11-01, provider-confirmed refreshes began recording successful evidence and the `Refreshed` lifecycle state; a mismatched provider session reference now atomically marks the local session `Compromised`, records failed reuse-detection evidence, and queues provider revocation work carrying no provider reference or token. The focused database suite proves both paths together with optimistic session concurrency. Security locks remain tenant-scoped evidence records. Platform security floors were approved in [P1-E02-D07](decisions/P1-E02-D07-platform-security-floors.md) on 2026-11-06; the real Keycloak refresh/revocation integration and applying the approved realm policy remain production gates and are not invented here.
 6. Implement MFA enrolment/challenges and step-up evidence for one approved customer channel and one staff/privileged flow.
     *Status: in progress — TOTP enrolment, provider-verified challenges and purpose, session and device-bound step-up evidence are implemented (2026-10-28) for the Identity and Access privileged operations. The provider boundary fails closed when unconfigured. On 2026-11-01 the evidence-consumption path became an atomic conditional database update, so concurrent protected operations cannot both use the same evidence across API replicas. Enrolment start and verified/rejected step-up outcomes append privacy-minimised authentication events containing only the stable factor kind or failure code. Self-revocation is now step-up protected, idempotent and actor scoped; it invalidates unused evidence in the same transaction, records one of three bounded reason codes, and permits a clean re-enrolment. Migration `20261101130009` adds explicit invalidation time/reason columns and database checks. Reconciliation excludes intentionally invalidated evidence from stale-evidence alerts. The complete Identity database/integration suite has 95 passing tests. The customer channel journey, passkey and push providers, and the named production sign-offs remain open.*
 7. Implement permission catalogue plus role draft, simulation, approval and publication lifecycle.
@@ -741,7 +743,7 @@ Performance and abuse tests must use approved production-load and attack-rate pr
 | Service-to-service authentication mechanism | Workload identity, rotation and platform dependency | Security/Platform | Slice 1 | Client credentials and audience-scoped service permissions approved by ADR-0008 |
 | Entitlement distribution/read-model strategy | Latency, availability and consistency | Architecture/Security | Slice 1 | Versioned snapshot call, consumer projection/cache and durable invalidation event approved by ADR-0009 |
 | Maximum entitlement/revocation propagation window | Residual access risk and cache settings | Security/Risk | Slice 1 | Default 60 seconds, hard maximum five minutes; privileged/financial paths require fresh source resolution |
-| Platform security floors for passwords, lockout and MFA | Institution configurability boundary | Security | Slice 4 | Open; [decision brief](decisions/P1-E02-D07-platform-security-floors.md) |
+| Platform security floors for passwords, lockout and MFA | Institution configurability boundary | Security | Slice 4 | Approved 2026-11-06 for 12/15 minimum lengths, breached-password screening, history 5, no periodic rotation, 5 failures per 15 minutes with a 15-minute lock, privileged MFA with 5-minute single-use step-up and 24/1-hour recovery delays, strengthen-only institution policy; [brief](decisions/P1-E02-D07-platform-security-floors.md) |
 | Approved MFA and recovery methods per actor/channel | Provider dependency and assurance | Security/Product | Slice 6 | Approved 2026-10-28: passkeys first, TOTP available now, SMS OTP for low-risk customer actions only, push for approvers, five-minute single-use step-up evidence; named production sign-offs pending |
 | Initial system permission catalogue and role templates | Launch operations and least privilege | Domain owners/Security | Slice 7 | Approved 2026-10-28: the 32 identifiers already enforced in code plus 13 inert role templates; named confirmations pending |
 | Role/grant approval thresholds and conflicts | Segregation of duties | Security/Operations | Slice 7 | Approved 2026-10-28: capability-class approval, eight seeded conflict pairs, no invented monetary thresholds; named confirmations pending |
@@ -751,7 +753,7 @@ Performance and abuse tests must use approved production-load and attack-rate pr
 | Authentication/security evidence retention | Storage, investigation and regulation | Security/Compliance | Before migration approval | Open |
 | Authentication and authorisation SLOs/load profile | Capacity and release gates | Product/Platform | Before performance test | Open |
 
-Decision briefs: [`P1-E02-D08` approved MFA and recovery methods](decisions/P1-E02-D08-mfa-and-recovery-methods.md), [`P1-E02-D09` permission catalogue and role templates](decisions/P1-E02-D09-permission-catalogue-and-role-templates.md), [`P1-E02-D10` approval thresholds and conflict rules](decisions/P1-E02-D10-role-and-grant-approval-thresholds-and-conflicts.md), [`P1-E02-D11` trusted devices](decisions/P1-E02-D11-trusted-device-protocol-and-trust-duration.md), [`P1-E02-D12` payload envelopes](decisions/P1-E02-D12-payload-envelope-format-algorithms-and-replay-policy.md), [`P1-E02-D13` key-operation boundary](decisions/P1-E02-D13-kms-hsm-product-and-key-operation-boundary.md).
+Decision briefs: [`P1-E02-D07` platform security floors](decisions/P1-E02-D07-platform-security-floors.md), [`P1-E02-D08` approved MFA and recovery methods](decisions/P1-E02-D08-mfa-and-recovery-methods.md), [`P1-E02-D09` permission catalogue and role templates](decisions/P1-E02-D09-permission-catalogue-and-role-templates.md), [`P1-E02-D10` approval thresholds and conflict rules](decisions/P1-E02-D10-role-and-grant-approval-thresholds-and-conflicts.md), [`P1-E02-D11` trusted devices](decisions/P1-E02-D11-trusted-device-protocol-and-trust-duration.md), [`P1-E02-D12` payload envelopes](decisions/P1-E02-D12-payload-envelope-format-algorithms-and-replay-policy.md), [`P1-E02-D13` key-operation boundary](decisions/P1-E02-D13-kms-hsm-product-and-key-operation-boundary.md).
 
 ## 21. Prohibited assumptions
 

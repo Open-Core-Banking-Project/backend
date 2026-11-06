@@ -48,6 +48,38 @@ scoped administrative service account after the corresponding Identity and Acces
 commits. That adapter, retry/reconciliation behavior and credential custody are a separate rollout
 step; manually maintained attributes are development-only.
 
+## Approved platform security floors (P1-E02-D07)
+
+[P1-E02-D07](../implementation/phase-1-banking-foundation/decisions/P1-E02-D07-platform-security-floors.md)
+fixes the weakest authentication controls the platform accepts. The realm must produce these outcomes; an
+institution may strengthen them, never weaken them. The reviewed realm export is the evidence and must contain no
+credential material.
+
+| Area | Approved outcome the realm must deliver |
+| --- | --- |
+| Password length | Minimum 12 for customer, corporate-user and partner identities; 15 for staff, agent, administrator and approver identities; 128 characters accepted without truncation |
+| Password composition | No composition-class rules. Breached and common passwords are refused through the approved screening integration |
+| Password history | The previous 5 passwords cannot be reused |
+| Password lifetime | No periodic expiry. Reset and temporary passwords expire after 24 hours, are single use and must be changed at first use |
+| Failed attempts | 5 consecutive failures in a rolling 15-minute window lock the password credential for 15 minutes |
+| Retry delay | The wait before a retry starts at 1 second, doubles per failure and never exceeds 30 seconds |
+| Unlock | Automatic at the end of the window, or by a security operator holding the lock-release permission with a recorded reason. No self-service unlock |
+| Enumeration and lockout abuse | Unknown usernames are never locked and receive the same response and timing as known ones. The lock binds the password credential only, so a registered passkey or approved second factor still authenticates |
+| Network limits | 20 attempts per minute and 100 per hour per source |
+| MFA | Required before activation for staff, administrator, agent, approver and corporate-administrator identities. Prohibited: SMS OTP for those identities, email OTP as sole factor, knowledge-based questions, voice OTP and password-only privileged access |
+| Step-up | Five minutes, single use, purpose-bound. Every operation already declared with `RequiresStepUp` remains a floor |
+| Recovery | Factor replacement waits 24 hours for privileged identities with a second approver and one hour for customers; recovery invalidates sessions, unused step-up evidence and device trust |
+
+Configure these through Keycloak's password policy, brute-force detection, required actions and authentication
+flows. The realm-policy review must demonstrate each outcome against the deployed provider version and record any
+gap where the provider cannot express it, with the compensating gateway or extension control. Do not copy
+development or provider-sample defaults into the realm: a missing or invalid setting fails closed, it never falls
+back to a permissive default.
+
+Production evidence for this section: the reviewed realm/client export, synthetic negative tests for spraying,
+stuffing, enumeration, lockout abuse, expired reset, missing MFA and step-up bypass, and dashboard and alert
+evidence with the runbook response path.
+
 ## API configuration
 
 Use environment variables or an approved secret/configuration provider:
