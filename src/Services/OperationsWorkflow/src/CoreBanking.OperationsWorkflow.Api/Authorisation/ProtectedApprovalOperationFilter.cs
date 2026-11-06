@@ -38,7 +38,16 @@ public sealed partial class ProtectedApprovalOperationFilter : IEndpointFilter
 
         try
         {
-            if (actor is not null) tenantContext.Establish(actor.InstitutionId);
+            if (actor is not null)
+            {
+                tenantContext.Establish(actor.InstitutionId);
+                if (actor.EntitlementVersion > 0
+                    && services.GetService<RefreshingEntitlementStore>() is { } projection)
+                {
+                    await projection.RefreshAsync(
+                        actor.Id, actor.InstitutionId, actor.EntitlementVersion, http.RequestAborted);
+                }
+            }
             string? institutionValue = http.Request.RouteValues["institutionId"]?.ToString();
             ResourceScope scope = string.IsNullOrWhiteSpace(institutionValue)
                 ? ResourceScope.None

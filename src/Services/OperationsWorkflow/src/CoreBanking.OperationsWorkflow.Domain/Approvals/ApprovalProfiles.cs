@@ -54,8 +54,15 @@ public static class ApprovalProfiles
         "customer.merge.request",
         "customer.merge.approve");
 
+    public static ApprovalProfile IdentityRolePublication { get; } = Create(
+        "identity.role.publish.v1",
+        "identity-role-publication-v1",
+        "identity-access",
+        "identity.role.version",
+        "identity.permission.assign");
+
     public static IReadOnlyList<ApprovalProfile> All { get; } =
-        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge];
+        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge, IdentityRolePublication];
 
     /// <summary>The source services that may submit a request, derived from the approved profiles.</summary>
     public static IReadOnlyList<string> SourceServices { get; } =

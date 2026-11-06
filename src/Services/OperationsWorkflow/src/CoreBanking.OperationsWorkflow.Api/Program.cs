@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
+using CoreBanking.BuildingBlocks.Infrastructure.Security;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.OperationsWorkflow.Api.Authorisation;
 using CoreBanking.OperationsWorkflow.Application.Approvals;
@@ -28,13 +29,65 @@ if (builder.Environment.IsDevelopment())
     builder.Services.AddSingleton<IEffectivePermissionSource>(provider => provider.GetRequiredService<LocalEntitlementStore>());
     builder.Services.AddSingleton<IEntitlementVersionSource>(provider => provider.GetRequiredService<LocalEntitlementStore>());
     builder.Services.AddSingleton<IActorContextResolver, DevelopmentActorContextResolver>();
+    builder.Services.AddSingleton<IApprovalEligibilityVerifier, DevelopmentApprovalEligibilityVerifier>();
 }
 else
 {
-    builder.Services.AddSingleton<EmptyEntitlementStore>();
-    builder.Services.AddSingleton<IEffectivePermissionSource>(provider => provider.GetRequiredService<EmptyEntitlementStore>());
-    builder.Services.AddSingleton<IEntitlementVersionSource>(provider => provider.GetRequiredService<EmptyEntitlementStore>());
+    RegisterWorkloadIdentity(builder.Services, builder.Configuration);
+    builder.Services.AddHttpClient<IEntitlementSnapshotProvider, IdentityEntitlementSnapshotProvider>(client =>
+    {
+        string? baseUrl = builder.Configuration["IdentityAccess:BaseUrl"];
+        if (Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? address)) client.BaseAddress = address;
+        client.Timeout = TimeSpan.FromSeconds(5);
+    }).AddHttpMessageHandler<WorkloadBearerTokenHandler>();
+    builder.Services.AddScoped<RefreshingEntitlementStore>();
+    builder.Services.AddScoped<IEffectivePermissionSource>(provider => provider.GetRequiredService<RefreshingEntitlementStore>());
+    builder.Services.AddScoped<IEntitlementVersionSource>(provider => provider.GetRequiredService<RefreshingEntitlementStore>());
     builder.Services.AddSingleton<IActorContextResolver, UnconfiguredActorContextResolver>();
+    builder.Services.AddHttpClient<IApprovalEligibilityVerifier, IdentityApprovalEligibilityVerifier>(client =>
+    {
+        string? baseUrl = builder.Configuration["IdentityAccess:BaseUrl"];
+        if (Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? address)) client.BaseAddress = address;
+        client.Timeout = TimeSpan.FromSeconds(5);
+    }).AddHttpMessageHandler<WorkloadBearerTokenHandler>();
+}
+
+static void RegisterWorkloadIdentity(IServiceCollection services, IConfiguration configuration)
+{
+    IConfigurationSection section = configuration.GetSection(ClientCredentialsTokenOptions.SectionName);
+    string? endpointValue = section["TokenEndpoint"]?.Trim();
+    string? clientId = section["ClientId"]?.Trim();
+    string? secretReference = section["ClientSecretReference"]?.Trim();
+    bool anyConfigured = !string.IsNullOrWhiteSpace(endpointValue)
+        || !string.IsNullOrWhiteSpace(clientId)
+        || !string.IsNullOrWhiteSpace(secretReference);
+
+    services.AddTransient<WorkloadBearerTokenHandler>();
+    if (!anyConfigured)
+    {
+        services.AddSingleton<IWorkloadAccessTokenSource, UnconfiguredWorkloadAccessTokenSource>();
+        return;
+    }
+
+    if (!Uri.TryCreate(endpointValue, UriKind.Absolute, out Uri? endpoint)
+        || string.IsNullOrWhiteSpace(clientId)
+        || string.IsNullOrWhiteSpace(secretReference))
+    {
+        throw new InvalidOperationException(
+            $"{ClientCredentialsTokenOptions.SectionName} requires TokenEndpoint, ClientId and ClientSecretReference together.");
+    }
+
+    ClientCredentialsTokenOptions options = new()
+    {
+        TokenEndpoint = endpoint,
+        ClientId = clientId,
+        ClientSecretReference = secretReference,
+    };
+    options.Validate();
+    services.AddSingleton(options);
+    services.AddSingleton<ISecretProvider, EnvironmentSecretProvider>();
+    services.AddHttpClient<IWorkloadAccessTokenSource, ClientCredentialsAccessTokenSource>(client =>
+        client.Timeout = TimeSpan.FromSeconds(5));
 }
 
 builder.Services.AddScoped(provider => new AuthorisationPolicy(

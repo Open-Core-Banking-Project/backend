@@ -22,17 +22,20 @@ public sealed class ApprovalWorkflowService : IApprovalWorkflowService
 
     private readonly OperationsWorkflowDbContext _context;
     private readonly IApprovalEntitlementVerifier _entitlements;
+    private readonly IApprovalEligibilityVerifier _eligibility;
     private readonly ITenantContext _tenantContext;
     private readonly TimeProvider _timeProvider;
 
     public ApprovalWorkflowService(
         OperationsWorkflowDbContext context,
         IApprovalEntitlementVerifier entitlements,
+        IApprovalEligibilityVerifier eligibility,
         ITenantContext tenantContext,
         TimeProvider timeProvider)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _entitlements = entitlements ?? throw new ArgumentNullException(nameof(entitlements));
+        _eligibility = eligibility ?? throw new ArgumentNullException(nameof(eligibility));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
@@ -66,6 +69,20 @@ public sealed class ApprovalWorkflowService : IApprovalWorkflowService
         }
 
         DateTimeOffset decidedAt = _timeProvider.GetUtcNow();
+        ApprovalEligibilityVerification eligibility = await _eligibility.VerifyAsync(
+            command.InstitutionId,
+            command.ApproverActorId,
+            CoreBanking.BuildingBlocks.Domain.Identity.ActorId.From(record.MakerActorId),
+            record.RequestId,
+            record.RequiredPermission,
+            cancellationToken).ConfigureAwait(false);
+        if (!eligibility.IsEligible)
+        {
+            throw string.Equals(eligibility.Code, "auth.segregation_of_duties", StringComparison.Ordinal)
+                ? Reject("maker_cannot_approve_own_request", "The maker cannot approve their own request.")
+                : Reject("approval_permission_missing", "Identity and Access refused the approval candidate.");
+        }
+
         EntitlementDecisionEvidence entitlement = await _entitlements.VerifyAsync(
             command.InstitutionId,
             command.ApproverActorId,
@@ -73,6 +90,15 @@ public sealed class ApprovalWorkflowService : IApprovalWorkflowService
             decidedAt,
             cancellationToken).ConfigureAwait(false)
             ?? throw Reject("approval_permission_missing", "Identity and Access could not prove a current approval entitlement.");
+        if (!long.TryParse(
+                entitlement.EntitlementVersion,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out long entitlementVersion)
+            || entitlementVersion != eligibility.EvaluatedEntitlementVersion)
+        {
+            throw Reject("approval_entitlement_stale", "Identity and Access returned inconsistent entitlement versions.");
+        }
 
         // The stored request names its profile; rebuilding with any other profile would enforce the wrong permission.
         ApprovalProfile profile = ApprovalProfiles.Find(record.WorkflowKey)

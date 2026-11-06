@@ -27,13 +27,16 @@ public sealed class ApprovalProfileTests
         Assert.Equal(
             "8af7874ad1e2c63ebcf210a75acd533e12372136f22a38e0f97ad4c321e4cb37",
             ApprovalProfiles.CustomerMerge.DefinitionHash);
+        Assert.Equal(
+            "b2698b7a16fe0e43a8341a5d8311484ce9943f21171cf38b73a697de20e3d3ae",
+            ApprovalProfiles.IdentityRolePublication.DefinitionHash);
     }
 
     [Fact]
     public void The_source_services_are_derived_from_the_catalogue()
     {
-        Assert.Equal(["core-ledger", "customer-onboarding"], ApprovalProfiles.SourceServices.ToArray());
-        Assert.Equal(3, ApprovalProfiles.All.Count);
+        Assert.Equal(["core-ledger", "customer-onboarding", "identity-access"], ApprovalProfiles.SourceServices.ToArray());
+        Assert.Equal(4, ApprovalProfiles.All.Count);
         Assert.Equal(
             ApprovalProfiles.SavingsEligibilityPublication.DefinitionHash,
             SavingsEligibilityPublicationProfile.DefinitionHash);

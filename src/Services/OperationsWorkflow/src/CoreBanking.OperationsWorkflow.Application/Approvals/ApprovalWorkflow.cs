@@ -36,6 +36,23 @@ public interface IApprovalEntitlementVerifier
         CancellationToken cancellationToken);
 }
 
+public sealed record ApprovalEligibilityVerification(bool IsEligible, string Code, long EvaluatedEntitlementVersion);
+
+/// <summary>
+/// Identity-owned decision-time check. Workflow supplies the maker stored on the request and the
+/// candidate resolved from trusted authentication; it never calculates eligibility itself.
+/// </summary>
+public interface IApprovalEligibilityVerifier
+{
+    Task<ApprovalEligibilityVerification> VerifyAsync(
+        InstitutionId institutionId,
+        ActorId candidateActorId,
+        ActorId makerActorId,
+        string sourceRequestId,
+        string requiredPermission,
+        CancellationToken cancellationToken);
+}
+
 public interface IApprovalWorkflowService
 {
     Task<ApprovalDecisionResult> DecideAsync(
