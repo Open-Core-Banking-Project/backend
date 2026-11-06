@@ -39,6 +39,9 @@ public sealed record AuthenticatedActor
 
     public string? DeviceId { get; init; }
 
+    /// <summary>The exact API audience validated from the access token.</summary>
+    public string? Audience { get; init; }
+
     /// <summary>Entitlement version carried by the token, compared with the current version.</summary>
     public required long EntitlementVersion { get; init; }
 

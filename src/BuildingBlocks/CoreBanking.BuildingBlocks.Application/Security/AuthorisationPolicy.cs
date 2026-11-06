@@ -61,7 +61,7 @@ public sealed class AuthorisationPolicy
                 request.Requirement.Permission);
         }
 
-        long currentVersion = _versions.GetCurrentVersion(actor.Id, actor.InstitutionId);
+        long currentVersion = _versions.GetCurrentVersion(actor.Id, actor.InstitutionId, actor.Type);
         if (currentVersion != actor.EntitlementVersion)
         {
             return AuthorisationDecision.Denied(
@@ -70,7 +70,7 @@ public sealed class AuthorisationPolicy
                 request.Requirement.Permission);
         }
 
-        EntitlementSnapshot? snapshot = _permissions.FindSnapshot(actor.Id, actor.InstitutionId);
+        EntitlementSnapshot? snapshot = _permissions.FindSnapshot(actor.Id, actor.InstitutionId, actor.Type);
         if (snapshot is null)
         {
             return AuthorisationDecision.Denied(
