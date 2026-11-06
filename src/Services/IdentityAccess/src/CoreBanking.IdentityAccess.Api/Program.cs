@@ -185,6 +185,7 @@ if (useRelationalStore)
     builder.Services.AddScoped<IStepUpEvidenceSource>(provider => provider.GetRequiredService<MfaService>());
     builder.Services.AddScoped<GrantAdministrationService>();
     builder.Services.AddScoped<RoleAdministrationService>();
+    builder.Services.AddScoped<AccessReviewService>();
     builder.Services.AddScoped<ServiceClientAdministrationService>();
     builder.Services.AddScoped<IServiceClientValidator>(provider => provider.GetRequiredService<ServiceClientAdministrationService>());
     builder.Services.AddScoped<EntitlementReconciliationService>();
@@ -252,9 +253,8 @@ if (app.Environment.IsDevelopment() && useRelationalStore)
     await PayloadKeyBootstrap.EnsureAsync(app.Services, builder.Configuration, app.Logger);
 }
 
-// Entitlement distribution. The actor may read their own snapshot; a stale or regressed answer
-// is a denial, never an empty permission set. A service-authenticated variant for other actors
-// arrives with slice 13.
+// Entitlement distribution. Human actors may read their own snapshot. The internal route permits
+// only a registered service identity carrying the explicit service-only capability.
 app.MapPost("/api/v1/entitlements/snapshot", (
     HttpContext http,
     EntitlementSnapshotRequestV1 request,
@@ -292,6 +292,45 @@ app.MapPost("/api/v1/entitlements/snapshot", (
 .AddEndpointFilter(new ProtectedOperationFilter(
     PermissionRequirement.For(IdentityPermissions.IdentityView),
     "identity.identity.view"));
+
+app.MapPost("/internal/v1/entitlements/snapshot", (
+    HttpContext http,
+    EntitlementSnapshotRequestV1 request,
+    EntitlementDistributionService service) =>
+{
+    if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+    {
+        return Results.Unauthorized();
+    }
+
+    EntitlementDistributionResult result = service.GetSnapshotForService(
+        actor,
+        ActorId.From(request.ActorId),
+        InstitutionId.From(request.InstitutionId),
+        request.MinimumVersion);
+
+    if (!result.IsAllowed)
+    {
+        int status = result.DenialCode == EntitlementDistributionV1.VersionRegressed
+            ? StatusCodes.Status409Conflict
+            : StatusCodes.Status403Forbidden;
+
+        return Results.Problem(
+            detail: "The entitlement snapshot is not available for this service request.",
+            statusCode: status,
+            title: "Entitlement snapshot refused",
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = result.DenialCode });
+    }
+
+    return Results.Ok(result.Snapshot);
+})
+.AddEndpointFilter(new ProtectedOperationFilter(
+    new PermissionRequirement
+    {
+        Permission = IdentityPermissions.ServiceEntitlementsRead,
+        AllowedActorTypes = new HashSet<ActorType> { ActorType.Service },
+    },
+    "service.identity.entitlements_read"));
 
 if (useRelationalStore)
 {
@@ -412,8 +451,10 @@ if (useRelationalStore)
             return Results.Unauthorized();
         }
 
+        string correlationId = http.Items[ProtectedOperationFilter.CorrelationItemKey] as string
+            ?? Guid.NewGuid().ToString("N");
         return Results.Ok(await devices.ListAsync(
-            new ListDevicesQuery(actor, identityId, OtherIdentityRequested: true), cancellationToken));
+            new ListDevicesQuery(actor, identityId, OtherIdentityRequested: true, correlationId), cancellationToken));
     })
     .AddEndpointFilter(new ProtectedOperationFilter(
         PermissionRequirement.For(IdentityPermissions.DeviceView),
@@ -677,6 +718,97 @@ app.MapPost("/api/v1/approvals/eligibility", async (
     PermissionRequirement.For(IdentityPermissions.ApprovalEligibilityReview),
     "identity.approval.eligibility.review"));
 
+// Workflow supplies the maker saved on its request and the candidate resolved from the human
+// request. Identity resolves current human entitlements; the service caller cannot supply grants.
+app.MapPost("/internal/v1/approvals/eligibility", async (
+    HttpContext http,
+    ServiceApprovalEligibilityRequestV1 request,
+    ApprovalEligibilityService service,
+    IEntitlementVersionSource versions,
+    CancellationToken cancellationToken) =>
+{
+    if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor serviceActor)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (string.IsNullOrWhiteSpace(request.InstitutionId)
+        || string.IsNullOrWhiteSpace(request.SourceSystem)
+        || string.IsNullOrWhiteSpace(request.SourceRequestId)
+        || string.IsNullOrWhiteSpace(request.MakerActorId)
+        || string.IsNullOrWhiteSpace(request.CandidateActorId))
+    {
+        return Results.Problem(
+            detail: "Institution, source request, maker and candidate references are required.",
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Invalid service eligibility request",
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.invalid_source_reference" });
+    }
+
+    InstitutionId institutionId = InstitutionId.From(request.InstitutionId);
+    if (serviceActor.InstitutionId != institutionId)
+    {
+        return Results.Problem(
+            detail: "The service institution does not match the approval request.",
+            statusCode: StatusCodes.Status403Forbidden,
+            title: "Service eligibility request refused",
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = ApprovalEligibilityCodeV1.WrongInstitution });
+    }
+
+    PermissionIdentifier permission;
+    try
+    {
+        permission = PermissionIdentifier.Parse(request.RequiredPermission);
+    }
+    catch (ArgumentException)
+    {
+        return Results.Problem(
+            detail: "RequiredPermission must be a stable capability in domain.resource.action form.",
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Invalid service eligibility request",
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "request.invalid_permission" });
+    }
+
+    ActorId candidateId = ActorId.From(request.CandidateActorId);
+    long currentVersion = versions.GetCurrentVersion(candidateId, institutionId, ActorType.Human);
+    AuthenticatedActor candidate = new()
+    {
+        Id = candidateId,
+        Type = ActorType.Human,
+        InstitutionId = institutionId,
+        EntitlementVersion = currentVersion,
+        Strength = AuthenticationStrength.SingleFactor,
+    };
+
+    string correlationId = http.Items[ProtectedOperationFilter.CorrelationItemKey] as string ?? Guid.NewGuid().ToString("N");
+    ApprovalEligibilityResult result = await service.EvaluateAsync(
+        permission,
+        request.MakerActorId,
+        institutionId,
+        candidate,
+        correlationId,
+        cancellationToken);
+
+    return Results.Ok(new ApprovalEligibilityResponseV1
+    {
+        Outcome = result.IsEligible ? ApprovalEligibilityOutcomeV1.Eligible : ApprovalEligibilityOutcomeV1.Ineligible,
+        Code = result.IsEligible ? ApprovalEligibilityCodeV1.Eligible : AuthorisationCodes.For(result.Reason),
+        RequiredPermission = result.Permission,
+        SourceSystem = request.SourceSystem,
+        SourceRequestId = request.SourceRequestId,
+        MakerSeparated = result.MakerSeparated,
+        EvaluatedEntitlementVersion = result.EvaluatedEntitlementVersion,
+        EvaluatedAt = result.EvaluatedAt,
+    });
+})
+.AddEndpointFilter(new ProtectedOperationFilter(
+    new PermissionRequirement
+    {
+        Permission = IdentityPermissions.ServiceApprovalEligibility,
+        AllowedActorTypes = new HashSet<ActorType> { ActorType.Service },
+    },
+    "service.identity.approval_eligibility"));
+
 // The epic 04 reference producer: the record and its outbox row are written in one transaction,
 // and the relay in the worker host publishes the event afterwards. It exists only where the
 // relational store is configured, because the in-memory stand-ins have no durable outbox.
@@ -906,6 +1038,48 @@ if (useRelationalStore)
     .AddEndpointFilter(new ProtectedOperationFilter(
         PermissionRequirement.For(IdentityPermissions.MfaManage),
         "identity.mfa.manage"));
+
+    // Factor revocation is self-scoped and terminal. Fresh step-up is mandatory; revocation also
+    // invalidates every unused evidence row issued by that factor before returning success.
+    app.MapPost("/api/v1/mfa/enrolments/{enrolmentId}/revoke", async (
+        HttpContext http,
+        string enrolmentId,
+        MfaRevocationRequestV1 request,
+        MfaService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+
+        try
+        {
+            return Results.Ok(await service.RevokeAsync(
+                actor.InstitutionId,
+                actor.Id,
+                enrolmentId,
+                request.ReasonCode,
+                cancellationToken));
+        }
+        catch (MfaException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: exception.Code == MfaContractV1.EnrolmentNotFound
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status409Conflict,
+                title: "Factor revocation refused",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = exception.Code });
+        }
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(
+        new PermissionRequirement
+        {
+            Permission = IdentityPermissions.MfaManage,
+            RequiresStepUp = true,
+        },
+        "identity.mfa.revoke"));
 
     // Step-up challenge. Success writes purpose-bound, single-use evidence for five minutes; the
     // protected operation then consumes it exactly once.
@@ -1264,6 +1438,46 @@ if (useRelationalStore)
         },
         "identity.role.create"));
 
+    app.MapPost("/api/v1/roles/{roleId}/submit", async (
+        HttpContext http,
+        string roleId,
+        RoleSubmissionRequestV1 request,
+        RoleAdministrationService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+
+        string correlationId = http.Items[ProtectedOperationFilter.CorrelationItemKey] as string
+            ?? Guid.NewGuid().ToString("N");
+        try
+        {
+            return Results.Ok(await service.SubmitAsync(
+                actor.InstitutionId,
+                actor.Id,
+                roleId,
+                correlationId,
+                cancellationToken));
+        }
+        catch (RoleAdministrationException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Role submission refused",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = exception.Code });
+        }
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(
+        new PermissionRequirement
+        {
+            Permission = IdentityPermissions.IdentityRoleCreate,
+            RequiresStepUp = true,
+        },
+        "identity.role.submit"));
+
     app.MapGet("/api/v1/roles/{roleId}", async (
         HttpContext http,
         string roleId,
@@ -1317,6 +1531,44 @@ if (useRelationalStore)
         },
         "identity.role.create"));
 
+    app.MapGet("/api/v1/access-reviews/identities/{identityId}", async (
+        HttpContext http,
+        string identityId,
+        AccessReviewService service,
+        CancellationToken cancellationToken) =>
+    {
+        if (http.Items[ProtectedOperationFilter.ActorItemKey] is not AuthenticatedActor actor)
+        {
+            return Results.Unauthorized();
+        }
+
+        string correlationId = http.Items[ProtectedOperationFilter.CorrelationItemKey] as string
+            ?? Guid.NewGuid().ToString("N");
+        try
+        {
+            return Results.Ok(await service.ReviewAsync(
+                actor.InstitutionId, actor.Id, identityId, correlationId, cancellationToken));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Results.Problem(
+                detail: exception.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Access review refused",
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["code"] = "identity.access_review_too_large",
+                });
+        }
+    })
+    .AddEndpointFilter(new ProtectedOperationFilter(
+        new PermissionRequirement
+        {
+            Permission = IdentityPermissions.IdentityAccessReview,
+            RequiresStepUp = true,
+        },
+        "identity.access.review"));
+
     // Service client administration. Only opaque credential references are stored; rotation keeps
     // the previous reference with the provider-side overlap, and revocation is explicit.
     app.MapPost("/api/v1/service-clients", async (
@@ -1339,6 +1591,7 @@ if (useRelationalStore)
                 request.Audience,
                 request.CredentialReference,
                 request.CredentialExpiresAt,
+                request.Permissions,
                 cancellationToken));
         }
         catch (ServiceClientAdministrationException exception)

@@ -4,6 +4,7 @@ using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
+using CoreBanking.IdentityAccess.Infrastructure;
 using CoreBanking.IdentityAccess.Infrastructure.Access;
 using CoreBanking.IdentityAccess.Infrastructure.Identity;
 using CoreBanking.IdentityAccess.Infrastructure.Institutions;
@@ -58,8 +59,8 @@ public static partial class Program
         builder.Services.AddScoped<SessionSecurityService>();
         builder.Services.AddSingleton(SessionLifecycleOptions.FromConfiguration(builder.Configuration));
         builder.Services.AddScoped<InstitutionProvisioningConsumer>();
-        builder.Services.AddScoped<IIntegrationEventConsumer>(provider =>
-            provider.GetRequiredService<InstitutionProvisioningConsumer>());
+        builder.Services.AddScoped<RoleApprovalDecidedConsumer>();
+        builder.Services.AddScoped<IIntegrationEventConsumer, IdentityAccessIntegrationEventConsumer>();
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
         builder.Services.AddScoped<GrantAdministrationService>();
@@ -74,8 +75,8 @@ public static partial class Program
         builder.Services.AddSingleton(new KafkaConsumerOptions
         {
             BootstrapServers = bootstrapServers,
-            GroupId = InstitutionProvisioningConsumer.ConsumerName,
-            Topics = [InstitutionProvisioningConsumer.TopicName],
+            GroupId = "identity-access.integration-events",
+            Topics = [InstitutionProvisioningConsumer.TopicName, RoleApprovalDecidedConsumer.TopicName],
         });
 
         builder.Services.AddHostedService<OutboxRelayWorker>();

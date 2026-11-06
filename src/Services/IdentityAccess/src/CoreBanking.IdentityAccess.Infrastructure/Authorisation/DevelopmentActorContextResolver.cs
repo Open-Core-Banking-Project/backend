@@ -71,6 +71,7 @@ public sealed class DevelopmentActorContextResolver : IActorContextResolver
             InstitutionId = InstitutionId.From(claims.InstitutionId),
             SessionId = claims.SessionId,
             DeviceId = claims.DeviceId,
+            Audience = claims.Audience,
             EntitlementVersion = claims.EntitlementVersion,
             Strength = claims.AuthenticationStrength,
         };
@@ -91,6 +92,8 @@ public sealed class DevelopmentActorContextResolver : IActorContextResolver
         public string? SessionId { get; init; }
 
         public string? DeviceId { get; init; }
+
+        public string? Audience { get; init; }
 
         public long EntitlementVersion { get; init; }
 

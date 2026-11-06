@@ -47,6 +47,10 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
 
     public DbSet<RolePermissionRecord> RolePermissions => Set<RolePermissionRecord>();
 
+    public DbSet<RoleVersionRecord> RoleVersions => Set<RoleVersionRecord>();
+
+    public DbSet<RoleVersionPermissionRecord> RoleVersionPermissions => Set<RoleVersionPermissionRecord>();
+
     public DbSet<IdentityRoleRecord> IdentityRoles => Set<IdentityRoleRecord>();
 
     public DbSet<ResourceScopeRecord> ResourceScopes => Set<ResourceScopeRecord>();
@@ -118,6 +122,8 @@ public sealed class IdentityAccessDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<ServiceClientRecord>().HasQueryFilter(client => CurrentInstitutionId != null && client.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<SessionRecord>().HasQueryFilter(session => CurrentInstitutionId != null && session.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<RoleRecord>().HasQueryFilter(role => CurrentInstitutionId != null && role.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<RoleVersionRecord>().HasQueryFilter(role => CurrentInstitutionId != null && role.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<RoleVersionPermissionRecord>().HasQueryFilter(role => CurrentInstitutionId != null && role.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<RolePermissionRecord>().HasQueryFilter(grant => CurrentInstitutionId != null && grant.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<IdentityRoleRecord>().HasQueryFilter(assignment => CurrentInstitutionId != null && assignment.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<ResourceScopeRecord>().HasQueryFilter(scope => CurrentInstitutionId != null && scope.InstitutionId == CurrentInstitutionId);

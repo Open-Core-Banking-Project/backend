@@ -87,7 +87,11 @@ public sealed class EntitlementReconciliationService
 
         long staleStepUpEvidence = await _context.StepUpEvidence
             .IgnoreQueryFilters()
-            .LongCountAsync(evidence => evidence.ConsumedAt == null && evidence.ExpiresAt <= now, cancellationToken)
+            .LongCountAsync(
+                evidence => evidence.ConsumedAt == null
+                    && evidence.InvalidatedAt == null
+                    && evidence.ExpiresAt <= now,
+                cancellationToken)
             .ConfigureAwait(false);
 
         return new EntitlementReconciliationFindings(

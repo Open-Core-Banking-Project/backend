@@ -29,7 +29,8 @@ public sealed record CompleteDeviceRegistrationCommand(
 public sealed record ListDevicesQuery(
     AuthenticatedActor Actor,
     string IdentityId,
-    bool OtherIdentityRequested);
+    bool OtherIdentityRequested,
+    string? CorrelationId = null);
 
 public sealed record SuspendDeviceCommand(
     AuthenticatedActor Actor,

@@ -85,6 +85,13 @@ public sealed class MfaService : IStepUpEvidenceSource
             ConcurrencyVersion = 1,
         };
         _context.MfaEnrolments.Add(enrolment);
+        AddAuthenticationEvent(
+            institutionId.Value,
+            actorId.Value,
+            "mfa_enrolment_started",
+            AuthenticationOutcome.Succeeded,
+            kindValue,
+            now);
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return new MfaEnrolmentResultV1
@@ -93,6 +100,104 @@ public sealed class MfaService : IStepUpEvidenceSource
             FactorKind = enrolment.FactorKind,
             Status = enrolment.Status,
             CreatedAt = enrolment.CreatedAt,
+        };
+    }
+
+    /// <summary>
+    /// Revokes one factor owned by the authenticated actor. The local revocation is authoritative
+    /// for platform use: every unused step-up record issued by that factor is invalidated in the
+    /// same transaction. Repeating the command returns the original terminal state without adding
+    /// another audit event.
+    /// </summary>
+    public async Task<MfaRevocationResultV1> RevokeAsync(
+        InstitutionId institutionId,
+        ActorId actorId,
+        string enrolmentId,
+        string reasonCode,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(institutionId);
+        ArgumentNullException.ThrowIfNull(actorId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(enrolmentId);
+
+        string normalizedReason = reasonCode?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (!MfaPolicy.IsRevocationReason(normalizedReason))
+        {
+            throw new MfaException(
+                MfaContractV1.FactorInvalid,
+                "The factor revocation reason is not supported.");
+        }
+
+        MfaEnrolmentRecord? enrolment = await _context.MfaEnrolments
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                record => record.EnrolmentId == enrolmentId && record.IdentityId == actorId.Value,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (enrolment is null)
+        {
+            throw new MfaException(MfaContractV1.EnrolmentNotFound, "The factor enrolment was not found.");
+        }
+
+        if (enrolment.Status == MfaContractV1.StatusRevoked)
+        {
+            return RevokedResult(enrolment, alreadyRevoked: true);
+        }
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        await using var transaction = await _context.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        int revoked = await _context.MfaEnrolments
+            .Where(record => record.EnrolmentId == enrolmentId
+                && record.IdentityId == actorId.Value
+                && record.Status != MfaContractV1.StatusRevoked)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(record => record.Status, MfaContractV1.StatusRevoked)
+                    .SetProperty(record => record.RevokedAt, now)
+                    .SetProperty(record => record.ConcurrencyVersion, record => record.ConcurrencyVersion + 1),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (revoked == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            MfaEnrolmentRecord terminal = await _context.MfaEnrolments
+                .AsNoTracking()
+                .SingleAsync(
+                    record => record.EnrolmentId == enrolmentId && record.IdentityId == actorId.Value,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return RevokedResult(terminal, alreadyRevoked: true);
+        }
+
+        await _context.StepUpEvidence
+            .Where(record => record.IdentityId == actorId.Value
+                && record.FactorKind == enrolment.FactorKind
+                && record.ConsumedAt == null
+                && record.InvalidatedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(record => record.InvalidatedAt, now)
+                    .SetProperty(record => record.InvalidationReasonCode, normalizedReason),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        AddAuthenticationEvent(
+            institutionId.Value,
+            actorId.Value,
+            "mfa_enrolment_revoked",
+            AuthenticationOutcome.Succeeded,
+            normalizedReason,
+            now);
+        await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+        return new MfaRevocationResultV1
+        {
+            EnrolmentId = enrolmentId,
+            Status = MfaContractV1.StatusRevoked,
+            RevokedAt = now,
+            AlreadyRevoked = false,
         };
     }
 
@@ -134,12 +239,21 @@ public sealed class MfaService : IStepUpEvidenceSource
 
         if (!verification.IsVerified)
         {
+            string failureCode = verification.FailureCode == "provider_unavailable"
+                ? MfaContractV1.ProviderUnavailable
+                : MfaContractV1.FactorInvalid;
+            AddAuthenticationEvent(
+                institutionId.Value,
+                actorId.Value,
+                "mfa_step_up_rejected",
+                AuthenticationOutcome.Failed,
+                failureCode,
+                _timeProvider.GetUtcNow());
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return new StepUpChallengeResultV1
             {
                 Status = MfaContractV1.StepUpRejected,
-                Code = verification.FailureCode == "provider_unavailable"
-                    ? MfaContractV1.ProviderUnavailable
-                    : MfaContractV1.FactorInvalid,
+                Code = failureCode,
             };
         }
 
@@ -162,6 +276,13 @@ public sealed class MfaService : IStepUpEvidenceSource
             IssuedAt = now,
             ExpiresAt = expiresAt,
         });
+        AddAuthenticationEvent(
+            institutionId.Value,
+            actorId.Value,
+            "mfa_step_up_verified",
+            AuthenticationOutcome.Succeeded,
+            MfaContractV1.Totp,
+            now);
 
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -184,6 +305,7 @@ public sealed class MfaService : IStepUpEvidenceSource
 
         DateTimeOffset now = _timeProvider.GetUtcNow();
         StepUpEvidenceRecord? evidence = await _context.StepUpEvidence
+            .AsNoTracking()
             .Where(record => record.InstitutionId == actor.InstitutionId.Value
                 && record.IdentityId == actor.Id.Value
                 && record.SessionId == actor.SessionId
@@ -197,6 +319,7 @@ public sealed class MfaService : IStepUpEvidenceSource
                 evidence.IssuedAt,
                 evidence.ExpiresAt,
                 evidence.ConsumedAt,
+                evidence.InvalidatedAt,
                 evidence.Purpose,
                 purpose,
                 evidence.SessionId,
@@ -208,10 +331,56 @@ public sealed class MfaService : IStepUpEvidenceSource
             return false;
         }
 
-        evidence.ConsumedAt = now;
-        await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return true;
+        // The validation above gives a fast, explicit denial reason inside the service. The
+        // conditional update is the authority: concurrent callers can both observe the same
+        // candidate, but PostgreSQL permits exactly one of them to change ConsumedAt from null.
+        // Repeating every binding and time condition also closes the gap between the read and the
+        // write without relying on an in-process lock or a single API replica.
+        int consumed = await _context.StepUpEvidence
+            .Where(record => record.EvidenceId == evidence.EvidenceId
+                && record.InstitutionId == actor.InstitutionId.Value
+                && record.IdentityId == actor.Id.Value
+                && record.SessionId == actor.SessionId
+                && record.Purpose == purpose
+                && record.DeviceId == actor.DeviceId
+                && record.ConsumedAt == null
+                && record.InvalidatedAt == null
+                && record.IssuedAt <= now
+                && record.ExpiresAt > now)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(record => record.ConsumedAt, now),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return consumed == 1;
     }
+
+    private void AddAuthenticationEvent(
+        string institutionId,
+        string identityId,
+        string eventType,
+        AuthenticationOutcome outcome,
+        string detail,
+        DateTimeOffset occurredAt) =>
+        _context.AuthenticationEvents.Add(new AuthenticationEventRecord
+        {
+            InstitutionId = institutionId,
+            AuthenticationEventId = Guid.NewGuid().ToString("N"),
+            IdentityId = identityId,
+            EventType = eventType,
+            Outcome = outcome,
+            Detail = detail,
+            OccurredAt = occurredAt,
+        });
+
+    private static MfaRevocationResultV1 RevokedResult(MfaEnrolmentRecord enrolment, bool alreadyRevoked) => new()
+    {
+        EnrolmentId = enrolment.EnrolmentId,
+        Status = MfaContractV1.StatusRevoked,
+        RevokedAt = enrolment.RevokedAt
+            ?? throw new InvalidOperationException("A revoked factor enrolment has no revocation timestamp."),
+        AlreadyRevoked = alreadyRevoked,
+    };
 }
 
 /// <summary>Stable failure with a contract code. No provider detail or secret is carried.</summary>

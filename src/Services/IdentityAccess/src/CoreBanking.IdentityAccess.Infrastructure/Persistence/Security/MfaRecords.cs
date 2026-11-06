@@ -57,4 +57,8 @@ public sealed class StepUpEvidenceRecord : ITenantOwnedEntity
     public DateTimeOffset ExpiresAt { get; set; }
 
     public DateTimeOffset? ConsumedAt { get; set; }
+
+    public DateTimeOffset? InvalidatedAt { get; set; }
+
+    public string? InvalidationReasonCode { get; set; }
 }

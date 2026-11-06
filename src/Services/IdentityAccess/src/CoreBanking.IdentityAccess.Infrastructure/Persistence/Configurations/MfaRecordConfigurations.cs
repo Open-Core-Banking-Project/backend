@@ -40,7 +40,16 @@ internal sealed class StepUpEvidenceRecordConfiguration : IEntityTypeConfigurati
     public void Configure(EntityTypeBuilder<StepUpEvidenceRecord> builder)
     {
         builder.ToTable("step_up_evidence", "security", table =>
-            table.HasCheckConstraint("ck_step_up_expiry_after_issue", "expires_at > issued_at"));
+        {
+            table.HasCheckConstraint("ck_step_up_expiry_after_issue", "expires_at > issued_at");
+            table.HasCheckConstraint(
+                "ck_step_up_invalidation_after_issue",
+                "invalidated_at IS NULL OR invalidated_at >= issued_at");
+            table.HasCheckConstraint(
+                "ck_step_up_invalidation_reason",
+                "(invalidated_at IS NULL AND invalidation_reason_code IS NULL) OR "
+                + "(invalidated_at IS NOT NULL AND invalidation_reason_code IN ('user_requested', 'device_lost', 'suspected_compromise'))");
+        });
         builder.HasKey(evidence => new { evidence.InstitutionId, evidence.EvidenceId });
 
         builder.Property(evidence => evidence.InstitutionId).HasColumnName("institution_id");
@@ -54,6 +63,8 @@ internal sealed class StepUpEvidenceRecordConfiguration : IEntityTypeConfigurati
         builder.Property(evidence => evidence.IssuedAt).HasColumnName("issued_at");
         builder.Property(evidence => evidence.ExpiresAt).HasColumnName("expires_at");
         builder.Property(evidence => evidence.ConsumedAt).HasColumnName("consumed_at");
+        builder.Property(evidence => evidence.InvalidatedAt).HasColumnName("invalidated_at");
+        builder.Property(evidence => evidence.InvalidationReasonCode).HasColumnName("invalidation_reason_code").HasMaxLength(50);
 
         builder.HasIndex(evidence => new { evidence.InstitutionId, evidence.IdentityId, evidence.SessionId, evidence.Purpose })
             .HasDatabaseName("ix_step_up_evidence_lookup");

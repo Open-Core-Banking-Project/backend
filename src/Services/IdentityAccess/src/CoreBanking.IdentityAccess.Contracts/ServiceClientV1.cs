@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace CoreBanking.IdentityAccess.Contracts;
 
@@ -24,6 +25,9 @@ public sealed record ServiceClientRegistrationRequestV1
 
     /// <summary>The audience this client may request tokens for.</summary>
     public required string Audience { get; init; }
+
+    /// <summary>Explicit service-only permissions. Human permission identifiers are refused.</summary>
+    public IReadOnlyList<string> Permissions { get; init; } = Array.Empty<string>();
 
     /// <summary>An opaque provider reference. Never a secret value.</summary>
     public required string CredentialReference { get; init; }
@@ -60,6 +64,8 @@ public sealed record ServiceClientResultV1
     public required string ClientName { get; init; }
 
     public required string Audience { get; init; }
+
+    public IReadOnlyList<string> Permissions { get; init; } = Array.Empty<string>();
 
     public required string Status { get; init; }
 

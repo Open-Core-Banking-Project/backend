@@ -44,6 +44,12 @@ public static class IdentityPermissions
     /// <summary>Capability for a security operator to revoke any device in the institution. Epic 02 slice 11.</summary>
     public static PermissionIdentifier DeviceRevoke { get; } = PermissionIdentifier.Parse("identity.device.revoke");
 
+    /// <summary>Service-only capability to read another actor's entitlement snapshot.</summary>
+    public static PermissionIdentifier ServiceEntitlementsRead { get; } = PermissionIdentifier.Parse("service.identity.entitlements_read");
+
+    /// <summary>Service-only capability for Workflow to evaluate a human approval candidate.</summary>
+    public static PermissionIdentifier ServiceApprovalEligibility { get; } = PermissionIdentifier.Parse("service.identity.approval_eligibility");
+
     public static IReadOnlySet<PermissionIdentifier> All { get; } = new HashSet<PermissionIdentifier>
     {
         PlatformFoundationExecute,

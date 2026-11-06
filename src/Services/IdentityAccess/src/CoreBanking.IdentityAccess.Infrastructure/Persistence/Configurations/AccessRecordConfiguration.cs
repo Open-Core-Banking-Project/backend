@@ -27,8 +27,21 @@ internal sealed class RoleRecordConfiguration : IEntityTypeConfiguration<RoleRec
         builder.Property(role => role.Status).HasColumnName("status").HasConversion<string>();
         builder.Property(role => role.CreatedAt).HasColumnName("created_at");
         builder.Property(role => role.UpdatedAt).HasColumnName("updated_at");
+        builder.Property(role => role.ConcurrencyVersion).HasColumnName("concurrency_version").IsConcurrencyToken();
+        builder.Property(role => role.ApprovalRequestId).HasColumnName("approval_request_id").HasMaxLength(64);
+        builder.Property(role => role.ApprovalContentHash).HasColumnName("approval_content_hash").HasMaxLength(64);
+        builder.Property(role => role.SubmittedBy).HasColumnName("submitted_by").HasMaxLength(128);
+        builder.Property(role => role.SubmittedAt).HasColumnName("submitted_at");
+        builder.Property(role => role.WorkflowDecisionReference).HasColumnName("workflow_decision_reference").HasMaxLength(128);
+        builder.Property(role => role.Decision).HasColumnName("decision").HasMaxLength(16);
+        builder.Property(role => role.DecidedBy).HasColumnName("decided_by").HasMaxLength(128);
+        builder.Property(role => role.DecidedAt).HasColumnName("decided_at");
+        builder.Property(role => role.PublishedAt).HasColumnName("published_at");
 
         builder.HasIndex(role => new { role.InstitutionId, role.RoleCode }).IsUnique();
+        builder.HasIndex(role => new { role.InstitutionId, role.ApprovalRequestId })
+            .IsUnique()
+            .HasFilter("approval_request_id IS NOT NULL");
     }
 }
 
@@ -103,6 +116,7 @@ internal sealed class IdentityRoleRecordConfiguration : IEntityTypeConfiguration
         builder.Property(assignment => assignment.InstitutionId).HasColumnName("institution_id");
         builder.Property(assignment => assignment.IdentityId).HasColumnName("identity_id");
         builder.Property(assignment => assignment.RoleId).HasColumnName("role_id");
+        builder.Property(assignment => assignment.RoleVersion).HasColumnName("role_version");
         builder.Property(assignment => assignment.RegionId).HasColumnName("region_id");
         builder.Property(assignment => assignment.BranchId).HasColumnName("branch_id");
         builder.Property(assignment => assignment.ChannelId).HasColumnName("channel_id");
@@ -121,6 +135,62 @@ internal sealed class IdentityRoleRecordConfiguration : IEntityTypeConfiguration
             .WithMany()
             .HasForeignKey(assignment => new { assignment.InstitutionId, assignment.RoleId })
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<RoleVersionRecord>()
+            .WithMany()
+            .HasForeignKey(assignment => new { assignment.InstitutionId, assignment.RoleId, Version = assignment.RoleVersion })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class RoleVersionRecordConfiguration : IEntityTypeConfiguration<RoleVersionRecord>
+{
+    public void Configure(EntityTypeBuilder<RoleVersionRecord> builder)
+    {
+        builder.ToTable("role_versions", "access");
+        builder.HasKey(version => new { version.InstitutionId, version.RoleId, version.Version });
+        builder.Property(version => version.InstitutionId).HasColumnName("institution_id");
+        builder.Property(version => version.RoleId).HasColumnName("role_id");
+        builder.Property(version => version.Version).HasColumnName("version");
+        builder.Property(version => version.RoleCode).HasColumnName("role_code").HasMaxLength(64);
+        builder.Property(version => version.RoleName).HasColumnName("role_name").HasMaxLength(200);
+        builder.Property(version => version.ContentHash).HasColumnName("content_hash").HasMaxLength(64);
+        builder.Property(version => version.ApprovalRequestId).HasColumnName("approval_request_id").HasMaxLength(64);
+        builder.Property(version => version.WorkflowDecisionReference).HasColumnName("workflow_decision_reference").HasMaxLength(128);
+        builder.Property(version => version.PublishedBy).HasColumnName("published_by").HasMaxLength(128);
+        builder.Property(version => version.PublishedAt).HasColumnName("published_at");
+        builder.HasIndex(version => new { version.InstitutionId, version.WorkflowDecisionReference }).IsUnique();
+        builder.HasOne<RoleRecord>()
+            .WithMany()
+            .HasForeignKey(version => new { version.InstitutionId, version.RoleId })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class RoleVersionPermissionRecordConfiguration : IEntityTypeConfiguration<RoleVersionPermissionRecord>
+{
+    public void Configure(EntityTypeBuilder<RoleVersionPermissionRecord> builder)
+    {
+        builder.ToTable("role_version_permissions", "access");
+        builder.HasKey(permission => new
+        {
+            permission.InstitutionId,
+            permission.RoleId,
+            permission.RoleVersion,
+            permission.PermissionCode,
+        });
+        builder.Property(permission => permission.InstitutionId).HasColumnName("institution_id");
+        builder.Property(permission => permission.RoleId).HasColumnName("role_id");
+        builder.Property(permission => permission.RoleVersion).HasColumnName("role_version");
+        builder.Property(permission => permission.PermissionCode).HasColumnName("permission_code");
+        builder.HasOne<RoleVersionRecord>()
+            .WithMany()
+            .HasForeignKey(permission => new { permission.InstitutionId, permission.RoleId, Version = permission.RoleVersion })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<PermissionRecord>()
+            .WithMany()
+            .HasForeignKey(permission => permission.PermissionCode)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

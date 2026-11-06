@@ -19,9 +19,8 @@ public sealed record EntitlementDistributionResult(EntitlementSnapshotV1? Snapsh
 }
 
 /// <summary>
-/// Distributes the effective permissions of one actor at one monotonic version. Today the caller
-/// is always the actor themselves; a service-authenticated variant is required before another
-/// service can ask on an actor's behalf (slice 13).
+/// Distributes the effective permissions of one actor at one monotonic version. Human callers are
+/// self-scoped; a separately authorised service caller may request a human actor's snapshot.
 /// </summary>
 public sealed class EntitlementDistributionService
 {
@@ -63,13 +62,49 @@ public sealed class EntitlementDistributionService
             return EntitlementDistributionResult.Denied(EntitlementDistributionV1.InstitutionMismatch);
         }
 
-        long currentVersion = _versions.GetCurrentVersion(requestedActorId, requestedInstitutionId);
+        return BuildSnapshot(requestedActorId, requestedInstitutionId, minimumVersion, caller.Type);
+    }
+
+    public EntitlementDistributionResult GetSnapshotForService(
+        AuthenticatedActor? caller,
+        ActorId requestedActorId,
+        InstitutionId requestedInstitutionId,
+        long minimumVersion)
+    {
+        ArgumentNullException.ThrowIfNull(requestedActorId);
+        ArgumentNullException.ThrowIfNull(requestedInstitutionId);
+
+        if (caller is null)
+        {
+            return EntitlementDistributionResult.Denied(AuthorisationCodes.MissingAuthentication);
+        }
+
+        if (caller.Type != ActorType.Service)
+        {
+            return EntitlementDistributionResult.Denied(EntitlementDistributionV1.ActorMismatch);
+        }
+
+        if (!string.Equals(caller.InstitutionId.Value, requestedInstitutionId.Value, StringComparison.Ordinal))
+        {
+            return EntitlementDistributionResult.Denied(EntitlementDistributionV1.InstitutionMismatch);
+        }
+
+        return BuildSnapshot(requestedActorId, requestedInstitutionId, minimumVersion, ActorType.Human);
+    }
+
+    private EntitlementDistributionResult BuildSnapshot(
+        ActorId requestedActorId,
+        InstitutionId requestedInstitutionId,
+        long minimumVersion,
+        ActorType actorType)
+    {
+        long currentVersion = _versions.GetCurrentVersion(requestedActorId, requestedInstitutionId, actorType);
         if (currentVersion < minimumVersion)
         {
             return EntitlementDistributionResult.Denied(EntitlementDistributionV1.VersionRegressed);
         }
 
-        EntitlementSnapshot? snapshot = _permissions.FindSnapshot(requestedActorId, requestedInstitutionId);
+        EntitlementSnapshot? snapshot = _permissions.FindSnapshot(requestedActorId, requestedInstitutionId, actorType);
         bool complete = snapshot is not null && snapshot.Version == currentVersion;
 
         return new EntitlementDistributionResult(
