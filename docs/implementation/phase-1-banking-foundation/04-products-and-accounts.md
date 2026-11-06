@@ -25,7 +25,7 @@ dependencies:
   - Phase 1 - Institution and Tenancy
   - Phase 1 - Identity, Roles and Permissions
   - Phase 1 - Customer and Onboarding
-last_updated: 2026-11-03
+last_updated: 2026-11-06
 ---
 
 # Epic: Products and Accounts
@@ -346,6 +346,7 @@ Contract rules:
 
 - Product rules use typed versioned contracts; do not expose arbitrary executable code or unrestricted expressions.
 - Customer, institution, branch, approval, ownership, account status and calculation results supplied by clients are untrusted.
+- Reference facts come from their owners under [P1-E04-D17](decisions/P1-E04-D17-reference-fact-transport-contracts.md); a client-supplied customer, branch or currency value never decides an account action.
 - Monetary contracts use decimal JSON representation policy plus explicit ISO currency; no binary floating point.
 - Summary responses label balance source/version/as-of data supplied by Ledger. Account module does not compute it.
 - Sensitive control reasons/evidence are masked unless a specific permission and purpose are present.
@@ -551,7 +552,7 @@ Implementation progress as of 2026-10-21: the first configuration-area engine is
 3. Implement product identity/version lifecycle and typed rule persistence with migration tests.
 4. Implement deterministic rule evaluation and simulation with boundary/golden tests and content hashing.
 5. Integrate product approval/publication with Workflow using exact version/hash and outbox events.
-6. Build customer/branch/classification reference consumers and freshness handling.
+6. Build customer/branch/classification reference consumers and freshness handling. *Status: in progress — the transport contracts were approved in [P1-E04-D17](decisions/P1-E04-D17-reference-fact-transport-contracts.md) on 2026-11-06: one service-authenticated customer-facts read with a 60-second validity ceiling, in-process branch and currency reference providers, caller-supplied facts excluded from authoritative decisions, residency criteria refused until the fact is stored, and a new `institution.currencies` configuration area. The consumer implementation is the remaining work.*
 7. Implement account application and eligibility snapshots with negative scope tests.
 8. Implement atomic account-number reservation, account creation and retry/concurrency tests.
 9. Implement approval/activation and ledger-initialization handoff, proving no opening balance/posting.
@@ -652,6 +653,7 @@ Performance tests use approved product/account volumes and contention profiles. 
 | Existing-account product migration policy | Customer terms and version binding | Product/Legal | Before migration feature |
 | Statement periods, formats, retention and delivery | US-023 and document integration | Product/Compliance | Slice 13 | Open |
 | Capacity, latency, RTO and RPO targets | Test/release gates | Product/Platform | Before release testing | Open |
+| Authoritative customer, branch and currency fact transport contracts | Decision trust boundary and contract shape | Architecture/Product/Security | Slice 6 | Approved 2026-11-06 for a service-authenticated internal customer-facts read with events as invalidation hints only, caller-supplied facts excluded from authoritative decisions, a 60-second validity ceiling with fail-closed staleness, residency criteria refused until the fact is stored, and a new `institution.currencies` configuration area; [brief](decisions/P1-E04-D17-reference-fact-transport-contracts.md) |
 
 ## 22. Prohibited assumptions
 

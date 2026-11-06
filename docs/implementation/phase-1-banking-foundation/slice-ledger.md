@@ -41,10 +41,10 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 - Slices: **176** across **12** epics.
 - Implemented: **36** — **19** awaiting evidence review and **17** with a recorded human approval.
 - In progress: **22**. Not started: **108**. Blocked approvals: **10**.
-- Decisions: **188** total — 133 open, 4 partially approved, 19 with no recorded status, 32 resolved.
-- Slices the controller may start now without a new decision: **1** (`P1-E04-S6`); its recorded prerequisite transport contracts are still unapproved, so the next human input is a contract review.
+- Decisions: **189** total — 133 open, 4 partially approved, 19 with no recorded status, 33 resolved.
+- Slices the controller may start now without a new decision: **1** (`P1-E04-S6`), now implementation-ready after `P1-E04-D17` approved its transport contracts.
 
-Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 after `P1-E02-D07` was approved. Verification is recorded separately in the
+Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 after `P1-E02-D07` and `P1-E04-D17` were approved. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
 
 ## Epic summary
@@ -68,9 +68,8 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 
 The controller now advances past Epic 2. `P1-E02-S5` closed on the approved `P1-E02-D07` floors, and `P1-E02-S6`
 already carries a bounded human approval. The next candidate is `P1-E04-S6` (customer, branch and classification
-reference consumers). It has no decision blocker, but its recorded note still requires approved
-customer/branch/currency transport contracts, so the next human input is a contract review rather than a security
-decision.
+reference consumers), and it is now implementation-ready: `P1-E04-D17` approved the customer, branch and currency
+fact transport contracts on 2026-11-06, including the trust rule that caller-supplied facts never decide an account.
 
 ## Human gates before the loop can advance
 
