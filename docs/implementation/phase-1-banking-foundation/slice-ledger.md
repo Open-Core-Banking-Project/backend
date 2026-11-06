@@ -39,12 +39,12 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 ## Snapshot
 
 - Slices: **176** across **12** epics.
-- Implemented: **37** — **20** awaiting evidence review and **17** with a recorded human approval.
-- In progress: **21**. Not started: **108**. Blocked approvals: **10**.
+- Implemented: **38** — **20** awaiting evidence review and **18** with a recorded human approval.
+- In progress: **21**. Not started: **107**. Blocked approvals: **10**.
 - Decisions: **189** total — 133 open, 4 partially approved, 19 with no recorded status, 33 resolved.
-- Slices the controller may start now without a new decision: **1** (`P1-E04-S6`), now implementation-ready after `P1-E04-D17` approved its transport contracts.
+- Slices the controller may start now without a new decision: **1** (`P1-E04-S15`), the Phase 1 closing evidence slice, now that `P1-E04-S14` closed.
 
-Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 after `P1-E02-D07` and `P1-E04-D17` were approved. Verification is recorded separately in the
+Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 after `P1-E02-D07` and `P1-E04-D17` were approved and slices `P1-E04-S6` and `P1-E04-S14` closed. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
 
 ## Epic summary
@@ -67,9 +67,10 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 ## Ready queue
 
 The controller now advances past the account-opening slices. `P1-E04-S6` closed on the approved `P1-E04-D17`
-contracts and `P1-E02-S5` on the approved `P1-E02-D07` floors. Slices 7 to 13 await product policy decisions
+contracts, `P1-E02-S5` on the approved `P1-E02-D07` floors and `P1-E04-S14` on the operational evidence it added
+without a new decision. Slices 7 to 13 await product policy decisions
 (`P1-E04-D06`, `D07`, `D09`, `D10`, `D11`, `D12`, `D13`, `D15`), so the next candidate without a decision blocker is
-`P1-E04-S14` (audit, observability, reconciliation, alerts and recovery runbooks).
+`P1-E04-S15` (security, performance, backup/restore and Phase 1 end-to-end evidence).
 
 ## Human gates before the loop can advance
 
@@ -91,7 +92,7 @@ backup-restore evidence that no agent can produce. See [00-phase-overview.md](00
 
 ## Review queue
 
-20 of the 37 implemented slices are awaiting evidence review; 30 slices have a recorded human approval.
+20 of the 38 implemented slices are awaiting evidence review; 31 slices have a recorded human approval.
 
 ## Verification runs
 
@@ -118,7 +119,8 @@ backup-restore evidence that no agent can produce. See [00-phase-overview.md](00
 | 2026-11-02 | P1-E02 slice 11 trusted-device final increment | IdentityAccess test-project build, non-database suite, focused PostgreSQL trusted-device suite, format and diff gates | Build passed; 188 non-database and 8 focused database tests passed; authorised cross-identity reads append privacy-minimised operator evidence without device metadata |
 | 2026-11-02 | P1-E02 slice 13 service identity final increment | Identity/Core Ledger/Workflow builds, focused workload/audience tests, focused PostgreSQL service-client suite, affected non-database suites and format gates | Builds passed; 24 focused unit, 6 focused database, 197 Identity, 102 Core Ledger and 26 Workflow tests passed; exact audience binding and fail-closed client-credentials propagation verified |
 | 2026-11-02 | P1-E02 slice 14 identity observability final increment | Identity test/worker builds, focused meter test, Identity non-database suite and format gate | Builds passed; 1 focused meter and 198 non-database tests passed; the four bounded reconciliation counters are registered on the shared OTLP collector path |
-| 2026-11-03 | P1-E04 slice 2 Products and Accounts contracts | Focused contract/architecture tests, complete Core Ledger unit suite, repository architecture suite and affected-file format gate | 5 focused, 107 Core Ledger and 15 architecture tests passed; Account commands exclude trusted state, summary balances remain distinct and Ledger sourced, and statement handoff carries no financial history |
+| 2026-11-03 | P1-E04 slice 2 Products and Accounts contracts | Focused contract/architecture tests, complete Core Ledger unit suite, repository architecture suite and affected-file format gate | 5 focused, 107 Core Ledger and 15 architecture tests passed; Account, Control and Statement contracts, mass-assignment refusal and financial-boundary separation verified; account commands exclude trusted state, summary balances remain distinct and Ledger sourced, and statement handoff carries no financial history |
+| 2026-11-06 | P1-E04 slice 14 audit, observability, reconciliation and recovery | Release solution build, full non-database suite, Core Ledger unit suite, `dotnet format --verify-no-changes` and `scripts/migrations-verify.ps1` for Core Ledger | Build passed with 0 warnings/0 errors; 581 non-database and 136 Core Ledger tests passed, including 10 reconciliation tests; all five finding codes, outbox-age gauges, per-code resolution telemetry and audit rows on both lifecycles verified |
 
 Gaps found by the verification run: CoreLedger exposes no `Category=Database` or `Category=Integration` tests, so
 runtime concurrency evidence (INS-002 concurrent duplicate institution code, INS-004 provisioning acknowledgement,
@@ -194,7 +196,7 @@ Owning service: Customer and Onboarding · document status `Implemented` · 3 im
 
 ### P1-E04 — Products and Accounts
 
-Owning service: Core Banking and Ledger · document status `Approved` · 4 implemented, 1 in progress, 1 blocked, 9 not started.
+Owning service: Core Banking and Ledger · document status `Approved` · 5 implemented, 1 in progress, 1 blocked, 8 not started.
 
 | Slice | Scope | Status | Approval | Unresolved decisions attached | Evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -211,7 +213,7 @@ Owning service: Core Banking and Ledger · document status `Approved` · 4 imple
 | 11 | Implement lien lifecycle and ledger availability-control handoff without Account balance arithmetic. | · not started | — | P1-E04-D11 | — |
 | 12 | Implement dormancy assessment/reactivation and controlled closure prerequisites. | · not started | — | P1-E04-D12, P1-E04-D13 | — |
 | 13 | Implement account summaries and statement-request authorisation/handoff. | · not started | — | P1-E04-D15 | — |
-| 14 | Add audit, observability, reconciliation, alerts and recovery runbooks. | · not started | — | — | — |
+| 14 | Add audit, observability, reconciliation, alerts and recovery runbooks. | ✔ implemented (claim) | pending | — | Configuration reconciliation report with five stable finding codes; `CoreBanking.ProductAccounts` counters and outbox-age gauges; per-code eligibility-resolution telemetry; institution audit rows on every Savings and currency submit/publish; products and accounts operations runbook |
 | 15 | Complete security, performance, backup/restore and Phase 1 end-to-end evidence. | · not started | — | — | — |
 
 ### P1-E05 — Core Ledger and Financial Posting
