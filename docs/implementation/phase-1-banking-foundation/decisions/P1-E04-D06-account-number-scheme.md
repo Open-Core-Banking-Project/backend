@@ -6,7 +6,7 @@ owners:
   - Institution/Core operations
   - Architecture
 required_by: P1-E04-S8
-status: Ready for review
+status: Approved
 brief_date: 2026-11-06
 related: [ADR-0015, P1-E04-D02, P1-E04-D09, P1-E04-D17]
 decisions: [P1-E04-D06]
@@ -141,9 +141,9 @@ choice; this brief only fixes the allow-list and the requirement that a check di
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending: approve, amend or reject the positions in §4 | |
-| Institution/Core operations | | Pending: confirm the configuration-area ownership and reveal permission | |
-| Architecture | | Pending: confirm the allow-listed segment vocabulary and reservation mechanics | |
+| Project owner | Recorded in the implementation session | Approved the recommended positions: an institution-owned effective-dated `institution.account-numbering` area, uniqueness within `(institution, scheme)`, allow-listed segments with the three permitted check-digit algorithms, atomic reservation that never uses `max + 1`, fail-closed exhaustion with a stable code, and masked-only disclosure with a stepped-up, audited reveal | 2026-11-06 |
+| Institution/Core operations | | Named confirmation required before the reveal permission is granted outside Development | |
+| Architecture | | Named confirmation required before slice 8 merges | |
 
 ## 8. Implementation notes (for slice 8)
 

@@ -6,7 +6,7 @@ owners:
   - Operations/Product
   - Architecture
 required_by: P1-E04-S9
-status: Ready for review
+status: Approved
 brief_date: 2026-11-06
 related: [ADR-0015, ADR-0009, P1-E04-D06, P1-E04-D07, P1-E04-D08, P1-E04-D13]
 decisions: [P1-E04-D09]
@@ -147,9 +147,9 @@ with the same SHA-256 definition hash pattern used by `institution.configuration
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending: approve, amend or reject the positions in §4 | |
-| Operations/Product | | Pending: confirm the ordering and maker-checker strictness | |
-| Architecture | | Pending: confirm the permission renames and the approval profile hash | |
+| Project owner | Recorded in the implementation session | Approved the recommended positions: reserve at approval and never at draft, create the account only from `Approved` in one atomic unit with the outbox fact, prove ledger initialisation from a ledger response rather than a local flag, and treat activation as a separate authorised transition gated on ledger state and the 60-second fact-freshness ceiling | 2026-11-06 |
+| Operations/Product | | Named confirmation required before slice 9 merges | |
+| Architecture | | Named confirmation required for the permission names and the pinned approval-profile hash | |
 
 ## 8. Implementation notes (for slice 9)
 

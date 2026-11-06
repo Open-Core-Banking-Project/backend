@@ -13,10 +13,10 @@ As of 2026-11-06:
 - Phase 0 is the established engineering foundation.
 - Phase 1 Epic 3, Customer and Onboarding, is merged on `main` and its epic document is `Implemented`. Its slices were approved on 2026-10-31, although several ledger status cells still describe partial slice history and need evidence reconciliation.
 - Phase 1 Epic 2, Identity, Roles and Permissions, has 14 of 15 slices recorded implemented pending review. Slice 5 closed on the approved `P1-E02-D07` platform security floors (2026-11-06); slice 6 already carries a bounded human approval; `P1-E02-D14` and `P1-E02-D15` remain open. Independent epic approval is still pending.
-- Phase 1 Epic 4, Products and Accounts, has an approved epic contract and partial implementation. Slice 6 is implementation-ready: `P1-E04-D17` approved the customer, branch and currency fact transport contracts on 2026-11-06.
+- Phase 1 Epic 4, Products and Accounts, has an approved epic contract and partial implementation. Slices 6 and 14 are implemented. `P1-E04-D17` approved the customer, branch and currency fact transport contracts, and `P1-E04-D06`, `D07` and `D09` approved the account-numbering, multiple-account and approval/activation rules, all on 2026-11-06, so slices 7, 8 and 9 are implementation-ready. `P1-E04-D10` to `D13` and `D15` remain open with ready-for-review briefs.
 - Frontend Admin is still documentation-only. Frontend User and Frontend Mobile contain only their initial repository documentation. Backend contract readiness therefore controls the next full-stack implementation step.
 
-The controller now selects P1-E04 slice 6 as the first unfinished slice without a decision blocker, and its prerequisite transport contracts are approved. A run must still re-evaluate the ledger and repository before acting because the state may have changed.
+The controller now selects P1-E04 slice 7 as the first unfinished slice without a decision blocker, followed by slices 8 and 9 whose decisions are also approved. A run must still re-evaluate the ledger and repository before acting because the state may have changed.
 
 ## State machine
 

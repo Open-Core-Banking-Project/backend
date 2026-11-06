@@ -6,7 +6,7 @@ owners:
   - Product/Risk
   - Compliance
 required_by: P1-E04-S7
-status: Ready for review
+status: Approved
 brief_date: 2026-11-06
 related: [ADR-0015, P1-E04-D06, P1-E04-D08, P1-E04-D09]
 decisions: [P1-E04-D07]
@@ -124,9 +124,9 @@ be left to a hard-coded limit in a handler.
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending: approve, amend or reject the positions in §4 | |
-| Product/Risk | | Pending: confirm the counting basis and default dimension | |
-| Compliance | | Pending: confirm that the institution ceiling, not the product rule, carries a legal limit | |
+| Project owner | Recorded in the implementation session | Approved the recommended positions: an `existing_accounts` criterion inside `product_eligibility.v1`, tightened by an `institution.account-opening-policy` ceiling with the stricter rule winning and a missing ceiling blocking opening, the counted status set, a short-lived `AccountOpeningClaim` covering in-flight applications, and per-customer-per-product-family as the default dimension | 2026-11-06 |
+| Product/Risk | | Named confirmation required before slice 7 merges | |
+| Compliance | | Named confirmation required that the institution ceiling, not the product rule, carries a legal limit | |
 
 ## 8. Implementation notes (for slice 7)
 
