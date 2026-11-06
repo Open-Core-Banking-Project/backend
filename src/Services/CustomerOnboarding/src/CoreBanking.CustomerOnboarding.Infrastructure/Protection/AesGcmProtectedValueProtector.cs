@@ -64,6 +64,52 @@ public sealed class AesGcmProtectedValueProtector : IProtectedValueProtector
         }
     }
 
+    public string Unprotect(string valueToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(valueToken);
+
+        if (!valueToken.StartsWith(TokenPrefix, StringComparison.Ordinal))
+        {
+            throw new ProtectedValueException("protected_value_invalid", "The stored value does not use a supported protection format.");
+        }
+
+        byte[] token;
+        try
+        {
+            token = Convert.FromBase64String(valueToken[TokenPrefix.Length..]);
+        }
+        catch (FormatException exception)
+        {
+            throw new ProtectedValueException("protected_value_invalid", "The stored value is not a valid protected token.", exception);
+        }
+
+        if (token.Length <= NonceBytes + TagBytes)
+        {
+            throw new ProtectedValueException("protected_value_invalid", "The stored value is too short to be a protected token.");
+        }
+
+        ReadOnlySpan<byte> nonce = token.AsSpan(0, NonceBytes);
+        ReadOnlySpan<byte> tag = token.AsSpan(NonceBytes, TagBytes);
+        ReadOnlySpan<byte> ciphertext = token.AsSpan(NonceBytes + TagBytes);
+        byte[] plaintext = new byte[ciphertext.Length];
+
+        try
+        {
+            using AesGcm aes = new(_encryptionKey, TagBytes);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        catch (CryptographicException exception)
+        {
+            throw new ProtectedValueException("protected_value_integrity_failed", "The stored value failed integrity verification.", exception);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plaintext);
+            CryptographicOperations.ZeroMemory(token);
+        }
+    }
+
     /// <summary>Masked display form: the tail is kept so staff can confirm a value they already hold.</summary>
     internal static string Mask(string value)
     {
