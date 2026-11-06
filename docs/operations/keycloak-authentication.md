@@ -73,6 +73,27 @@ missing, so deployment cannot silently fall back to the synthetic development id
 `ConnectionStrings__IdentityAccess` is still mandatory outside Development. Authentication
 configuration does not apply database migrations or make the entitlement store optional.
 
+## Outbound workload identity
+
+Core Ledger and Operations Workflow call Identity and Access with OAuth client credentials. Register
+one confidential Keycloak client per calling service, configure its audience mapper to emit exactly
+`corebanking-identity-api`, and register the same client identifier and audience through the Identity
+service-client administration API. Grant only the service capabilities the caller needs.
+
+Configure the caller with metadata and an opaque secret reference:
+
+```text
+IdentityAccess__BaseUrl=https://identity-api.example.com
+IdentityAccess__WorkloadIdentity__TokenEndpoint=https://identity.example.com/realms/core-banking/protocol/openid-connect/token
+IdentityAccess__WorkloadIdentity__ClientId=core-ledger
+IdentityAccess__WorkloadIdentity__ClientSecretReference=identity.core-ledger.client-secret
+```
+
+The referenced secret is resolved through `ISecretProvider`; it must not appear in ordinary
+configuration, logs or evidence. Partial configuration, a non-HTTPS token endpoint, a missing secret,
+a rejected token request or a token lifetime outside 31 to 3600 seconds fails closed. Access tokens
+are cached only until 30 seconds before expiry. No token is persisted or logged.
+
 ## Verification gate
 
 Before enabling traffic, prove all of the following with synthetic identities:
@@ -89,6 +110,10 @@ Before enabling traffic, prove all of the following with synthetic identities:
 6. Incrementing the entitlement version makes the old token fail authorisation within the approved
    invalidation window.
 7. Key rotation succeeds while an old compromised key is rejected after the approved overlap.
+8. A service token whose validated `aud` differs from its registered service-client audience is
+   rejected before the protected handler runs.
+9. Core Ledger or Operations Workflow obtains a short-lived client-credentials token and completes
+   one synthetic call to the appropriate Identity internal route; missing credentials deny the call.
 
 Retain test and deployment evidence without recording access tokens, client secrets, passwords or
 private keys.
