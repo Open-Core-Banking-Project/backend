@@ -3,7 +3,7 @@ phase: "Phase 1 - Banking Foundation"
 artifact: Slice and decision ledger
 status: Active
 approval_model: Human approves each slice
-snapshot: 2026-11-01
+snapshot: 2026-11-06
 source_documents: 01..12 epic implementation documents
 ---
 
@@ -39,13 +39,12 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 ## Snapshot
 
 - Slices: **176** across **12** epics.
-- Implemented and awaiting review: **18**.
-- Approved by a human reviewer: **28** (including P1-E02-S13 and P1-E02-S14 on 2026-11-02).
-- In progress: **23**. Not started: **108**. Blocked approvals: **10**.
-- Decisions: **188** total — 134 open, 4 partially approved, 19 with no recorded status, 31 resolved.
-- Slices that may start right now without a new human decision: **0**.
+- Implemented: **36** — **19** awaiting evidence review and **17** with a recorded human approval.
+- In progress: **22**. Not started: **108**. Blocked approvals: **10**.
+- Decisions: **188** total — 133 open, 4 partially approved, 19 with no recorded status, 32 resolved.
+- Slices the controller may start now without a new decision: **1** (`P1-E04-S6`); its recorded prerequisite transport contracts are still unapproved, so the next human input is a contract review.
 
-Statuses were reconciled from `slice-ledger.csv` on 2026-11-02. Verification is recorded separately in the
+Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 after `P1-E02-D07` was approved. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
 
 ## Epic summary
@@ -53,7 +52,7 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-02. Verification is 
 | Epic | Document status | Slices | Approved | Implemented | In progress | Blocked | Not started | Unresolved decisions |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | P1-E01 Institution and Tenancy | Implemented | 12 | 11 | 11 | 0 | 1 | 0 | 9 |
-| P1-E02 Identity, Roles and Permissions | In Progress | 15 | 2 | 13 | 2 | 0 | 0 | 3 |
+| P1-E02 Identity, Roles and Permissions | In Progress | 15 | 2 | 14 | 1 | 0 | 0 | 2 |
 | P1-E03 Customer and Onboarding | Implemented | 15 | 15 | 3 | 12 | 0 | 0 | 0 |
 | P1-E04 Products and Accounts | Approved | 15 | 0 | 4 | 1 | 1 | 9 | 13 |
 | P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
@@ -67,9 +66,11 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-02. Verification is 
 
 ## Ready queue
 
-No further slice is startable without a decision. The controller selects `P1-E02-S5`, whose remaining platform
-security floors and provider integration are blocked by `P1-E02-D07`. The implemented local session lifecycle stays
-fail closed while that decision remains open.
+The controller now advances past Epic 2. `P1-E02-S5` closed on the approved `P1-E02-D07` floors, and `P1-E02-S6`
+already carries a bounded human approval. The next candidate is `P1-E04-S6` (customer, branch and classification
+reference consumers). It has no decision blocker, but its recorded note still requires approved
+customer/branch/currency transport contracts, so the next human input is a contract review rather than a security
+decision.
 
 ## Human gates before the loop can advance
 
@@ -91,7 +92,7 @@ backup-restore evidence that no agent can produce. See [00-phase-overview.md](00
 
 ## Review queue
 
-18 of the 35 implemented slices are awaiting evidence review; 28 slices have a recorded human approval.
+19 of the 36 implemented slices are awaiting evidence review; 30 slices have a recorded human approval.
 
 ## Verification runs
 
@@ -157,8 +158,8 @@ Owning service: Identity and Access · document status `In Progress` · 13 imple
 | 1 | Approve ADR-0008 identity provider/token/channel model and ADR-0009 authorisation distribution/invalidation m… | ✔ implemented (claim) | pending | — | ADR-0008/0009 accepted; threat model recorded |
 | 2 | Promote Phase 0 actor, tenant, permission, scope, decision and entitlement contracts to versioned production… | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-26 |
 | 3 | Implement identity, membership and provider-link lifecycle with institution provisioning events and cross-ten… | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-26 |
-| 4 | Implement authentication-policy versions and the approved provider adapter using synthetic/non-production cre… | ✔ implemented (claim) | pending | P1-E02-D07 | Epic doc progress note 2026-10-26 |
-| 5 | Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence. | ◐ in progress | pending | P1-E02-D07 | Provider-confirmed refresh evidence; atomic refresh-reuse compromise and durable provider-revocation work; optimistic concurrency |
+| 4 | Implement authentication-policy versions and the approved provider adapter using synthetic/non-production cre… | ✔ implemented (claim) | pending | — | Epic doc progress note 2026-10-26 |
+| 5 | Implement sessions, refresh/revocation coordination, lockouts and append-only authentication evidence. | ✔ implemented (claim) | pending | — | Provider-confirmed refresh evidence; atomic refresh-reuse compromise and durable provider-revocation work; optimistic concurrency; platform security floors approved in P1-E02-D07 (2026-11-06); real Keycloak refresh/revocation integration remains the production gate |
 | 6 | Implement MFA enrolment/challenges and step-up evidence for one approved customer channel and one staff/privileged flow. | ◐ in progress | approved with named gaps (2026-11-01) | — | TOTP enrolment, atomic single-use step-up, outcome evidence, and step-up-protected self-revocation with transactional evidence invalidation |
 | 7 | Implement permission catalogue plus role draft, simulation, approval and publication lifecycle. | ✔ implemented (claim) | approved with named gates (2026-11-01) | — | Full lifecycle plus immutable versions, version-pinned grants, contention protection and audited access review; named production confirmations remain |
 | 8 | Implement scoped grants, conflict-of-duty evaluation, temporary expiry and entitlement version advancement. S… | ✔ implemented (claim) | pending | — | Scoped role assignment, temporary grants, conflict evaluation, revoca… |
@@ -641,6 +642,10 @@ Every decision the epic documents still require, with its owner and the slice it
 | P1-E12-D13 | Emergency access/change policy | Security/Risk/Operations | Production access | open | — |
 | P1-E12-D14 | Data migration and go-live cutover plan | Business/Architecture/Operations | Go-live rehearsal | open | — |
 | P1-E12-D15 | Production support model and provider escalation | Operations/Vendor management | Go-live | open | — |
+| 2026-11-06 | Solution build | `dotnet build CoreBanking.sln --configuration Release` | Pass, 0 warnings, 0 errors |
+| 2026-11-06 | Formatting gate | `dotnet format --verify-no-changes` | Pass, no changes required |
+| 2026-11-06 | Migration drift (IdentityAccess, CoreLedger, OperationsWorkflow) | `scripts/migrations-verify.ps1 -Configuration Release -NoBuild` | Consistent model snapshot in all three contexts |
+| 2026-11-06 | Non-database suites | `dotnet test --filter "Category!=Database&Category!=Integration"` Release | Pass: 198 Identity, 107 Core Ledger, 146 Customer Onboarding, 26 Workflow, 15 Architecture and the smaller suites |
 
 ## Maintenance
 

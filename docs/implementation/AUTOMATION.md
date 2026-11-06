@@ -8,15 +8,15 @@ The phase and epic documents remain the implementation contracts. The slice ledg
 
 ## Current hand-off point
 
-As of 2026-11-01:
+As of 2026-11-06:
 
 - Phase 0 is the established engineering foundation.
 - Phase 1 Epic 3, Customer and Onboarding, is merged on `main` and its epic document is `Implemented`. Its slices were approved on 2026-10-31, although several ledger status cells still describe partial slice history and need evidence reconciliation.
-- Phase 1 Epic 2, Identity, Roles and Permissions, is the active unfinished epic. Its document is `In Progress`; slices 5, 6, 7, 9, 10, 11, 13, and 14 remain `in progress`, and independent approval is pending across the epic.
-- Phase 1 Epic 4, Products and Accounts, contains partial implementation, but its contract is still `Draft` and its decision slice is blocked. It is not eligible for autonomous continuation beyond reversible evidence gathering.
+- Phase 1 Epic 2, Identity, Roles and Permissions, has 14 of 15 slices recorded implemented pending review. Slice 5 closed on the approved `P1-E02-D07` platform security floors (2026-11-06); slice 6 already carries a bounded human approval; `P1-E02-D14` and `P1-E02-D15` remain open. Independent epic approval is still pending.
+- Phase 1 Epic 4, Products and Accounts, has an approved epic contract and partial implementation. Its slice 6 has no decision blocker, but its recorded note still requires approved customer, branch and currency transport contracts before implementation.
 - Frontend Admin is still documentation-only. Frontend User and Frontend Mobile contain only their initial repository documentation. Backend contract readiness therefore controls the next full-stack implementation step.
 
-The next autonomous implementation target is the smallest dependency-ready unfinished slice in P1-E02. The initial candidate selected by the controller is P1-E02 slice 5. A run must re-evaluate the ledger and repository before acting because the state may have changed.
+The controller now selects P1-E04 slice 6 as the first unfinished slice without a decision blocker. A run must confirm the prerequisite transport contracts are approved before editing; if they are not, the correct action is a contract review rather than implementation. Re-evaluate the ledger and repository before acting because the state may have changed.
 
 ## State machine
 
