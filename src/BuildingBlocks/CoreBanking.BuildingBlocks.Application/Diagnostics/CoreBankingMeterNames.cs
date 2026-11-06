@@ -4,4 +4,5 @@ namespace CoreBanking.BuildingBlocks.Application.Diagnostics;
 public static class CoreBankingMeterNames
 {
     public const string IdentityAccess = "CoreBanking.IdentityAccess";
+    public const string ProductAccounts = "CoreBanking.ProductAccounts";
 }

@@ -14,6 +14,7 @@ using CoreBanking.CoreLedger.Application.Institutions;
 using CoreBanking.CoreLedger.Contracts;
 using CoreBanking.CoreLedger.Domain.Institutions;
 using CoreBanking.CoreLedger.Infrastructure.Persistence;
+using CoreBanking.CoreLedger.Infrastructure.Products;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoreBanking.CoreLedger.Infrastructure.Institutions;
@@ -41,17 +42,20 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
     private readonly IdempotencyService _idempotency;
     private readonly ITenantContext _tenantContext;
     private readonly TimeProvider _timeProvider;
+    private readonly ProductAccountMetrics? _metrics;
 
     public InstitutionCurrencyConfigurationService(
         CoreLedgerDbContext context,
         IdempotencyService idempotency,
         ITenantContext tenantContext,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ProductAccountMetrics? metrics = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _idempotency = idempotency ?? throw new ArgumentNullException(nameof(idempotency));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _metrics = metrics;
     }
 
     public async Task<CurrencyDraftResult> CreateDraftAsync(
@@ -75,10 +79,11 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
         string canonicalJson = BuildJson(parsed.BaseCurrency, parsed.SupportedCurrencies);
         ConfigurationContent content = ConfigurationContent.Create(canonicalJson);
         string fingerprint = IdempotencyKey.Fingerprint(string.Join('|', versionId, content.Hash));
-        IdempotencyOutcome outcome = await _idempotency.ExecuteAsync(
+        IdempotencyOutcome outcome = await ExecuteRecordedAsync(
             IdempotencyKey.Create(command.InstitutionId.Value, "institution.currencies.draft.create", command.ActorId.Value, command.IdempotencyKey),
             fingerprint,
-            token => CreateDraftCoreAsync(command.InstitutionId, command.ActorId, versionId, content, token),
+            "draft.create",
+            token => CreateDraftCoreAsync(command.InstitutionId, command.ActorId, versionId, content, command.CorrelationId, token),
             cancellationToken).ConfigureAwait(false);
         return DecodeDraft(outcome, outcome.Kind == IdempotencyOutcomeKind.Replayed);
     }
@@ -94,10 +99,11 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
         ArgumentException.ThrowIfNullOrWhiteSpace(command.ContentHash);
         string contentHash = command.ContentHash.Trim().ToLowerInvariant();
         string fingerprint = IdempotencyKey.Fingerprint(string.Join('|', versionId, simulationId, contentHash));
-        IdempotencyOutcome outcome = await _idempotency.ExecuteAsync(
+        IdempotencyOutcome outcome = await ExecuteRecordedAsync(
             IdempotencyKey.Create(command.InstitutionId.Value, "institution.currencies.simulate", command.ActorId.Value, command.IdempotencyKey),
             fingerprint,
-            token => SimulateCoreAsync(command.InstitutionId, versionId, simulationId, contentHash, token),
+            "simulate",
+            token => SimulateCoreAsync(command.InstitutionId, command.ActorId, versionId, simulationId, contentHash, command.CorrelationId, token),
             cancellationToken).ConfigureAwait(false);
         return DecodeSimulation(outcome, outcome.Kind == IdempotencyOutcomeKind.Replayed);
     }
@@ -114,9 +120,10 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
         ArgumentException.ThrowIfNullOrWhiteSpace(command.ContentHash);
         string contentHash = command.ContentHash.Trim().ToLowerInvariant();
         string fingerprint = IdempotencyKey.Fingerprint(string.Join('|', requestId, versionId, contentHash));
-        IdempotencyOutcome outcome = await _idempotency.ExecuteAsync(
+        IdempotencyOutcome outcome = await ExecuteRecordedAsync(
             IdempotencyKey.Create(command.InstitutionId.Value, "institution.currencies.submit", command.ActorId.Value, command.IdempotencyKey),
             fingerprint,
+            "submit",
             token => SubmitCoreAsync(command, requestId, versionId, contentHash, token),
             cancellationToken).ConfigureAwait(false);
         return DecodeSubmission(outcome, outcome.Kind == IdempotencyOutcomeKind.Replayed);
@@ -137,9 +144,10 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
             publicationId, versionId, contentHash,
             command.EffectiveFrom.ToString("O", CultureInfo.InvariantCulture),
             command.EffectiveTo?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty));
-        IdempotencyOutcome outcome = await _idempotency.ExecuteAsync(
+        IdempotencyOutcome outcome = await ExecuteRecordedAsync(
             IdempotencyKey.Create(command.InstitutionId.Value, "institution.currencies.publish", command.ActorId.Value, command.IdempotencyKey),
             fingerprint,
+            "publish",
             token => PublishCoreAsync(command, publicationId, versionId, contentHash, token),
             cancellationToken).ConfigureAwait(false);
         return DecodePublication(outcome, outcome.Kind == IdempotencyOutcomeKind.Replayed);
@@ -150,6 +158,7 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
         ActorId actorId,
         string versionId,
         ConfigurationContent content,
+        string correlationId,
         CancellationToken cancellationToken)
     {
         await EnsureInstitutionActiveAsync(institutionId, cancellationToken).ConfigureAwait(false);
@@ -194,15 +203,18 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
             Version = 1,
             CreatedAt = now,
         });
+        AddAudit(institutionId, actorId, "institution.configuration.create", "institution.currency.draft.create", versionId, "succeeded", content.Hash, correlationId, now);
         await SaveAsync("currency_draft_conflict", "The currency configuration changed while a draft was being created.", cancellationToken).ConfigureAwait(false);
         return EncodeDraft(institutionId.Value, versionId, content.Hash, DraftStatus, now);
     }
 
     private async Task<string?> SimulateCoreAsync(
         InstitutionId institutionId,
+        ActorId actorId,
         string versionId,
         string simulationId,
         string contentHash,
+        string correlationId,
         CancellationToken cancellationToken)
     {
         ConfigurationVersionRecord record = await LoadVersionAsync(institutionId, versionId, cancellationToken).ConfigureAwait(false);
@@ -242,6 +254,7 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
             Outcome = "passed",
             SimulatedAt = now,
         });
+        AddAudit(institutionId, actorId, "institution.configuration.simulate", "institution.currency.simulation.record", simulationId, "succeeded", record.ContentHash, correlationId, now);
         await SaveAsync("currency_simulation_conflict", "The currency simulation could not be recorded.", cancellationToken).ConfigureAwait(false);
         return EncodeSimulation(institutionId.Value, versionId, record.ContentHash, content.Hash, content.Hash, "passed", now);
     }
@@ -326,6 +339,7 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
         record.Status = SubmittedStatus;
         record.ApprovalReference = requestId;
         record.Version++;
+        AddAudit(command.InstitutionId, command.ActorId, "institution.configuration.submit", "institution.currency.approval.submit", record.VersionId, "succeeded", requestId, command.CorrelationId, now);
         await SaveAsync("currency_submission_conflict", "The currency configuration changed while approval was being submitted.", cancellationToken).ConfigureAwait(false);
         return EncodeSubmission(record.InstitutionId, requestId, record.VersionId, record.ContentHash, eventId, SubmittedStatus, now);
     }
@@ -413,6 +427,7 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
         record.EffectiveTo = proposed.EffectiveTo;
         record.PublishedAt = now;
         record.Version++;
+        AddAudit(command.InstitutionId, command.ActorId, "institution.configuration.publish", "institution.currency.publish", record.VersionId, "succeeded", publicationId, command.CorrelationId, now);
         await SaveAsync("currency_publication_conflict", "The currency configuration changed while it was being published.", cancellationToken).ConfigureAwait(false);
         return EncodePublication(
             record.InstitutionId,
@@ -468,6 +483,60 @@ public sealed class InstitutionCurrencyConfigurationService : IInstitutionCurren
         {
             throw Reject("cross_tenant_access_denied", "The authenticated institution does not match the configuration target.");
         }
+    }
+
+    private async Task<IdempotencyOutcome> ExecuteRecordedAsync(
+        IdempotencyKey key,
+        string fingerprint,
+        string command,
+        Func<CancellationToken, Task<string?>> core,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            IdempotencyOutcome outcome = await _idempotency
+                .ExecuteAsync(key, fingerprint, core, cancellationToken)
+                .ConfigureAwait(false);
+            _metrics?.RecordConfigurationCommand(
+                Area,
+                command,
+                outcome.Kind == IdempotencyOutcomeKind.Replayed ? "replayed" : "succeeded");
+            return outcome;
+        }
+        catch (InstitutionCurrencyConfigurationRejectedException)
+        {
+            _metrics?.RecordConfigurationCommand(Area, command, "rejected");
+            throw;
+        }
+    }
+
+    private void AddAudit(
+        InstitutionId institutionId,
+        ActorId actorId,
+        string permission,
+        string action,
+        string resourceId,
+        string outcome,
+        string afterReference,
+        string correlationId,
+        DateTimeOffset occurredAt)
+    {
+        _context.InstitutionAuditEvents.Add(new InstitutionAuditRecord
+        {
+            InstitutionId = institutionId.Value,
+            AuditEventId = Guid.NewGuid().ToString("N"),
+            ActorId = actorId.Value,
+            ActorType = "human",
+            Permission = permission,
+            Action = action,
+            ResourceType = "institution.configuration.version",
+            ResourceId = resourceId,
+            Outcome = outcome,
+            Reason = string.Empty,
+            CorrelationId = correlationId,
+            AfterReference = afterReference,
+            OccurredAt = occurredAt,
+        });
     }
 
     private static string SetId(InstitutionId institutionId) => string.Concat("institution-currencies:", institutionId.Value);

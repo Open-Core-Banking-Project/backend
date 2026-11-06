@@ -339,6 +339,7 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
         record.Status = "submitted";
         record.ApprovalReference = requestId;
         record.Version++;
+        AddAudit(record.InstitutionId, command.ActorId, "product.version.update", "product.savings.eligibility.approval.submit", record.VersionId, requestId, command.CorrelationId, now);
         await SaveAsync("product_approval_conflict", "The product version changed while approval was being submitted.", cancellationToken)
             .ConfigureAwait(false);
         return EncodeSubmission(record.InstitutionId, requestId, record.VersionId, record.ContentHash, eventId, "submitted", now);
@@ -417,6 +418,7 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
         record.EffectiveTo = proposed.EffectiveTo;
         record.PublishedAt = now;
         record.Version++;
+        AddAudit(record.InstitutionId, command.ActorId, "product.version.publish", "product.savings.eligibility.publish", record.VersionId, publicationId, command.CorrelationId, now);
         _context.ConfigurationPublications.Add(new ConfigurationPublicationRecord
         {
             InstitutionId = record.InstitutionId,
@@ -540,6 +542,34 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
         if (_tenantContext.CurrentInstitution != institutionId)
             throw Reject("cross_tenant_access_denied", "The authenticated institution does not match the product target.");
+    }
+
+    private void AddAudit(
+        string institutionId,
+        ActorId actorId,
+        string permission,
+        string action,
+        string resourceId,
+        string afterReference,
+        string correlationId,
+        DateTimeOffset occurredAt)
+    {
+        _context.InstitutionAuditEvents.Add(new InstitutionAuditRecord
+        {
+            InstitutionId = institutionId,
+            AuditEventId = Guid.NewGuid().ToString("N"),
+            ActorId = actorId.Value,
+            ActorType = "human",
+            Permission = permission,
+            Action = action,
+            ResourceType = "product.savings.eligibility.version",
+            ResourceId = resourceId,
+            Outcome = "succeeded",
+            Reason = string.Empty,
+            CorrelationId = correlationId,
+            AfterReference = afterReference,
+            OccurredAt = occurredAt,
+        });
     }
 
     private static string ValidateIdentifier(string value, string parameterName, int maximumLength)

@@ -78,6 +78,7 @@ public static class CoreBankingObservability
                     .AddMeter("CoreBanking.Messaging")
                     .AddMeter("CoreBanking.Institutions")
                     .AddMeter(CoreBankingMeterNames.IdentityAccess)
+                    .AddMeter(CoreBankingMeterNames.ProductAccounts)
                     .AddOtlpExporter(options =>
                     {
                         options.Endpoint = endpointUri;

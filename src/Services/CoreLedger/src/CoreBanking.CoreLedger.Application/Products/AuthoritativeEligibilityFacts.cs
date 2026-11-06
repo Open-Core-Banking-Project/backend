@@ -40,6 +40,22 @@ public sealed record CurrencyReferenceSnapshot(
     IReadOnlyCollection<string> SupportedCurrencies,
     string ReferenceVersion);
 
+/// <summary>Bounded reference-fact outcome telemetry. Implementations must never record payload values.</summary>
+public interface IReferenceFactTelemetry
+{
+    void Record(string outcome);
+}
+
+/// <summary>Telemetry sink used when no meter is configured (tests and simulations).</summary>
+public sealed class NullReferenceFactTelemetry : IReferenceFactTelemetry
+{
+    public static NullReferenceFactTelemetry Instance { get; } = new();
+
+    public void Record(string outcome)
+    {
+    }
+}
+
 public interface ICustomerEligibilityFactsSource
 {
     Task<CustomerFactsLookup> GetAsync(
@@ -84,18 +100,27 @@ public sealed class AuthoritativeEligibilityFactsResolver
 
     private const string ActiveBranchStatus = "active";
 
+    private ResolvedEligibilityFacts Reject(string code)
+    {
+        _telemetry.Record(code);
+        return ResolvedEligibilityFacts.Rejected(code);
+    }
+
     private readonly ICustomerEligibilityFactsSource _customers;
     private readonly IBranchReferenceSource _branches;
     private readonly ICurrencyReferenceSource _currencies;
+    private readonly IReferenceFactTelemetry _telemetry;
 
     public AuthoritativeEligibilityFactsResolver(
         ICustomerEligibilityFactsSource customers,
         IBranchReferenceSource branches,
-        ICurrencyReferenceSource currencies)
+        ICurrencyReferenceSource currencies,
+        IReferenceFactTelemetry? telemetry = null)
     {
         _customers = customers ?? throw new ArgumentNullException(nameof(customers));
         _branches = branches ?? throw new ArgumentNullException(nameof(branches));
         _currencies = currencies ?? throw new ArgumentNullException(nameof(currencies));
+        _telemetry = telemetry ?? NullReferenceFactTelemetry.Instance;
     }
 
     public async Task<ResolvedEligibilityFacts> ResolveAsync(
@@ -115,28 +140,28 @@ public sealed class AuthoritativeEligibilityFactsResolver
             .ConfigureAwait(false);
         if (lookup.Snapshot is null)
         {
-            return ResolvedEligibilityFacts.Rejected(lookup.RejectionCode ?? "eligibility_facts_unavailable");
+            return Reject(lookup.RejectionCode ?? "eligibility_facts_unavailable");
         }
 
         CustomerEligibilitySnapshot customer = lookup.Snapshot;
         if (!string.Equals(customer.InstitutionId, institutionId.Value, StringComparison.Ordinal))
         {
-            return ResolvedEligibilityFacts.Rejected("eligibility_facts_mismatch");
+            return Reject("eligibility_facts_mismatch");
         }
 
         if (customer.ValidUntil < asOf)
         {
-            return ResolvedEligibilityFacts.Rejected("eligibility_facts_stale");
+            return Reject("eligibility_facts_stale");
         }
 
         if (customer.ValidUntil - customer.AsOf > MaximumValidity)
         {
-            return ResolvedEligibilityFacts.Rejected("eligibility_facts_window_exceeded");
+            return Reject("eligibility_facts_window_exceeded");
         }
 
         if (string.IsNullOrWhiteSpace(branchId))
         {
-            return ResolvedEligibilityFacts.Rejected("branch_not_available");
+            return Reject("branch_not_available");
         }
 
         BranchReferenceSnapshot? branch = await _branches
@@ -144,7 +169,7 @@ public sealed class AuthoritativeEligibilityFactsResolver
             .ConfigureAwait(false);
         if (branch is null || !string.Equals(branch.Status, ActiveBranchStatus, StringComparison.OrdinalIgnoreCase))
         {
-            return ResolvedEligibilityFacts.Rejected("branch_not_available");
+            return Reject("branch_not_available");
         }
 
         CurrencyReferenceSnapshot? currency = await _currencies
@@ -152,20 +177,21 @@ public sealed class AuthoritativeEligibilityFactsResolver
             .ConfigureAwait(false);
         if (currency is null || string.IsNullOrWhiteSpace(currency.ReferenceVersion))
         {
-            return ResolvedEligibilityFacts.Rejected("currency_reference_unavailable");
+            return Reject("currency_reference_unavailable");
         }
 
         string requestedCurrency = currencyCode.Trim().ToUpperInvariant();
         if (!currency.SupportedCurrencies.Contains(requestedCurrency, StringComparer.Ordinal))
         {
-            return ResolvedEligibilityFacts.Rejected("currency_not_supported");
+            return Reject("currency_not_supported");
         }
 
         if (string.IsNullOrWhiteSpace(customer.FactsVersion) || string.IsNullOrWhiteSpace(branch.ReferenceVersion))
         {
-            return ResolvedEligibilityFacts.Rejected("eligibility_facts_version_missing");
+            return Reject("eligibility_facts_version_missing");
         }
 
+        _telemetry.Record("resolved");
         return ResolvedEligibilityFacts.Resolved(new AuthoritativeProductEligibilityFacts(
             customer.FactsVersion,
             branch.ReferenceVersion,

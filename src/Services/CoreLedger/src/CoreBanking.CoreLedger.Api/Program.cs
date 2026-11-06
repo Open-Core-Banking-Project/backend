@@ -52,6 +52,8 @@ provisioningPlan.Validate();
 builder.Services.AddSingleton(provisioningPlan);
 builder.Services.AddSingleton<ITenantContext, AmbientTenantContext>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton(ProductAccountMetrics.Shared);
+builder.Services.AddSingleton<IReferenceFactTelemetry, ProductAccountTelemetry>();
 RegisterWorkloadIdentity(builder.Services, builder.Configuration);
 
 // Authoritative customer facts are read from their owner. Without a configured endpoint the source
@@ -156,6 +158,7 @@ if (useRelationalStore)
     builder.Services.AddScoped<IBusinessCalendarService, BusinessCalendarService>();
     builder.Services.AddScoped<ISavingsProductConfigurationService, SavingsProductConfigurationService>();
     builder.Services.AddScoped<IInstitutionCurrencyConfigurationService, InstitutionCurrencyConfigurationService>();
+    builder.Services.AddScoped<IConfigurationReconciliationService, ConfigurationReconciliationService>();
     builder.Services.AddScoped<IBranchReferenceSource, BranchReferenceSource>();
     builder.Services.AddScoped<ICurrencyReferenceSource, CurrencyReferenceSource>();
     builder.Services.AddScoped<AuthoritativeEligibilityFactsResolver>();
@@ -172,6 +175,9 @@ WebApplication app = builder.Build();
 if (useRelationalStore)
 {
     InstitutionOperationalGauges.Register(
+        app.Services.GetRequiredService<IServiceScopeFactory>(),
+        app.Services.GetRequiredService<TimeProvider>());
+    ProductAccountGauges.Register(
         app.Services.GetRequiredService<IServiceScopeFactory>(),
         app.Services.GetRequiredService<TimeProvider>());
 }
@@ -664,6 +670,26 @@ static void MapSavingsProductEndpoints(WebApplication app)
     .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
         InstitutionPermissions.ConfigurationPublishRequirement,
         "institution.configuration.publish"));
+
+    // On-demand reconciliation of the product and currency configuration areas.
+    // Decision: P1-E04 slice 14.
+    app.MapGet("/internal/v1/reconciliation/product-accounts", async (
+        IConfigurationReconciliationService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            ConfigurationReconciliationReport report = await service.ReconcileAsync(cancellationToken);
+            return Results.Ok(report);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Problem("reconciliation.context_required", "Reconciliation unavailable", exception.Message, StatusCodes.Status409Conflict);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationAuditViewRequirement,
+        "institution.configuration.audit"));
 
     app.MapPost("/api/v1/institutions/{institutionId}/products/{productId}/savings-eligibility/versions", async (
         HttpContext http,

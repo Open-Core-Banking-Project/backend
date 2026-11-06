@@ -32,6 +32,13 @@ public static class InstitutionPermissions
 
     public static PermissionIdentifier ConfigurationPublish { get; } = PermissionIdentifier.Parse("institution.configuration.publish");
 
+    /// <summary>
+    /// Reconciliation and configuration-audit reads. Epic 1 names this capability
+    /// <c>institution.configuration.audit.view</c>, which has four segments; the platform grammar accepts
+    /// exactly three, so the enforced identifier is <c>institution.configuration.audit</c>.
+    /// </summary>
+    public static PermissionIdentifier ConfigurationAuditView { get; } = PermissionIdentifier.Parse("institution.configuration.audit");
+
     public static PermissionRequirement CreateRequirement { get; } = new()
     {
         Permission = Create,
@@ -65,4 +72,5 @@ public static class InstitutionPermissions
     public static PermissionRequirement ConfigurationSimulateRequirement { get; } = new() { Permission = ConfigurationSimulate, RequiresStepUp = true };
     public static PermissionRequirement ConfigurationSubmitRequirement { get; } = new() { Permission = ConfigurationSubmit, RequiresStepUp = true, IsRestrictedApproval = true };
     public static PermissionRequirement ConfigurationPublishRequirement { get; } = new() { Permission = ConfigurationPublish, RequiresStepUp = true, IsRestrictedApproval = true };
+    public static PermissionRequirement ConfigurationAuditViewRequirement { get; } = new() { Permission = ConfigurationAuditView, RequiresStepUp = true };
 }
