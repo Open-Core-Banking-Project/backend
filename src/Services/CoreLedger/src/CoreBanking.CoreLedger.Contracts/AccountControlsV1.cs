@@ -1,0 +1,100 @@
+using System;
+using System.Collections.Generic;
+
+namespace CoreBanking.CoreLedger.Contracts;
+
+public sealed record CreateAccountRestrictionRequestV1(
+    string RequestId,
+    string RestrictionTypeCode,
+    string PostingDirectionCode,
+    IReadOnlyCollection<string> ChannelScopeCodes,
+    IReadOnlyCollection<string> TransactionTypeScopeCodes,
+    string ReasonCode,
+    string? AuthorityReference,
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? EffectiveTo);
+
+public sealed record RestrictionResponseV1(
+    string InstitutionId,
+    string RestrictionId,
+    string AccountId,
+    string RestrictionTypeCode,
+    string PostingDirectionCode,
+    string Status,
+    long ControlVersion,
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? EffectiveTo,
+    DateTimeOffset ChangedAt,
+    bool Replayed);
+
+public sealed record CreateAccountLienRequestV1(
+    string RequestId,
+    MonetaryAmountV1 Amount,
+    string PriorityCode,
+    string ReasonCode,
+    string AuthorityReference,
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? EffectiveTo);
+
+public sealed record LienResponseV1(
+    string InstitutionId,
+    string LienId,
+    string AccountId,
+    MonetaryAmountV1 Amount,
+    string PriorityCode,
+    string Status,
+    long ControlVersion,
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? EffectiveTo,
+    DateTimeOffset ChangedAt,
+    bool Replayed);
+
+public sealed record EvaluateAccountControlsRequestV1(
+    string PostingIntentId,
+    string PostingDirectionCode,
+    string TransactionTypeCode,
+    string ChannelCode,
+    MonetaryAmountV1 Amount,
+    long KnownControlVersion,
+    DateTimeOffset EvaluationTime);
+
+public sealed record EffectiveAccountControlV1(
+    string ControlId,
+    string ControlTypeCode,
+    string ScopeCode,
+    string Status,
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? EffectiveTo);
+
+public sealed record AccountControlDecisionV1(
+    string InstitutionId,
+    string AccountId,
+    string PostingIntentId,
+    string Outcome,
+    IReadOnlyCollection<string> ReasonCodes,
+    IReadOnlyCollection<EffectiveAccountControlV1> EffectiveControls,
+    long ControlVersion,
+    DateTimeOffset EvaluatedAt);
+
+public sealed record AccountRestrictionChangedV1(
+    string InstitutionId,
+    string AccountId,
+    string RestrictionId,
+    string RestrictionTypeCode,
+    string PostingDirectionCode,
+    IReadOnlyCollection<string> ScopeCodes,
+    string Status,
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? EffectiveTo,
+    long ControlVersion,
+    DateTimeOffset ChangedAt);
+
+public sealed record AccountLienChangedV1(
+    string InstitutionId,
+    string AccountId,
+    string LienId,
+    MonetaryAmountV1 Amount,
+    string Status,
+    string PriorityCode,
+    long ControlVersion,
+    DateTimeOffset ChangedAt);
