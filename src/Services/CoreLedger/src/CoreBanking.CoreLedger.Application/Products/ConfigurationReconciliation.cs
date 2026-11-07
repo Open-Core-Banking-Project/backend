@@ -51,6 +51,61 @@ public sealed record AccountNumberSchemeDepletion(
     long Available,
     int DepletionBand);
 
+/// <summary>One account as account reconciliation reads it.</summary>
+public sealed record AccountReconciliationFacts(
+    string AccountId,
+    string AccountApplicationId,
+    string Status,
+    string LedgerInitialisationStatus,
+    string? LedgerAccountReference);
+
+/// <summary>One application as account reconciliation reads it.</summary>
+public sealed record ApplicationReconciliationFacts(
+    string ApplicationId,
+    string Status);
+
+/// <summary>
+/// Detects account states that must never survive a settled system: an open or active account without a
+/// proven ledger initialisation, and an approved application that never produced an account.
+/// Decision: P1-E04-D09.
+/// </summary>
+public static class AccountReconciliationPolicy
+{
+    public const string MissingLedgerInitialisationCode = "account_without_ledger_initialisation";
+    public const string ApprovedWithoutAccountCode = "approved_application_without_account";
+
+    private static readonly string[] InitialisedStatuses = ["Open", "Active", "Restricted", "Frozen", "Dormant", "PendingClosure", "Closed"];
+
+    public static IReadOnlyList<ConfigurationReconciliationFinding> Evaluate(
+        IReadOnlyCollection<AccountReconciliationFacts> accounts,
+        IReadOnlyCollection<ApplicationReconciliationFacts> applications)
+    {
+        ArgumentNullException.ThrowIfNull(accounts);
+        ArgumentNullException.ThrowIfNull(applications);
+
+        List<ConfigurationReconciliationFinding> findings = [];
+        findings.AddRange(accounts
+            .Where(account => InitialisedStatuses.Contains(account.Status, StringComparer.Ordinal)
+                && (!string.Equals(account.LedgerInitialisationStatus, "initialised", StringComparison.Ordinal)
+                    || string.IsNullOrWhiteSpace(account.LedgerAccountReference)))
+            .OrderBy(account => account.AccountId, StringComparer.Ordinal)
+            .Take(ConfigurationReconciliationPolicy.MaximumFindingsPerCode)
+            .Select(account => new ConfigurationReconciliationFinding(
+                MissingLedgerInitialisationCode,
+                account.AccountApplicationId,
+                account.AccountId)));
+        findings.AddRange(applications
+            .Where(application => string.Equals(application.Status, "Approved", StringComparison.Ordinal))
+            .OrderBy(application => application.ApplicationId, StringComparer.Ordinal)
+            .Take(ConfigurationReconciliationPolicy.MaximumFindingsPerCode)
+            .Select(application => new ConfigurationReconciliationFinding(
+                ApprovedWithoutAccountCode,
+                application.ApplicationId,
+                application.ApplicationId)));
+        return findings;
+    }
+}
+
 public interface IConfigurationReconciliationService
 {
     Task<ConfigurationReconciliationReport> ReconcileAsync(CancellationToken cancellationToken);

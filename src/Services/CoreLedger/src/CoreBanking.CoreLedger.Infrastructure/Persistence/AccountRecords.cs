@@ -25,6 +25,11 @@ public sealed class AccountApplicationRecord : ITenantOwnedEntity
     public required string CurrencyCode { get; set; }
     public required string AccountPurposeCode { get; set; }
     public required string OwnershipTypeCode { get; set; }
+    public string? EligibilityEvaluationId { get; set; }
+    public string? EligibilitySnapshotHash { get; set; }
+    public string? ApprovalRequestId { get; set; }
+    public string? ApprovedByActorId { get; set; }
+    public DateTimeOffset? ApprovedAt { get; set; }
     public required string Status { get; set; }
     public required string CreatedByActorId { get; set; }
     public long Version { get; set; }
@@ -56,8 +61,24 @@ public sealed class AccountRecord : ITenantOwnedEntity
     public required string SchemeVersionId { get; set; }
     public required string Status { get; set; }
     public required string LedgerInitialisationStatus { get; set; }
+    public string? LedgerAccountReference { get; set; }
     public long Version { get; set; }
     public DateTimeOffset OpenedAt { get; set; }
+}
+
+/// <summary>
+/// The ledger account opened for one bank account. It deliberately has no amount, balance or posting
+/// column: opening and activation can never create money. Decision: P1-E04-D09.
+/// </summary>
+public sealed class LedgerAccountRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+    public required string LedgerAccountId { get; set; }
+    public required string AccountId { get; set; }
+    public required string CurrencyCode { get; set; }
+    public required string Status { get; set; }
+    public long Version { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 /// <summary>

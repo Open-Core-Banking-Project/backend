@@ -283,6 +283,20 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("account_purpose_code");
 
+                    b.Property<string>("ApprovalRequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("approval_request_id");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<string>("ApprovedByActorId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("approved_by_actor_id");
+
                     b.Property<string>("BranchId")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -310,6 +324,16 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
                         .HasColumnName("customer_id");
+
+                    b.Property<string>("EligibilityEvaluationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("eligibility_evaluation_id");
+
+                    b.Property<string>("EligibilitySnapshotHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("eligibility_snapshot_hash");
 
                     b.Property<string>("OwnershipTypeCode")
                         .IsRequired()
@@ -718,6 +742,11 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
                         .HasColumnName("customer_id");
+
+                    b.Property<string>("LedgerAccountReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ledger_account_reference");
 
                     b.Property<string>("LedgerInitialisationStatus")
                         .IsRequired()
@@ -1809,6 +1838,56 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerAccountRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("LedgerAccountId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ledger_account_id");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "LedgerAccountId");
+
+                    b.HasIndex("InstitutionId", "AccountId")
+                        .IsUnique();
+
+                    b.ToTable("ledger_accounts", "account", t =>
+                        {
+                            t.HasCheckConstraint("ck_ledger_accounts_status", "status IN ('initialised', 'closed')");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.OrganisationStatusHistoryRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -2225,6 +2304,15 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("InstitutionId", "RollbackOfVersionId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerAccountRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.ProductRecord", b =>

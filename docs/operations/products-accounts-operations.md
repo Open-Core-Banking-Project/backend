@@ -5,10 +5,10 @@ Operational contract for the Core Banking and Ledger product and account configu
 `institution.account-numbering`) and the account application and opening boundary.
 Decisions: P1-E04 slice 14, P1-E04-D06, P1-E04-D07.
 
-Restrictions, liens, dormancy, activation and statements are not implemented, so this runbook covers the
-configuration lifecycle, reference-fact consumption, account applications with their eligibility evidence,
-number allocation, account opening and the integrity signals that exist today. Extend it in the same change
-that enables those features; do not document a capability ahead of the code.
+Restrictions, liens, dormancy and statements are not implemented, so this runbook covers the configuration
+lifecycle, reference-fact consumption, account applications with their eligibility evidence, number
+allocation, approval, account opening, activation and the integrity signals that exist today. Extend it in the
+same change that enables those features; do not document a capability ahead of the code.
 
 ## Signals
 
@@ -61,6 +61,8 @@ and returns a tenant-scoped, identifier-only report:
 | `published_version_without_publication` | A version claims `published` with no publication evidence | Do not serve it as effective; re-publish through the lifecycle or supersede it |
 | `approved_without_approval_evidence` | An approved version lacks approval reference or approver | Re-open approval through Workflow; publication must keep failing closed |
 | `overlapping_publication_periods` | Two publications in one set overlap or one is open-ended | Supersede the earlier publication with a closed period; account decisions must treat the set as ambiguous and deny |
+| `account_without_ledger_initialisation` | An account exists without a proven ledger initialisation reference | Stop activation for that account; the ledger contract must return its own reference before the account can become active. Never set the reference by hand |
+| `approved_application_without_account` | An application is approved but produced no account | Read the opening rejection code (scheme missing, exhausted or a segment that cannot be projected); the application stays approved and unassigned until the cause is fixed |
 
 Each code reports at most 20 findings so the response stays bounded; `IsHealthy` is false while any finding or
 pending outbox message exists.
@@ -70,6 +72,12 @@ pending outbox message exists.
 **Product or currency publication failure.** Read the stable code, correct the cause, and re-submit with the
 same idempotency key only when the payload is unchanged. A changed payload needs a new key. Never edit a
 configuration version row directly: published versions are immutable and the hash is the evidence.
+
+**Approval and activation.** An application becomes `PendingApproval` only from `Eligible`, and the decision must match the exact
+application version and eligibility snapshot hash; a mismatched decision is refused before anything changes. An approved decision opens
+the account in the same transaction, so a caller never opens an approved application twice. Activation refuses with
+`ledger_initialisation_unproven`, `account_number_scheme_not_effective`, `eligibility_facts_stale` or the product rule code; the account
+stays open and unactivated, and the remedy is to fix the named cause - not to force the status.
 
 **Number allocation contention.** `account_number_reservation_conflict` means two openings created the
 reservation row at the same time; the retry succeeds once the row exists. A sustained conflict rate means the

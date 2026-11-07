@@ -62,4 +62,24 @@ public static class AccountApplicationLifecycle
         current == AccountApplicationStatus.Approved
             ? AccountApplicationStatus.Open
             : throw new InvalidOperationException($"account_application_transition_not_allowed:{current}");
+
+    /// <summary>Only an eligible application may be submitted for approval. Decision: P1-E04-D09.</summary>
+    public static AccountApplicationStatus RecordSubmittedForApproval(AccountApplicationStatus current) =>
+        current == AccountApplicationStatus.Eligible
+            ? AccountApplicationStatus.PendingApproval
+            : throw new InvalidOperationException($"account_application_transition_not_allowed:{current}");
+
+    /// <summary>The decision applies only to a submitted application and is idempotent by request.</summary>
+    public static AccountApplicationStatus RecordApprovalDecision(AccountApplicationStatus current, bool approved)
+    {
+        if (current != AccountApplicationStatus.PendingApproval)
+            throw new InvalidOperationException($"account_application_transition_not_allowed:{current}");
+        return approved ? AccountApplicationStatus.Approved : AccountApplicationStatus.Rejected;
+    }
+
+    /// <summary>Activation is a separate authorised transition from an open account. Decision: P1-E04-D09.</summary>
+    public static AccountApplicationStatus RecordActivated(AccountApplicationStatus current) =>
+        current == AccountApplicationStatus.Open
+            ? AccountApplicationStatus.Active
+            : throw new InvalidOperationException($"account_application_transition_not_allowed:{current}");
 }

@@ -102,6 +102,12 @@ public interface IAccountNumberAllocator
 public interface IAccountOpeningService
 {
     Task<AccountOpenedResult> OpenAsync(OpenAccountCommand command, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The atomic unit without its own transaction, for a caller that already owns one, such as the approval
+    /// decision. Returns the encoded result. Decision: P1-E04-D09.
+    /// </summary>
+    Task<string?> OpenWithinTransactionAsync(OpenAccountCommand command, CancellationToken cancellationToken);
 }
 
 /// <summary>

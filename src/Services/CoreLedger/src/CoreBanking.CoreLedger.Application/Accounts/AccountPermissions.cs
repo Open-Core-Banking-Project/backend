@@ -17,6 +17,9 @@ public static class AccountPermissions
     public static PermissionIdentifier NumberReveal { get; } =
         PermissionIdentifier.Parse("account.number.reveal");
 
+    public static PermissionIdentifier ActivationCreate { get; } =
+        PermissionIdentifier.Parse("account.activation.create");
+
     public static PermissionRequirement ApplicationCreateRequirement { get; } = new()
     {
         Permission = ApplicationCreate,
@@ -38,6 +41,12 @@ public static class AccountPermissions
     public static PermissionRequirement NumberRevealRequirement { get; } = new()
     {
         Permission = NumberReveal,
+        RequiresStepUp = true,
+    };
+
+    public static PermissionRequirement ActivationCreateRequirement { get; } = new()
+    {
+        Permission = ActivationCreate,
         RequiresStepUp = true,
     };
 }

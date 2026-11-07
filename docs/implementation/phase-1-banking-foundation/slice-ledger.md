@@ -39,12 +39,12 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 ## Snapshot
 
 - Slices: **176** across **12** epics.
-- Implemented: **40** — **22** awaiting evidence review and **18** with a recorded human approval.
-- In progress: **21**. Not started: **105**. Blocked approvals: **10**.
+- Implemented: **41** — **23** awaiting evidence review and **18** with a recorded human approval.
+- In progress: **21**. Not started: **104**. Blocked approvals: **10**.
 - Decisions: **189** total — 130 open, 4 partially approved, 19 with no recorded status, 36 resolved.
-- Slices the controller may start now without a new decision: **2** — `P1-E04-S9` after `P1-E04-D07`, `D06` and `D09` were approved, plus `P1-E04-S15`, the Phase 1 closing evidence slice.
+- Slices the controller may start now without a new decision: **1** — `P1-E04-S15`, the Phase 1 closing evidence slice, which needs the live stack.
 
-Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 and 2026-11-07 after `P1-E02-D07`, `P1-E04-D17`, `P1-E04-D06`, `P1-E04-D07` and `P1-E04-D09` were approved and slices `P1-E04-S6`, `P1-E04-S7`, `P1-E04-S8` and `P1-E04-S14` closed. Verification is recorded separately in the
+Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 and 2026-11-07 after `P1-E02-D07`, `P1-E04-D17`, `P1-E04-D06`, `P1-E04-D07` and `P1-E04-D09` were approved and slices `P1-E04-S6` to `P1-E04-S9` and `P1-E04-S14` closed. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
 
 ## Epic summary
@@ -54,7 +54,7 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 | P1-E01 Institution and Tenancy | Implemented | 12 | 11 | 11 | 0 | 1 | 0 | 9 |
 | P1-E02 Identity, Roles and Permissions | In Progress | 15 | 2 | 14 | 1 | 0 | 0 | 2 |
 | P1-E03 Customer and Onboarding | Implemented | 15 | 15 | 3 | 12 | 0 | 0 | 0 |
-| P1-E04 Products and Accounts | Approved | 15 | 0 | 8 | 0 | 1 | 6 | 10 |
+| P1-E04 Products and Accounts | Approved | 15 | 0 | 9 | 0 | 1 | 5 | 10 |
 | P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
 | P1-E06 Workflow and Maker-Checker | Approved | 13 | 0 | 4 | 0 | 1 | 8 | 12 |
 | P1-E07 Payments, Collections and VTU | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
@@ -66,13 +66,12 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 
 ## Ready queue
 
-`P1-E04-S7` (application and eligibility snapshots) and `P1-E04-S8` (number reservation and account opening) are
-implemented and awaiting review, so the controller now selects `P1-E04-S9` (approval, activation and
-ledger-initialisation handoff under `P1-E04-D09`). Slices 10 to 13 still await product policy decisions
-(`P1-E04-D10`, `D11`, `D12`, `D13`, `D15`), and every one of those has a ready-for-review brief under
-[`decisions/`](decisions) with a recommended position, the current implementation state and a sign-off table.
-`P1-E04-S15` (security, performance, backup/restore and Phase 1 end-to-end evidence) stays available but needs the
-live stack.
+Slices 7, 8 and 9 are implemented and awaiting review, so the account-opening journey now exists end to end in code:
+application, eligibility evidence, approval, number allocation, account opening, ledger initialisation and
+activation. The controller therefore has no product-policy work left to start: slices 10 to 13 await `P1-E04-D10`,
+`D11`, `D12`, `D13` and `D15`, each with a ready-for-review brief under [`decisions/`](decisions), and the only
+unblocked candidate is `P1-E04-S15` (security, performance, backup/restore and Phase 1 end-to-end evidence), which
+needs the live stack.
 
 ## Human gates before the loop can advance
 

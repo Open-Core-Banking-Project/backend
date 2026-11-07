@@ -34,6 +34,11 @@ internal sealed class AccountApplicationRecordConfiguration : IEntityTypeConfigu
         builder.Property(x => x.CurrencyCode).HasColumnName("currency_code").HasMaxLength(3);
         builder.Property(x => x.AccountPurposeCode).HasColumnName("account_purpose_code").HasMaxLength(64);
         builder.Property(x => x.OwnershipTypeCode).HasColumnName("ownership_type_code").HasMaxLength(64);
+        builder.Property(x => x.EligibilityEvaluationId).HasColumnName("eligibility_evaluation_id").HasMaxLength(128);
+        builder.Property(x => x.EligibilitySnapshotHash).HasColumnName("eligibility_snapshot_hash").HasMaxLength(64);
+        builder.Property(x => x.ApprovalRequestId).HasColumnName("approval_request_id").HasMaxLength(128);
+        builder.Property(x => x.ApprovedByActorId).HasColumnName("approved_by_actor_id").HasMaxLength(128);
+        builder.Property(x => x.ApprovedAt).HasColumnName("approved_at");
         builder.Property(x => x.Status).HasColumnName("status").HasMaxLength(32);
         builder.Property(x => x.CreatedByActorId).HasColumnName("created_by_actor_id").HasMaxLength(128);
         builder.Property(x => x.Version).HasColumnName("version").IsConcurrencyToken();
@@ -80,8 +85,30 @@ internal sealed class AccountRecordConfiguration : IEntityTypeConfiguration<Acco
         builder.Property(x => x.SchemeVersionId).HasColumnName("scheme_version_id").HasMaxLength(128);
         builder.Property(x => x.Status).HasColumnName("status").HasMaxLength(32);
         builder.Property(x => x.LedgerInitialisationStatus).HasColumnName("ledger_initialisation_status").HasMaxLength(32);
+        builder.Property(x => x.LedgerAccountReference).HasColumnName("ledger_account_reference").HasMaxLength(128);
         builder.Property(x => x.Version).HasColumnName("version").IsConcurrencyToken();
         builder.Property(x => x.OpenedAt).HasColumnName("opened_at");
+    }
+}
+
+internal sealed class LedgerAccountRecordConfiguration : IEntityTypeConfiguration<LedgerAccountRecord>
+{
+    public void Configure(EntityTypeBuilder<LedgerAccountRecord> builder)
+    {
+        builder.ToTable("ledger_accounts", "account", table =>
+            table.HasCheckConstraint("ck_ledger_accounts_status", "status IN ('initialised', 'closed')"));
+        builder.HasKey(x => new { x.InstitutionId, x.LedgerAccountId });
+        builder.HasIndex(x => new { x.InstitutionId, x.AccountId }).IsUnique();
+        builder.HasOne<AccountRecord>().WithMany()
+            .HasForeignKey(x => new { x.InstitutionId, x.AccountId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.Property(x => x.InstitutionId).HasColumnName("institution_id").HasMaxLength(128);
+        builder.Property(x => x.LedgerAccountId).HasColumnName("ledger_account_id").HasMaxLength(128);
+        builder.Property(x => x.AccountId).HasColumnName("account_id").HasMaxLength(128);
+        builder.Property(x => x.CurrencyCode).HasColumnName("currency_code").HasMaxLength(3);
+        builder.Property(x => x.Status).HasColumnName("status").HasMaxLength(32);
+        builder.Property(x => x.Version).HasColumnName("version").IsConcurrencyToken();
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at");
     }
 }
 

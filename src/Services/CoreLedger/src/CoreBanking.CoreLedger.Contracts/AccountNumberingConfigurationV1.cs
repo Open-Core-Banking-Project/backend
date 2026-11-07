@@ -31,6 +31,24 @@ public sealed record PublishAccountNumberingRequestV1(
 public sealed record OpenAccountRequestV1(
     long ExpectedVersion);
 
+public sealed record SubmitAccountApplicationForApprovalRequestV1(
+    string RequestId,
+    string SourceRequestKey,
+    long ExpectedVersion);
+
+public sealed record AccountActivationRequestV1(
+    long ExpectedVersion);
+
+public sealed record AccountActivationResponseV1(
+    string InstitutionId,
+    string AccountId,
+    string MaskedAccountNumber,
+    string Status,
+    string LedgerAccountReference,
+    long Version,
+    DateTimeOffset ActivatedAt,
+    bool Replayed);
+
 public sealed record RevealAccountNumberRequestV1(
     string Reason);
 

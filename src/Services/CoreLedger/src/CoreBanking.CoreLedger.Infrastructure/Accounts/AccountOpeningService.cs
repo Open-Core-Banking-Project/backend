@@ -33,6 +33,7 @@ public sealed class AccountOpeningService : IAccountOpeningService
     private readonly TimeProvider _timeProvider;
     private readonly IAccountNumberSchemeSource _schemes;
     private readonly IAccountNumberAllocator _allocator;
+    private readonly ILedgerAccountInitialisation _initialisation;
 
     public AccountOpeningService(
         CoreLedgerDbContext context,
@@ -40,7 +41,8 @@ public sealed class AccountOpeningService : IAccountOpeningService
         ITenantContext tenantContext,
         TimeProvider timeProvider,
         IAccountNumberSchemeSource schemes,
-        IAccountNumberAllocator allocator)
+        IAccountNumberAllocator allocator,
+        ILedgerAccountInitialisation initialisation)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _idempotency = idempotency ?? throw new ArgumentNullException(nameof(idempotency));
@@ -48,6 +50,7 @@ public sealed class AccountOpeningService : IAccountOpeningService
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _schemes = schemes ?? throw new ArgumentNullException(nameof(schemes));
         _allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
+        _initialisation = initialisation ?? throw new ArgumentNullException(nameof(initialisation));
     }
 
     public async Task<AccountOpenedResult> OpenAsync(
@@ -55,21 +58,19 @@ public sealed class AccountOpeningService : IAccountOpeningService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        ArgumentNullException.ThrowIfNull(command.InstitutionId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(command.IdempotencyKey);
-        ArgumentException.ThrowIfNullOrWhiteSpace(command.ApplicationId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(command.CorrelationId);
-        if (_tenantContext.CurrentInstitution != command.InstitutionId)
-        {
-            throw Reject("cross_tenant_access_denied", "The authenticated institution does not match the application target.");
-        }
-
+        Validate(command);
         string applicationId = command.ApplicationId.Trim();
         string fingerprint = IdempotencyKey.Fingerprint(string.Join('|', applicationId, command.ExpectedVersion));
         IdempotencyOutcome outcome = await _idempotency.ExecuteAsync(
             IdempotencyKey.Create(command.InstitutionId.Value, "account.open", command.ActorId.Value, command.IdempotencyKey),
             fingerprint,
-            token => OpenCoreAsync(command, applicationId, token),
+            async token =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync(token).ConfigureAwait(false);
+                string? result = await OpenWithinTransactionAsync(command, token).ConfigureAwait(false);
+                await transaction.CommitAsync(token).ConfigureAwait(false);
+                return result;
+            },
             cancellationToken).ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(outcome.Result))
@@ -82,11 +83,16 @@ public sealed class AccountOpeningService : IAccountOpeningService
         return result with { Replayed = outcome.Kind == IdempotencyOutcomeKind.Replayed };
     }
 
-    private async Task<string?> OpenCoreAsync(
+    /// <summary>
+    /// The atomic unit the approval decision runs inside its own transaction: reserve the number, create the
+    /// account, initialise the ledger account, and append the history, audit and outbox fact. Decision: P1-E04-D09.
+    /// </summary>
+    public async Task<string?> OpenWithinTransactionAsync(
         OpenAccountCommand command,
-        string applicationId,
         CancellationToken cancellationToken)
     {
+        Validate(command);
+        string applicationId = command.ApplicationId.Trim();
         AccountApplicationRecord application = await _context.AccountApplications
             .SingleOrDefaultAsync(record => record.AccountApplicationId == applicationId, cancellationToken)
             .ConfigureAwait(false)
@@ -131,8 +137,6 @@ public sealed class AccountOpeningService : IAccountOpeningService
 
         string branchCode = await ResolveBranchCodeAsync(application.BranchId, cancellationToken).ConfigureAwait(false);
 
-        // The reservation, the account row, the history, the audit and the outbox fact commit together.
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         AllocatedAccountNumber allocated;
         try
         {
@@ -177,6 +181,35 @@ public sealed class AccountOpeningService : IAccountOpeningService
             OpenedAt = now,
         };
         _context.Accounts.Add(account);
+
+        LedgerInitialisationResult initialisation;
+        try
+        {
+            initialisation = await _initialisation
+                .InitialiseAsync(command.InstitutionId, accountId, account.CurrencyCode, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (AccountApplicationRejectedException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            throw Reject(
+                "ledger_initialisation_unavailable",
+                "The ledger could not open its account, so no account row was committed.",
+                exception);
+        }
+
+        if (string.IsNullOrWhiteSpace(initialisation.LedgerAccountReference)
+            || !string.Equals(initialisation.Status, "initialised", StringComparison.Ordinal))
+        {
+            throw Reject("ledger_initialisation_failed", "The ledger did not confirm its account initialisation.");
+        }
+
+        account.LedgerInitialisationStatus = initialisation.Status;
+        account.LedgerAccountReference = initialisation.LedgerAccountReference;
+
         _context.AccountStatusHistory.Add(new AccountStatusHistoryRecord
         {
             InstitutionId = command.InstitutionId.Value,
@@ -196,8 +229,19 @@ public sealed class AccountOpeningService : IAccountOpeningService
         AddOutboxFact(command, account, now);
 
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return Serialise(account, replayed: false);
+    }
+
+    private void Validate(OpenAccountCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command.InstitutionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.IdempotencyKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.ApplicationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.CorrelationId);
+        if (_tenantContext.CurrentInstitution != command.InstitutionId)
+        {
+            throw Reject("cross_tenant_access_denied", "The authenticated institution does not match the application target.");
+        }
     }
 
     private void AddOutboxFact(OpenAccountCommand command, AccountRecord account, DateTimeOffset now)

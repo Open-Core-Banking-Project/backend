@@ -5,7 +5,9 @@ using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
+using CoreBanking.CoreLedger.Application.Accounts;
 using CoreBanking.CoreLedger.Infrastructure;
+using CoreBanking.CoreLedger.Infrastructure.Accounts;
 using CoreBanking.CoreLedger.Infrastructure.Institutions;
 using CoreBanking.CoreLedger.Infrastructure.Persistence;
 using CoreBanking.CoreLedger.Infrastructure.Products;
@@ -66,6 +68,11 @@ public static partial class Program
         builder.Services.AddScoped<InstitutionBoundaryAcknowledgementConsumer>();
         builder.Services.AddScoped<SavingsEligibilityApprovalDecidedConsumer>();
         builder.Services.AddScoped<InstitutionConfigurationApprovalDecidedConsumer>();
+        builder.Services.AddScoped<AccountApplicationApprovalDecidedConsumer>();
+        builder.Services.AddScoped<IAccountOpeningService, AccountOpeningService>();
+        builder.Services.AddScoped<IAccountNumberSchemeSource, AccountNumberSchemeSource>();
+        builder.Services.AddScoped<IAccountNumberAllocator, AccountNumberAllocator>();
+        builder.Services.AddScoped<ILedgerAccountInitialisation, LedgerAccountInitialisationService>();
         builder.Services.AddScoped<IIntegrationEventConsumer, CoreLedgerIntegrationEventConsumer>();
         builder.Services.AddSingleton(new OutboxRelayOptions());
         builder.Services.AddScoped<OutboxRelay>();
@@ -81,7 +88,7 @@ public static partial class Program
             Topics = acknowledgementServices
                 .Select(InstitutionBoundaryAcknowledgementConsumer.TopicForService)
                 .Append(SavingsEligibilityApprovalDecidedConsumer.TopicName)
-                .Append(InstitutionConfigurationApprovalDecidedConsumer.TopicName)
+                .Distinct(StringComparer.Ordinal)
                 .ToArray(),
         });
 

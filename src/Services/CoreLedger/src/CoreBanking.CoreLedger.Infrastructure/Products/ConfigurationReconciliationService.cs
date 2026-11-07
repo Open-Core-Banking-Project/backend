@@ -88,8 +88,7 @@ public sealed class ConfigurationReconciliationService : IConfigurationReconcili
 
         DateTimeOffset now = _timeProvider.GetUtcNow();
         long oldestAge = pending.Length == 0 ? 0 : (long)Math.Max(0, (now - pending.Min()).TotalSeconds);
-        AccountNumberSchemeDepletion[] schemes = (await _context.AccountNumberReservations
-            .AsNoTracking()
+        AccountNumberSchemeDepletion[] schemes = (await _context.AccountNumberReservations.AsNoTracking()
             .Select(record => new { record.SchemeVersionId, record.SchemeId, record.Capacity, record.HighWaterMark, record.NextValue })
             .ToArrayAsync(cancellationToken)
             .ConfigureAwait(false))
@@ -103,10 +102,45 @@ public sealed class ConfigurationReconciliationService : IConfigurationReconcili
             .ToArray();
         return new ConfigurationReconciliationReport(
             now,
-            ConfigurationReconciliationPolicy.Evaluate(versions, publications),
+            [
+                .. ConfigurationReconciliationPolicy.Evaluate(versions, publications),
+                .. await EvaluateAccountsAsync(cancellationToken).ConfigureAwait(false),
+            ],
             pending.LongLength,
             oldestAge,
             schemes);
+    }
+
+    private async Task<IReadOnlyList<ConfigurationReconciliationFinding>> EvaluateAccountsAsync(
+        CancellationToken cancellationToken)
+    {
+        AccountReconciliationFacts[] accounts = (await _context.Accounts
+            .AsNoTracking()
+            .Select(record => new
+            {
+                record.AccountId,
+                record.AccountApplicationId,
+                record.Status,
+                record.LedgerInitialisationStatus,
+                record.LedgerAccountReference,
+            })
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false))
+            .Select(record => new AccountReconciliationFacts(
+                record.AccountId,
+                record.AccountApplicationId,
+                record.Status,
+                record.LedgerInitialisationStatus,
+                record.LedgerAccountReference))
+            .ToArray();
+        ApplicationReconciliationFacts[] applications = (await _context.AccountApplications
+            .AsNoTracking()
+            .Select(record => new { record.AccountApplicationId, record.Status })
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false))
+            .Select(record => new ApplicationReconciliationFacts(record.AccountApplicationId, record.Status))
+            .ToArray();
+        return AccountReconciliationPolicy.Evaluate(accounts, applications);
     }
 
     private static int AccountNumberAllocationBand(long highWaterMark, long capacity)

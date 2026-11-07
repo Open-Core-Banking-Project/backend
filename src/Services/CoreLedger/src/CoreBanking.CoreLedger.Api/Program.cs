@@ -171,6 +171,9 @@ if (useRelationalStore)
     builder.Services.AddScoped<IAccountNumberSchemeSource, AccountNumberSchemeSource>();
     builder.Services.AddScoped<IAccountNumberAllocator, AccountNumberAllocator>();
     builder.Services.AddScoped<IAccountOpeningService, AccountOpeningService>();
+    builder.Services.AddScoped<ILedgerAccountInitialisation, LedgerAccountInitialisationService>();
+    builder.Services.AddScoped<IAccountApprovalService, AccountApprovalService>();
+    builder.Services.AddScoped<IAccountActivationService, AccountActivationService>();
     builder.Services.AddScoped<IAccountNumberRevealService, AccountNumberRevealService>();
     builder.Services.AddScoped<IAccountOpeningPolicyConfigurationService, AccountOpeningPolicyConfigurationService>();
     builder.Services.AddScoped<IAccountOpeningPolicySource, AccountOpeningPolicySource>();
@@ -1438,6 +1441,93 @@ static void MapAccountEndpoints(WebApplication app)
     .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
         AccountPermissions.NumberRevealRequirement,
         "account.number.reveal"));
+
+    // Approval submission and activation. The decision itself arrives from Operations Workflow.
+    // Decisions: P1-E04-D06, P1-E04-D09.
+    app.MapPost("/api/v1/institutions/{institutionId}/account-applications/{applicationId}/approval-requests", async (
+        HttpContext http,
+        string institutionId,
+        string applicationId,
+        SubmitAccountApplicationForApprovalRequestV1 request,
+        IAccountApprovalService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            SubmitAccountApplicationForApprovalResult result = await service.SubmitForApprovalAsync(
+                new SubmitAccountApplicationForApprovalCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    applicationId,
+                    request.ExpectedVersion,
+                    request.RequestId,
+                    request.SourceRequestKey,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Approval submission rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid approval submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ApplicationCreateRequirement,
+        "account.application.create"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/activate", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        AccountActivationRequestV1 request,
+        IAccountActivationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountActivatedResult result = await service.ActivateAsync(
+                new ActivateAccountCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    request.ExpectedVersion,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new AccountActivationResponseV1(
+                institutionId,
+                result.AccountId,
+                result.MaskedAccountNumber,
+                result.Status.ToString(),
+                result.LedgerAccountReference,
+                result.Version,
+                result.ActivatedAt,
+                result.Replayed));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            int status = exception.Code == "account_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status409Conflict;
+            return Problem(exception.Code, "Account activation rejected", exception.Message, status);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account activation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ActivationCreateRequirement,
+        "account.activation.create"));
 }
 
 static AccountEligibilityEvaluationResponseV1 ToEvaluationResponse(string institutionId, AccountEligibilityResult result) =>

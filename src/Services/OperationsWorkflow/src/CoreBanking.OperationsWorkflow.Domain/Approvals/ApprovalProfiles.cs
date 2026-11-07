@@ -73,8 +73,19 @@ public static class ApprovalProfiles
         "institution.configuration.version",
         "institution.configuration.approve");
 
+    /// <summary>
+    /// Opening an account from an eligible application. The approver decides the exact application version
+    /// and eligibility snapshot, and the maker can never approve it. Decision: P1-E04-D09.
+    /// </summary>
+    public static ApprovalProfile AccountOpening { get; } = Create(
+        "account.open.v1",
+        "account-open-approval-v1",
+        "core-ledger",
+        "account.application",
+        "account.application.approve");
+
     public static IReadOnlyList<ApprovalProfile> All { get; } =
-        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge, IdentityRolePublication, InstitutionConfigurationPublication];
+        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge, IdentityRolePublication, InstitutionConfigurationPublication, AccountOpening];
 
     /// <summary>The source services that may submit a request, derived from the approved profiles.</summary>
     public static IReadOnlyList<string> SourceServices { get; } =
