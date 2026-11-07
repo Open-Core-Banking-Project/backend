@@ -22,17 +22,20 @@ public sealed class CoreLedgerIntegrationEventConsumer : IIntegrationEventConsum
     private readonly SavingsEligibilityApprovalDecidedConsumer _savingsApprovals;
     private readonly InstitutionConfigurationApprovalDecidedConsumer _configurationApprovals;
     private readonly AccountApplicationApprovalDecidedConsumer _accountApprovals;
+    private readonly AccountClosureApprovalDecidedConsumer _closureApprovals;
 
     public CoreLedgerIntegrationEventConsumer(
         InstitutionBoundaryAcknowledgementConsumer institutions,
         SavingsEligibilityApprovalDecidedConsumer savingsApprovals,
         InstitutionConfigurationApprovalDecidedConsumer configurationApprovals,
-        AccountApplicationApprovalDecidedConsumer accountApprovals)
+        AccountApplicationApprovalDecidedConsumer accountApprovals,
+        AccountClosureApprovalDecidedConsumer closureApprovals)
     {
         _institutions = institutions ?? throw new ArgumentNullException(nameof(institutions));
         _savingsApprovals = savingsApprovals ?? throw new ArgumentNullException(nameof(savingsApprovals));
         _configurationApprovals = configurationApprovals ?? throw new ArgumentNullException(nameof(configurationApprovals));
         _accountApprovals = accountApprovals ?? throw new ArgumentNullException(nameof(accountApprovals));
+        _closureApprovals = closureApprovals ?? throw new ArgumentNullException(nameof(closureApprovals));
     }
 
     public string Topic => throw new NotSupportedException("The routing consumer subscribes to multiple configured topics.");
@@ -48,6 +51,7 @@ public sealed class CoreLedgerIntegrationEventConsumer : IIntegrationEventConsum
         return SubjectType(envelope) switch
         {
             AccountOpeningApprovalV1.SubjectType => _accountApprovals.HandleAsync(envelope, cancellationToken),
+            AccountClosureApprovalV1.SubjectType => _closureApprovals.HandleAsync(envelope, cancellationToken),
             InstitutionConfigurationApprovalV1.SubjectType => _configurationApprovals.HandleAsync(envelope, cancellationToken),
             SavingsEligibilityApprovalV1.SubjectType => _savingsApprovals.HandleAsync(envelope, cancellationToken),
             _ => _institutions.HandleAsync(envelope, cancellationToken),

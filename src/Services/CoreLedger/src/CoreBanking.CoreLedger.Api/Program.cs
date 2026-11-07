@@ -177,6 +177,15 @@ if (useRelationalStore)
     builder.Services.AddScoped<IAccountControlService, AccountControlService>();
     builder.Services.AddScoped<ILedgerAvailabilitySource, LedgerAvailabilitySource>();
     builder.Services.AddScoped<IAccountLienService, AccountLienService>();
+    builder.Services.AddScoped<IAccountDormancyConfigurationService, AccountDormancyConfigurationService>();
+    builder.Services.AddScoped<IDormancyRuleSource, DormancyRuleSource>();
+    builder.Services.AddScoped<IBusinessDateSource, BusinessDateSource>();
+    builder.Services.AddScoped<IAccountActivitySource, LedgerQualifyingActivitySource>();
+    builder.Services.AddScoped<IAccountDormancyService, AccountDormancyService>();
+    builder.Services.AddScoped<ILedgerClosureConditionSource, LedgerClosureConditionSource>();
+    builder.Services.AddScoped<IAccountClosureService, AccountClosureService>();
+    builder.Services.AddScoped<IAccountClosureApprovalApplier>(provider =>
+        (IAccountClosureApprovalApplier)provider.GetRequiredService<IAccountClosureService>());
     builder.Services.AddScoped<IAccountNumberRevealService, AccountNumberRevealService>();
     builder.Services.AddScoped<IAccountOpeningPolicyConfigurationService, AccountOpeningPolicyConfigurationService>();
     builder.Services.AddScoped<IAccountOpeningPolicySource, AccountOpeningPolicySource>();
@@ -1931,7 +1940,484 @@ static void MapAccountEndpoints(WebApplication app)
     .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
         AccountPermissions.ApplicationViewRequirement,
         "account.application.view"));
+
+    // Institution dormancy rule lifecycle (area dormancy.rules). Decision: P1-E04-D12.
+    app.MapPost("/api/v1/institutions/{institutionId}/configurations/dormancy.rules/versions", async (
+        HttpContext http,
+        string institutionId,
+        CreateDormancyRuleDraftRequestV1 request,
+        IAccountDormancyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationDraftOutcome result = await service.CreateDraftAsync(
+                new CreateDormancyRuleDraftCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    request.VersionId,
+                    request.RuleId,
+                    request.RuleVersion,
+                    request.ThresholdDays,
+                    request.NoticeLeadDays,
+                    request.ReactivationRequiresApproval,
+                    [.. request.QualifyingActivities.Select(activity =>
+                        new DormancyQualifyingActivity(activity.ActivityCode, activity.Direction))],
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Dormancy rule rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid dormancy rule", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationCreateRequirement,
+        "institution.configuration.create"));
+
+    app.MapPost("/api/v1/configurations/dormancy-rules/{versionId}/simulate", async (
+        HttpContext http,
+        string versionId,
+        SimulateDormancyRuleRequestV1 request,
+        IAccountDormancyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationSimulationOutcome result = await service.SimulateAsync(
+                new SimulateDormancyRuleCommand(
+                    InstitutionId.From(InstitutionIdOf(http)),
+                    Actor(http).Id,
+                    key,
+                    versionId,
+                    request.SimulationId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Dormancy rule simulation rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid dormancy rule simulation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSimulateRequirement,
+        "institution.configuration.simulate"));
+
+    app.MapPost("/api/v1/configurations/dormancy-rules/{versionId}/submit", async (
+        HttpContext http,
+        string versionId,
+        SubmitDormancyRuleRequestV1 request,
+        IAccountDormancyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationSubmissionOutcome result = await service.SubmitForApprovalAsync(
+                new SubmitDormancyRuleCommand(
+                    InstitutionId.From(InstitutionIdOf(http)),
+                    Actor(http).Id,
+                    key,
+                    request.RequestId,
+                    request.SourceRequestKey,
+                    versionId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Dormancy rule submission rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid dormancy rule submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSubmitRequirement,
+        "institution.configuration.submit"));
+
+    app.MapPost("/api/v1/configurations/dormancy-rules/{versionId}/publish", async (
+        HttpContext http,
+        string versionId,
+        PublishDormancyRuleRequestV1 request,
+        IAccountDormancyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationPublicationOutcome result = await service.PublishAsync(
+                new PublishDormancyRuleCommand(
+                    InstitutionId.From(InstitutionIdOf(http)),
+                    Actor(http).Id,
+                    key,
+                    request.PublicationId,
+                    versionId,
+                    request.ContentHash,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Dormancy rule publication rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid dormancy rule publication", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationPublishRequirement,
+        "institution.configuration.publish"));
+
+    // The approved dormancy assessment and reactivation. Decision: P1-E04-D12.
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/dormancy-assessments", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        DormancyAssessmentRequestV1? request,
+        IAccountDormancyService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            DormancyAssessmentResult result = await service.AssessAsync(
+                new AssessAccountDormancyCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    ParseOptionalDate(request?.BusinessDate),
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToDormancyAssessmentResponse(institutionId, result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Dormancy assessment rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid dormancy assessment", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.DormancyAssessRequirement,
+        "account.dormancy.assess"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/dormancy-assessments/catch-up", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        DormancyAssessmentRequestV1? request,
+        IAccountDormancyService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            IReadOnlyList<DormancyAssessmentResult> results = await service.AssessCatchUpAsync(
+                InstitutionId.From(institutionId),
+                Actor(http).Id,
+                accountId,
+                ParseOptionalDate(request?.BusinessDate),
+                CorrelationId(http),
+                cancellationToken);
+            return Results.Ok(results.Select(result => ToDormancyAssessmentResponse(institutionId, result)).ToArray());
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Dormancy catch-up rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid dormancy catch-up", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.DormancyAssessRequirement,
+        "account.dormancy.assess"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/reactivations", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        ReactivateAccountRequestV1 request,
+        IAccountDormancyService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountReactivatedResult result = await service.ReactivateAsync(
+                new ReactivateAccountCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    request.ExpectedVersion,
+                    request.ReasonCode,
+                    request.ApprovalReference,
+                    request.MakerActorId,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new AccountReactivatedResponseV1(
+                institutionId,
+                result.AccountId,
+                result.MaskedAccountNumber,
+                result.Status,
+                result.ReasonCode,
+                result.AccountVersion,
+                result.ReactivatedAt,
+                result.Replayed));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Reactivation rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid reactivation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.DormancyReactivateRequirement,
+        "account.dormancy.reactivate"));
+
+    // Closure proposals and their six approved steps. Decision: P1-E04-D13.
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/closure-proposals", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        CreateAccountClosureProposalRequestV1 request,
+        IAccountClosureService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountClosureProposalResult result = await service.ProposeAsync(
+                new CreateAccountClosureProposalCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    request.RequestId,
+                    request.ReasonCode,
+                    request.SupportingReference,
+                    request.LienReleaseDecisionRecorded,
+                    request.DisputeOpen,
+                    request.NoticePending,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToClosureProposalResponse(result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Closure proposal rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid closure proposal", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ClosureProposeRequirement,
+        "account.closure.propose"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/closure-proposals/{proposalId}/submissions", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        string proposalId,
+        SubmitAccountClosureProposalRequestV1 request,
+        IAccountClosureService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountClosureProposalResult result = await service.SubmitForApprovalAsync(
+                new SubmitAccountClosureProposalCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    proposalId,
+                    request.ExpectedVersion,
+                    request.RequestId,
+                    request.SourceRequestKey,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToClosureProposalResponse(result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Closure submission rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid closure submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ClosureProposeRequirement,
+        "account.closure.submit"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/closure-proposals/{proposalId}/rechecks", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        string proposalId,
+        RecheckAccountClosureRequestV1 request,
+        IAccountClosureService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountClosureProposalResult result = await service.RecheckAsync(
+                new RecheckAccountClosureCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    proposalId,
+                    request.ExpectedVersion,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToClosureProposalResponse(result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Closure re-check rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid closure re-check", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ClosureApproveRequirement,
+        "account.closure.recheck"));
+
+    app.MapGet("/api/v1/institutions/{institutionId}/accounts/{accountId}/closure-proposals/{proposalId}", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        string proposalId,
+        IAccountClosureService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            AccountClosureProposalResult result = await service.GetAsync(
+                InstitutionId.From(institutionId),
+                accountId,
+                proposalId,
+                cancellationToken);
+            return Results.Ok(ToClosureProposalResponse(result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Closure proposal query rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid closure proposal query", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ApplicationViewRequirement,
+        "account.application.view"));
 }
+
+static string InstitutionIdOf(HttpContext http) =>
+    http.Request.RouteValues.TryGetValue("institutionId", out object? value) && value is not null
+        ? value.ToString() ?? string.Empty
+        : string.Empty;
+
+static DateOnly? ParseOptionalDate(string? value) =>
+    string.IsNullOrWhiteSpace(value)
+        ? null
+        : DateOnly.Parse(value.Trim(), CultureInfo.InvariantCulture);
+
+static int RejectedStatus(string code) => code switch
+{
+    "account_not_found" or "account_closure_proposal_not_found" => StatusCodes.Status404NotFound,
+    _ => StatusCodes.Status409Conflict,
+};
+
+static DormancyAssessmentResponseV1 ToDormancyAssessmentResponse(string institutionId, DormancyAssessmentResult result) =>
+    new(
+        institutionId,
+        result.AccountId,
+        result.AssessmentId,
+        result.BusinessDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        result.Decision,
+        result.TransitionPermitted,
+        result.NoticeDue,
+        result.ReasonCodes,
+        result.LastQualifyingActivityDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        result.InactivityDays,
+        result.ThresholdDays,
+        result.RuleVersionId,
+        result.Status,
+        result.AccountVersion,
+        result.Replayed);
+
+static AccountClosureProposalResponseV1 ToClosureProposalResponse(AccountClosureProposalResult result) =>
+    new(
+        result.InstitutionId,
+        result.ProposalId,
+        result.AccountId,
+        result.RequestId,
+        result.Status,
+        result.ReasonCode,
+        result.SupportingReference,
+        result.RefusalCodes,
+        result.ConditionSnapshotHash,
+        result.LedgerAccountReference,
+        result.LedgerSnapshotVersion,
+        result.ConditionsAsOf,
+        result.LedgerBalance,
+        result.AvailableBalance,
+        result.Holds,
+        result.OutstandingLienAmount,
+        result.PendingSettlements,
+        result.ApprovalRequestId,
+        result.ChangedAt,
+        result.Version,
+        result.Replayed);
 
 static LienResponseV1 ToLienResponse(string institutionId, AccountLienResult result) =>
     new(

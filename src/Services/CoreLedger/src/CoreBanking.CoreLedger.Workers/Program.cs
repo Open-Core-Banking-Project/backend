@@ -69,6 +69,11 @@ public static partial class Program
         builder.Services.AddScoped<SavingsEligibilityApprovalDecidedConsumer>();
         builder.Services.AddScoped<InstitutionConfigurationApprovalDecidedConsumer>();
         builder.Services.AddScoped<AccountApplicationApprovalDecidedConsumer>();
+        builder.Services.AddScoped<AccountClosureApprovalDecidedConsumer>();
+        builder.Services.AddScoped<ILedgerClosureConditionSource, LedgerClosureConditionSource>();
+        builder.Services.AddScoped<IAccountClosureService, AccountClosureService>();
+        builder.Services.AddScoped<IAccountClosureApprovalApplier>(provider =>
+            (IAccountClosureApprovalApplier)provider.GetRequiredService<IAccountClosureService>());
         builder.Services.AddScoped<IAccountOpeningService, AccountOpeningService>();
         builder.Services.AddScoped<IAccountNumberSchemeSource, AccountNumberSchemeSource>();
         builder.Services.AddScoped<IAccountNumberAllocator, AccountNumberAllocator>();

@@ -84,8 +84,19 @@ public static class ApprovalProfiles
         "account.application",
         "account.application.approve");
 
+    /// <summary>
+    /// Closing an account. The approver decides the exact closure proposal version and the condition snapshot the
+    /// maker saw, and the maker can never approve it. Decision: P1-E04-D13.
+    /// </summary>
+    public static ApprovalProfile AccountClosure { get; } = Create(
+        "account.close.v1",
+        "account-close-approval-v1",
+        "core-ledger",
+        "account.closure.proposal",
+        "account.closure.approve");
+
     public static IReadOnlyList<ApprovalProfile> All { get; } =
-        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge, IdentityRolePublication, InstitutionConfigurationPublication, AccountOpening];
+        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge, IdentityRolePublication, InstitutionConfigurationPublication, AccountOpening, AccountClosure];
 
     /// <summary>The source services that may submit a request, derived from the approved profiles.</summary>
     public static IReadOnlyList<string> SourceServices { get; } =

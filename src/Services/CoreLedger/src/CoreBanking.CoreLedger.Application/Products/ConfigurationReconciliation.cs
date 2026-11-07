@@ -64,24 +64,37 @@ public sealed record ApplicationReconciliationFacts(
     string ApplicationId,
     string Status);
 
+/// <summary>One closure proposal as account reconciliation reads it. Decision: P1-E04-D13.</summary>
+public sealed record ClosureReconciliationFacts(
+    string ProposalId,
+    string AccountId,
+    string Status,
+    decimal LedgerBalance,
+    string? ConditionSnapshotHash);
+
 /// <summary>
 /// Detects account states that must never survive a settled system: an open or active account without a
-/// proven ledger initialisation, and an approved application that never produced an account.
-/// Decision: P1-E04-D09.
+/// proven ledger initialisation, an approved application that never produced an account, a closed account whose
+/// recorded closure balance was not zero, and a closed account with no condition snapshot behind it.
+/// Decisions: P1-E04-D09, P1-E04-D13.
 /// </summary>
 public static class AccountReconciliationPolicy
 {
     public const string MissingLedgerInitialisationCode = "account_without_ledger_initialisation";
     public const string ApprovedWithoutAccountCode = "approved_application_without_account";
+    public const string ClosedWithResidualBalanceCode = "closed_account_with_residual_balance";
+    public const string ClosureWithoutSnapshotCode = "closure_without_condition_snapshot";
 
     private static readonly string[] InitialisedStatuses = ["Open", "Active", "Restricted", "Frozen", "Dormant", "PendingClosure", "Closed"];
 
     public static IReadOnlyList<ConfigurationReconciliationFinding> Evaluate(
         IReadOnlyCollection<AccountReconciliationFacts> accounts,
-        IReadOnlyCollection<ApplicationReconciliationFacts> applications)
+        IReadOnlyCollection<ApplicationReconciliationFacts> applications,
+        IReadOnlyCollection<ClosureReconciliationFacts>? closures = null)
     {
         ArgumentNullException.ThrowIfNull(accounts);
         ArgumentNullException.ThrowIfNull(applications);
+        closures ??= [];
 
         List<ConfigurationReconciliationFinding> findings = [];
         findings.AddRange(accounts
@@ -102,6 +115,27 @@ public static class AccountReconciliationPolicy
                 ApprovedWithoutAccountCode,
                 application.ApplicationId,
                 application.ApplicationId)));
+        findings.AddRange(closures
+            .Where(closure => string.Equals(closure.Status, "closed", StringComparison.Ordinal)
+                && closure.LedgerBalance != 0m)
+            .OrderBy(closure => closure.ProposalId, StringComparer.Ordinal)
+            .Take(ConfigurationReconciliationPolicy.MaximumFindingsPerCode)
+            .Select(closure => new ConfigurationReconciliationFinding(
+                ClosedWithResidualBalanceCode,
+                closure.ProposalId,
+                closure.AccountId)));
+        string[] snapshotted = [.. closures
+            .Where(closure => !string.IsNullOrWhiteSpace(closure.ConditionSnapshotHash))
+            .Select(closure => closure.AccountId)];
+        findings.AddRange(accounts
+            .Where(account => string.Equals(account.Status, "Closed", StringComparison.Ordinal)
+                && !snapshotted.Contains(account.AccountId, StringComparer.Ordinal))
+            .OrderBy(account => account.AccountId, StringComparer.Ordinal)
+            .Take(ConfigurationReconciliationPolicy.MaximumFindingsPerCode)
+            .Select(account => new ConfigurationReconciliationFinding(
+                ClosureWithoutSnapshotCode,
+                account.AccountApplicationId,
+                account.AccountId)));
         return findings;
     }
 }

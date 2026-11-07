@@ -140,7 +140,19 @@ public sealed class ConfigurationReconciliationService : IConfigurationReconcili
             .ConfigureAwait(false))
             .Select(record => new ApplicationReconciliationFacts(record.AccountApplicationId, record.Status))
             .ToArray();
-        return AccountReconciliationPolicy.Evaluate(accounts, applications);
+        ClosureReconciliationFacts[] closures = (await _context.AccountClosureProposals
+            .AsNoTracking()
+            .Select(record => new { record.ProposalId, record.AccountId, record.Status, record.LedgerBalance, record.ConditionSnapshotHash })
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false))
+            .Select(record => new ClosureReconciliationFacts(
+                record.ProposalId,
+                record.AccountId,
+                record.Status,
+                record.LedgerBalance,
+                record.ConditionSnapshotHash))
+            .ToArray();
+        return AccountReconciliationPolicy.Evaluate(accounts, applications, closures);
     }
 
     private static int AccountNumberAllocationBand(long highWaterMark, long capacity)

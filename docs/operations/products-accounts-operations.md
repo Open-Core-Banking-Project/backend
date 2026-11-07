@@ -5,10 +5,10 @@ Operational contract for the Core Banking and Ledger product and account configu
 `institution.account-numbering`) and the account application and opening boundary.
 Decisions: P1-E04 slice 14, P1-E04-D06, P1-E04-D07.
 
-Dormancy, closure and statements are not implemented, so this runbook covers the configuration lifecycle,
-reference-fact consumption, account applications with their eligibility evidence, number allocation, approval,
-account opening, activation, account controls, liens and the integrity signals that exist today. Extend it in the
-same change that enables those features; do not document a capability ahead of the code.
+Statements are not implemented, so this runbook covers the configuration lifecycle, reference-fact consumption,
+account applications with their eligibility evidence, number allocation, approval, account opening, activation,
+account controls, liens, dormancy and reactivation, closure and the integrity signals that exist today. Extend it in
+the same change that enables those features; do not document a capability ahead of the code.
 
 ## Signals
 
@@ -72,6 +72,32 @@ pending outbox message exists.
 **Product or currency publication failure.** Read the stable code, correct the cause, and re-submit with the
 same idempotency key only when the payload is unchanged. A changed payload needs a new key. Never edit a
 configuration version row directly: published versions are immutable and the hash is the evidence.
+
+**Dormancy assessment.** An assessment is recorded once per account, business date and rule version, and a repeated
+run returns the recorded outcome rather than assessing the same day twice. The clock is the institution business date
+and the last qualifying posted customer-initiated movement; a read, a fee, an interest capitalisation, a control change
+or an unposted attempt never resets it. `dormancy_rule_missing` and `dormancy_activity_source_unavailable` mean the day
+was recorded as `NotAssessable` and nothing transitioned: publish the rule or restore the ledger source, then re-run
+the same business date. `dormancy_notice_missing` means the threshold was reached but the required notice was never
+recorded, so the account stays Active until a notice fact exists. `dormancy_assessment_lease_held` means another worker
+is assessing that account; the lease expires after two minutes and never needs manual clearance. Missing days are caught
+up in order with the catch-up route using the oldest missed business date, so the oldest date is never skipped.
+
+**Reactivation.** Only a dormant account can be reactivated, and the dormancy rule decides whether an approval
+reference and a different actor are required (`dormancy_reactivation_requires_approval`,
+`dormancy_reactivation_dual_control_required`). Reactivation clears dormancy alone: freezes, blocks and liens are still
+in force afterwards, so the account can be active and still denied a debit by the control precedence.
+
+**Closure.** Follow the six approved steps and never shortcut them. A proposal records the ledger condition snapshot;
+`account_closure_conditions_not_met` with a refusal code means the account is not closable yet, and the refusal codes
+are the plan: settle the balance, release holds or liens, wait for the dispute or notice, or clear the legal control.
+Submission binds approval under `account.close.v1` to the exact proposal version and condition snapshot hash.
+`balance_source_stale` means the ledger answer aged out of the 60-second ceiling, so re-propose. After approval the
+account sits in `PendingClosure` with debits denied; if the final re-check does not settle, use the re-check route once
+the condition is resolved, and re-check refusals are recorded on the proposal. A closed account never reopens and its
+number is never reused: a returning customer opens a new account. Reconciliation reports
+`closed_account_with_residual_balance` and `closure_without_condition_snapshot`, and either one is an incident because
+closure is not reversible.
 
 **Liens.** A lien reduces availability and never denies a posting by itself. Its claimed amount is immutable: a
 partial release or a ledger satisfaction adds an entry and lowers the outstanding amount, and the lien stays active until

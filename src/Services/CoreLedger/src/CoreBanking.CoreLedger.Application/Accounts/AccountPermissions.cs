@@ -20,6 +20,46 @@ public static class AccountPermissions
     public static PermissionIdentifier ActivationCreate { get; } =
         PermissionIdentifier.Parse("account.activation.create");
 
+    public static PermissionIdentifier DormancyAssess { get; } =
+        PermissionIdentifier.Parse("account.dormancy.assess");
+
+    public static PermissionIdentifier DormancyReactivate { get; } =
+        PermissionIdentifier.Parse("account.dormancy.reactivate");
+
+    public static PermissionIdentifier ClosurePropose { get; } =
+        PermissionIdentifier.Parse("account.closure.propose");
+
+    public static PermissionIdentifier ClosureApprove { get; } =
+        PermissionIdentifier.Parse("account.closure.approve");
+
+    public static PermissionRequirement DormancyAssessRequirement { get; } = new()
+    {
+        Permission = DormancyAssess,
+    };
+
+    public static PermissionRequirement DormancyReactivateRequirement { get; } = new()
+    {
+        Permission = DormancyReactivate,
+        RequiresStepUp = true,
+    };
+
+    public static PermissionRequirement ClosureProposeRequirement { get; } = new()
+    {
+        Permission = ClosurePropose,
+        RequiresStepUp = true,
+    };
+
+    /// <summary>
+    /// The closure approver decides a proposal under the <c>account.close.v1</c> profile and can never approve
+    /// their own proposal. Decision: P1-E04-D13.
+    /// </summary>
+    public static PermissionRequirement ClosureApproveRequirement { get; } = new()
+    {
+        Permission = ClosureApprove,
+        RequiresStepUp = true,
+        IsRestrictedApproval = true,
+    };
+
     public static PermissionRequirement ApplicationCreateRequirement { get; } = new()
     {
         Permission = ApplicationCreate,

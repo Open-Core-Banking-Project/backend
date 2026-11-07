@@ -1,0 +1,127 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using CoreBanking.BuildingBlocks.Domain.Identity;
+using CoreBanking.CoreLedger.Application.Accounts;
+using CoreBanking.CoreLedger.Domain.Accounts;
+using CoreBanking.CoreLedger.Domain.Institutions;
+using CoreBanking.CoreLedger.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace CoreBanking.CoreLedger.Infrastructure.Accounts;
+
+/// <summary>
+/// Resolves the effective, published <c>dormancy.rules</c> version. A missing, overlapping, superseded or
+/// corrupt rule yields no rule, so the account is reported unassessable instead of being given a default
+/// threshold. Decision: P1-E04-D12.
+/// </summary>
+public sealed class DormancyRuleSource : IDormancyRuleSource
+{
+    private readonly CoreLedgerDbContext _context;
+
+    public DormancyRuleSource(CoreLedgerDbContext context) =>
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    public async Task<DormancyRuleLookup> GetAsync(
+        InstitutionId institutionId,
+        DateTimeOffset asOf,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(institutionId);
+
+        ConfigurationSetRecord? set = await _context.ConfigurationSets
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                record => record.InstitutionId == institutionId.Value && record.Area == DormancyRule.Area,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (set is null)
+        {
+            return DormancyRuleLookup.Rejected(AccountDormancyPolicy.RuleMissingCode);
+        }
+
+        ConfigurationPublicationRecord[] effective = await _context.ConfigurationPublications
+            .AsNoTracking()
+            .Where(record => record.InstitutionId == institutionId.Value
+                && record.ConfigurationSetId == set.ConfigurationSetId
+                && record.EffectiveFrom <= asOf
+                && (record.EffectiveTo == null || asOf < record.EffectiveTo))
+            .Take(2)
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (effective.Length == 0)
+        {
+            return DormancyRuleLookup.Rejected(AccountDormancyPolicy.RuleMissingCode);
+        }
+
+        if (effective.Length > 1)
+        {
+            return DormancyRuleLookup.Rejected("dormancy_rule_ambiguous");
+        }
+
+        ConfigurationPublicationRecord publication = effective[0];
+        ConfigurationVersionRecord? version = await _context.ConfigurationVersions
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                record => record.InstitutionId == institutionId.Value && record.VersionId == publication.VersionId,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (version is null
+            || !string.Equals(version.Schema, DormancyRule.Schema, StringComparison.Ordinal)
+            || !string.Equals(version.ConfigurationSetId, set.ConfigurationSetId, StringComparison.Ordinal)
+            || !string.Equals(version.Status, "published", StringComparison.Ordinal)
+            || !string.Equals(version.ContentHash, publication.ContentHash, StringComparison.Ordinal)
+            || version.EffectiveFrom != publication.EffectiveFrom
+            || version.EffectiveTo != publication.EffectiveTo)
+        {
+            return DormancyRuleLookup.Rejected("dormancy_rule_integrity_failed");
+        }
+
+        ConfigurationContent content = ConfigurationContent.Create(version.ContentJson);
+        if (!string.Equals(content.Hash, version.ContentHash, StringComparison.Ordinal))
+        {
+            return DormancyRuleLookup.Rejected("dormancy_rule_integrity_failed");
+        }
+
+        try
+        {
+            return DormancyRuleLookup.Found(DormancyRule.Parse(version.ContentJson), version.VersionId, version.ContentHash);
+        }
+        catch (ArgumentException)
+        {
+            return DormancyRuleLookup.Rejected("dormancy_rule_invalid");
+        }
+    }
+}
+
+/// <summary>
+/// The institution's current business date from its business-date control. Dormancy is never decided from
+/// wall-clock time, so this is the only date an assessment may use. Decision: P1-E04-D12.
+/// </summary>
+public sealed class BusinessDateSource : IBusinessDateSource
+{
+    private readonly CoreLedgerDbContext _context;
+
+    public BusinessDateSource(CoreLedgerDbContext context) =>
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    public async Task<DateOnly> GetCurrentBusinessDateAsync(
+        InstitutionId institutionId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(institutionId);
+
+        BusinessDateControlRecord? control = await _context.BusinessDateControls
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                record => record.InstitutionId == institutionId.Value,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return control is null
+            ? throw new AccountApplicationRejectedException(
+                "business_date_unavailable",
+                "The institution has no current business date, so dormancy cannot be assessed.")
+            : control.CurrentBusinessDate;
+    }
+}
