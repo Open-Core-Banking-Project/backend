@@ -7,7 +7,7 @@ owners:
   - Core operations
   - Architecture
 required_by: P1-E04-S10
-status: Ready for review
+status: Approved
 brief_date: 2026-11-06
 related: [ADR-0015, P1-E04-D11, P1-E04-D13]
 decisions: [P1-E04-D10]
@@ -158,7 +158,7 @@ pattern and exclude the maker.
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending: approve, amend or reject the positions in §4 | |
+| Project owner | Recorded in the implementation session | Approved a deny-dominant model with no permissive control type, the fixed legal-block to notice precedence, `allow`/`deny`/`review` as the only outcomes, a lien separated from a hold, and deterministic ordered reason codes | 2026-11-07 |
 | Legal/Risk | | Pending: confirm the precedence order and manual-release rule | |
 | Architecture | | Pending: confirm deny-dominance, version skew and permission names | |
 

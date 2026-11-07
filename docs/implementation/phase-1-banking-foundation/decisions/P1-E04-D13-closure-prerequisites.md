@@ -6,7 +6,7 @@ owners:
   - Finance/Operations
   - Compliance
 required_by: P1-E04-S12
-status: Ready for review
+status: Approved
 brief_date: 2026-11-06
 related: [ADR-0015, P1-E04-D06, P1-E04-D10, P1-E04-D11, P1-E04-D12, P1-E04-D15]
 decisions: [P1-E04-D13]
@@ -140,7 +140,7 @@ against a `Closed` account.
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending: approve, amend or reject the positions in §4 | |
+| Project owner | Recorded in the implementation session | Approved the settled-balance closure condition from a live ledger response inside the freshness ceiling, the prohibiting state and refusal codes, and the six-step ordering with approval bound to the proposal version and condition snapshot hash | 2026-11-07 |
 | Finance/Operations | | Pending: confirm the settled-balance definition and residual-money rule | |
 | Compliance | | Pending: confirm the post-close allow-list and notice obligations | |
 

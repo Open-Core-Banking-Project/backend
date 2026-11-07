@@ -6,7 +6,7 @@ owners:
   - Product/Compliance
   - Security
 required_by: P1-E04-S13
-status: Ready for review
+status: Approved
 brief_date: 2026-11-06
 related: [ADR-0015, P1-E04-D13, ADR-0009]
 decisions: [P1-E04-D15]
@@ -138,7 +138,7 @@ retention and delivery rules are unapproved, and the epic forbids building state
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending: approve, amend or reject the positions in §4 | |
+| Project owner | Recorded in the implementation session | Approved the allowed periods and their bounds, `pdf` and `csv` as the only Phase 1 formats with no default, the purpose allow-list, and the ledger query as the only statement content source carrying its integrity reference | 2026-11-07 |
 | Product/Compliance | | Pending: confirm periods, purposes and the retention floor | |
 | Security | | Pending: confirm delivery, signed-reference lifetime and PII rules | |
 

@@ -6,7 +6,7 @@ owners:
   - Compliance/Product
   - Core operations
 required_by: P1-E04-S12
-status: Ready for review
+status: Approved
 brief_date: 2026-11-06
 related: [ADR-0015, P1-E04-D10, P1-E04-D13]
 decisions: [P1-E04-D12]
@@ -138,7 +138,7 @@ authorised are unapproved, and the epic forbids inferring them.
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending: approve, amend or reject the positions in §4 | |
+| Project owner | Recorded in the implementation session | Approved posted customer-initiated ledger movement as the only qualifying activity through the `dormancy.qualifying_activity` allow-list, business date as the only clock, no shipped default dormancy threshold, and one recorded assessment per account, business date and rule version | 2026-11-07 |
 | Compliance/Product | | Pending: confirm the qualifying-activity list and notice requirement | |
 | Core operations | | Pending: confirm the business-date catch-up policy and reactivation approvals | |
 

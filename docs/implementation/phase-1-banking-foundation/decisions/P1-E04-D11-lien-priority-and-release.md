@@ -7,7 +7,7 @@ owners:
   - Core operations
   - Architecture
 required_by: P1-E04-S11
-status: Ready for review
+status: Approved
 brief_date: 2026-11-06
 related: [ADR-0015, P1-E04-D10, P1-E04-D13]
 decisions: [P1-E04-D11]
@@ -133,7 +133,7 @@ unapproved, so the availability answer is currently undefined.
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending: approve, amend or reject the positions in §4 | |
+| Project owner | Recorded in the implementation session | Approved the four allow-listed lien codes with deterministic `(codeRank, priorityRank, effectiveFrom, lienId)` ordering, an immutable amount with a separate outstanding amount, partial release as its own approved entry, the availability floor with `uncoveredLienAmount`, and a separate release permission with a second approver for statutory, tax and institution liens | 2026-11-07 |
 | Legal/Finance | | Pending: confirm priority vocabulary, partial release and statutory release authority | |
 | Architecture | | Pending: confirm the availability formula and version handshake | |
 
