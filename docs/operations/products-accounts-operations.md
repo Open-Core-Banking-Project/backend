@@ -5,10 +5,10 @@ Operational contract for the Core Banking and Ledger product and account configu
 `institution.account-numbering`) and the account application and opening boundary.
 Decisions: P1-E04 slice 14, P1-E04-D06, P1-E04-D07.
 
-Restrictions, liens, dormancy and statements are not implemented, so this runbook covers the configuration
-lifecycle, reference-fact consumption, account applications with their eligibility evidence, number
-allocation, approval, account opening, activation and the integrity signals that exist today. Extend it in the
-same change that enables those features; do not document a capability ahead of the code.
+Liens, dormancy, closure and statements are not implemented, so this runbook covers the configuration lifecycle,
+reference-fact consumption, account applications with their eligibility evidence, number allocation, approval,
+account opening, activation, account controls and the integrity signals that exist today. Extend it in the same
+change that enables those features; do not document a capability ahead of the code.
 
 ## Signals
 
@@ -72,6 +72,15 @@ pending outbox message exists.
 **Product or currency publication failure.** Read the stable code, correct the cause, and re-submit with the
 same idempotency key only when the payload is unchanged. A changed payload needs a new key. Never edit a
 configuration version row directly: published versions are immutable and the hash is the evidence.
+
+**Control evaluation.** `allow`, `deny` and `review` are the only outcomes. `deny` names every denying control in
+`control_denied:<type>` codes ordered by the approved precedence; `review` means either the caller's control version was stale
+(`control_version_stale`) or the only prohibitions are manually releasable, in which case a human must release them first.
+Never re-evaluate with a forged control version and never add a permissive control: no control grants an ability.
+
+**Control release.** A manually releasable control (regulatory freeze, legal block) needs a release approval reference and a
+releaser other than the applier; the response refuses with `account_control_release_requires_approval` otherwise. A released
+control is retained with its history, never deleted.
 
 **Approval and activation.** An application becomes `PendingApproval` only from `Eligible`, and the decision must match the exact
 application version and eligibility snapshot hash; a mismatched decision is refused before anything changes. An approved decision opens

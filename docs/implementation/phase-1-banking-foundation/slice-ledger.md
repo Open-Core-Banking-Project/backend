@@ -39,10 +39,10 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 ## Snapshot
 
 - Slices: **176** across **12** epics.
-- Implemented: **41** — **23** awaiting evidence review and **18** with a recorded human approval.
-- In progress: **21**. Not started: **104**. Blocked approvals: **10**.
+- Implemented: **42** — **24** awaiting evidence review and **18** with a recorded human approval.
+- In progress: **21**. Not started: **103**. Blocked approvals: **10**.
 - Decisions: **189** total — 125 open, 4 partially approved, 19 with no recorded status, 41 resolved.
-- Slices the controller may start now without a new decision: **5** — `P1-E04-S10`, `P1-E04-S11`, `P1-E04-S12` and `P1-E04-S13` after `P1-E04-D10`, `D11`, `D12`, `D13` and `D15` were approved, plus `P1-E04-S15`.
+- Slices the controller may start now without a new decision: **4** — `P1-E04-S11`, `P1-E04-S12` and `P1-E04-S13` after `P1-E04-D10`, `D11`, `D12`, `D13` and `D15` were approved, plus `P1-E04-S15`.
 
 Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 and 2026-11-07 after `P1-E02-D07`, `P1-E04-D17` and `P1-E04-D06`, `D07`, `D09`, `D10`, `D11`, `D12`, `D13` and `D15` were approved and slices `P1-E04-S6` to `P1-E04-S9` and `P1-E04-S14` closed. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
@@ -54,7 +54,7 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 | P1-E01 Institution and Tenancy | Implemented | 12 | 11 | 11 | 0 | 1 | 0 | 9 |
 | P1-E02 Identity, Roles and Permissions | In Progress | 15 | 2 | 14 | 1 | 0 | 0 | 2 |
 | P1-E03 Customer and Onboarding | Implemented | 15 | 15 | 3 | 12 | 0 | 0 | 0 |
-| P1-E04 Products and Accounts | Approved | 15 | 0 | 9 | 0 | 1 | 5 | 5 |
+| P1-E04 Products and Accounts | Approved | 15 | 0 | 10 | 0 | 1 | 4 | 5 |
 | P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
 | P1-E06 Workflow and Maker-Checker | Approved | 13 | 0 | 4 | 0 | 1 | 8 | 12 |
 | P1-E07 Payments, Collections and VTU | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
@@ -69,9 +69,10 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 Slices 7, 8 and 9 are implemented and awaiting review, so the account-opening journey exists end to end in code:
 application, eligibility evidence, approval, number allocation, account opening, ledger initialisation and
 activation. The remaining product policy decisions were approved on 2026-11-07 (`P1-E04-D10`, `D11`, `D12`, `D13`,
-`D15`), so the controller now selects `P1-E04-S10` (typed restrictions, freezes and blocks plus the ledger
-control-evaluation contract), followed by `P1-E04-S11` (lien lifecycle), `P1-E04-S12` (dormancy, reactivation and
-closure prerequisites) and `P1-E04-S13` (account summaries and statement handoff). `P1-E04-S15` (security,
+`D15`). `P1-E04-S10` (typed restrictions, freezes and blocks plus the ledger control-evaluation contract) is
+implemented and awaiting review, so the controller now selects `P1-E04-S11` (lien lifecycle), followed by
+`P1-E04-S12` (dormancy, reactivation and closure prerequisites) and `P1-E04-S13` (account summaries and statement
+handoff). `P1-E04-S15` (security,
 performance, backup/restore and Phase 1 end-to-end evidence) stays available but needs the live stack, and
 `P1-E04-D14` (existing-account product migration) and `P1-E04-D16` (capacity, latency, RTO and RPO) remain open.
 

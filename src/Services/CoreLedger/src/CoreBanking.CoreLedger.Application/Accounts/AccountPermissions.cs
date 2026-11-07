@@ -38,6 +38,37 @@ public static class AccountPermissions
         Permission = ApplicationView,
     };
 
+    public static PermissionIdentifier RestrictionApply { get; } =
+        PermissionIdentifier.Parse("account.restriction.apply");
+
+    public static PermissionIdentifier RestrictionRelease { get; } =
+        PermissionIdentifier.Parse("account.restriction.release");
+
+    /// <summary>
+    /// The ledger's control-evaluation capability. The epic's four-segment
+    /// <c>service.account.controls.evaluate</c> is not expressible under the grammar, so the approved
+    /// three-segment form is used. Decision: P1-E04-D10.
+    /// </summary>
+    public static PermissionIdentifier ControlsEvaluate { get; } =
+        PermissionIdentifier.Parse("account.controls.evaluate");
+
+    public static PermissionRequirement RestrictionApplyRequirement { get; } = new()
+    {
+        Permission = RestrictionApply,
+        RequiresStepUp = true,
+    };
+
+    public static PermissionRequirement RestrictionReleaseRequirement { get; } = new()
+    {
+        Permission = RestrictionRelease,
+        RequiresStepUp = true,
+    };
+
+    public static PermissionRequirement ControlsEvaluateRequirement { get; } = new()
+    {
+        Permission = ControlsEvaluate,
+    };
+
     public static PermissionRequirement NumberRevealRequirement { get; } = new()
     {
         Permission = NumberReveal,

@@ -418,6 +418,101 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountBlockRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("BlockId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("block_id");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AppliedByActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("applied_by_actor_id");
+
+                    b.Property<string>("AuthorityReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("authority_reference");
+
+                    b.Property<string>("BlockTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("block_type_code");
+
+                    b.Property<long>("ControlVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("control_version");
+
+                    b.Property<DateTimeOffset>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTimeOffset?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_to");
+
+                    b.Property<string>("OperationScopeJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("operation_scope_json");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<DateTimeOffset?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<string>("ReleasedByActorId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("released_by_actor_id");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.Property<bool>("RequiresManualRelease")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_manual_release");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("InstitutionId", "BlockId");
+
+                    b.HasIndex("InstitutionId", "AccountId", "Status");
+
+                    b.ToTable("account_blocks", "account", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_blocks_period", "effective_to IS NULL OR effective_to > effective_from");
+
+                            t.HasCheckConstraint("ck_account_blocks_status", "status IN ('active', 'released', 'expired')");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountEligibilityEvaluationRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -531,6 +626,99 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                     b.HasIndex("InstitutionId", "AccountApplicationId", "EvaluatedAt");
 
                     b.ToTable("account_eligibility_evaluations", "account");
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountFreezeRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("FreezeId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("freeze_id");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AppliedByActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("applied_by_actor_id");
+
+                    b.Property<string>("AuthorityReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("authority_reference");
+
+                    b.Property<long>("ControlVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("control_version");
+
+                    b.Property<DateTimeOffset>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTimeOffset?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_to");
+
+                    b.Property<string>("FreezeTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("freeze_type_code");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<DateTimeOffset?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<string>("ReleasedByActorId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("released_by_actor_id");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.Property<bool>("RequiresManualRelease")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_manual_release");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("InstitutionId", "FreezeId");
+
+                    b.HasIndex("InstitutionId", "AccountId", "Status");
+
+                    b.ToTable("account_freezes", "account", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_freezes_period", "effective_to IS NULL OR effective_to > effective_from");
+
+                            t.HasCheckConstraint("ck_account_freezes_status", "status IN ('active', 'released', 'expired')");
+
+                            t.HasCheckConstraint("ck_account_freezes_type", "freeze_type_code IN ('regulatory', 'institution')");
+                        });
                 });
 
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountNumberReservationRecord", b =>
@@ -832,6 +1020,114 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_accounts_ledger_initialisation", "ledger_initialisation_status IN ('not_initialised', 'initialised', 'failed')");
 
                             t.HasCheckConstraint("ck_accounts_status", "status IN ('Open', 'Active', 'Restricted', 'Frozen', 'Dormant', 'PendingClosure', 'Closed')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRestrictionRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("RestrictionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("restriction_id");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AppliedByActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("applied_by_actor_id");
+
+                    b.Property<string>("AuthorityReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("authority_reference");
+
+                    b.Property<string>("ChannelScopeJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("channel_scope_json");
+
+                    b.Property<long>("ControlVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("control_version");
+
+                    b.Property<DateTimeOffset>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTimeOffset?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_to");
+
+                    b.Property<string>("PostingDirectionCode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("posting_direction_code");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<DateTimeOffset?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<string>("ReleasedByActorId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("released_by_actor_id");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.Property<bool>("RequiresManualRelease")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_manual_release");
+
+                    b.Property<string>("RestrictionTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("restriction_type_code");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TransactionTypeScopeJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("transaction_type_scope_json");
+
+                    b.HasKey("InstitutionId", "RestrictionId");
+
+                    b.HasIndex("InstitutionId", "AccountId", "Status");
+
+                    b.ToTable("account_restrictions", "account", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_restrictions_direction", "posting_direction_code IN ('debit', 'credit', 'both')");
+
+                            t.HasCheckConstraint("ck_account_restrictions_period", "effective_to IS NULL OR effective_to > effective_from");
+
+                            t.HasCheckConstraint("ck_account_restrictions_status", "status IN ('active', 'released', 'expired')");
                         });
                 });
 
@@ -2172,11 +2468,29 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountBlockRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountEligibilityEvaluationRecord", b =>
                 {
                     b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountApplicationRecord", null)
                         .WithMany()
                         .HasForeignKey("InstitutionId", "AccountApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountFreezeRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -2195,6 +2509,15 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                     b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountApplicationRecord", null)
                         .WithMany()
                         .HasForeignKey("InstitutionId", "AccountApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRestrictionRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

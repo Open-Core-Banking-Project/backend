@@ -174,6 +174,7 @@ if (useRelationalStore)
     builder.Services.AddScoped<ILedgerAccountInitialisation, LedgerAccountInitialisationService>();
     builder.Services.AddScoped<IAccountApprovalService, AccountApprovalService>();
     builder.Services.AddScoped<IAccountActivationService, AccountActivationService>();
+    builder.Services.AddScoped<IAccountControlService, AccountControlService>();
     builder.Services.AddScoped<IAccountNumberRevealService, AccountNumberRevealService>();
     builder.Services.AddScoped<IAccountOpeningPolicyConfigurationService, AccountOpeningPolicyConfigurationService>();
     builder.Services.AddScoped<IAccountOpeningPolicySource, AccountOpeningPolicySource>();
@@ -1528,6 +1529,244 @@ static void MapAccountEndpoints(WebApplication app)
     .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
         AccountPermissions.ActivationCreateRequirement,
         "account.activation.create"));
+
+    // Account controls under the approved deny-dominant precedence. Decision: P1-E04-D10.
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/restrictions", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        CreateAccountRestrictionRequestV1 request,
+        IAccountControlService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountControlChangeResult result = await service.ApplyRestrictionAsync(
+                new ApplyAccountRestrictionCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    request.RequestId,
+                    request.RestrictionTypeCode,
+                    request.PostingDirectionCode,
+                    request.ChannelScopeCodes,
+                    request.TransactionTypeScopeCodes,
+                    request.ReasonCode,
+                    request.AuthorityReference,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new RestrictionResponseV1(
+                institutionId,
+                result.ControlId,
+                result.AccountId,
+                result.ControlTypeCode,
+                request.PostingDirectionCode,
+                result.Status,
+                result.ControlVersion,
+                result.EffectiveFrom,
+                result.EffectiveTo,
+                result.ChangedAt,
+                result.Replayed));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Restriction rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid restriction", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.RestrictionApplyRequirement,
+        "account.restriction.apply"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/freezes", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        CreateAccountFreezeRequestV1 request,
+        IAccountControlService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountControlChangeResult result = await service.ApplyFreezeAsync(
+                new ApplyAccountFreezeCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    request.RequestId,
+                    request.FreezeTypeCode,
+                    request.ReasonCode,
+                    request.AuthorityReference,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Freeze rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid freeze", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.RestrictionApplyRequirement,
+        "account.restriction.apply"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/blocks", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        CreateAccountBlockRequestV1 request,
+        IAccountControlService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountControlChangeResult result = await service.ApplyBlockAsync(
+                new ApplyAccountBlockCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    request.RequestId,
+                    request.BlockTypeCode,
+                    request.OperationScopeCodes,
+                    request.ReasonCode,
+                    request.AuthorityReference,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Block rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid block", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.RestrictionApplyRequirement,
+        "account.restriction.apply"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/controls/{controlId}/release", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        string controlId,
+        ReleaseAccountControlRequestV1 request,
+        IAccountControlService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountControlChangeResult result = await service.ReleaseAsync(
+                new ReleaseAccountControlCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    controlId,
+                    request.ControlKind,
+                    request.ReasonCode,
+                    request.ApprovalReference,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            int status = exception.Code == "account_control_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status409Conflict;
+            return Problem(exception.Code, "Control release rejected", exception.Message, status);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid control release", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.RestrictionReleaseRequirement,
+        "account.restriction.release"));
+
+    app.MapPost("/internal/v1/institutions/{institutionId}/accounts/{accountId}/control-evaluations", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        EvaluateAccountControlsRequestV1 request,
+        IAccountControlService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            AccountControlEvaluationResult result = await service.EvaluateAsync(
+                new EvaluateAccountControlsCommand(
+                    InstitutionId.From(institutionId),
+                    accountId,
+                    request.PostingIntentId,
+                    request.PostingDirectionCode,
+                    request.TransactionTypeCode,
+                    request.ChannelCode,
+                    new MonetaryAmountView(request.Amount?.Amount ?? 0m, request.Amount?.Currency ?? string.Empty),
+                    request.KnownControlVersion,
+                    request.EvaluationTime),
+                cancellationToken);
+            return Results.Ok(new AccountControlDecisionV1(
+                institutionId,
+                result.AccountId,
+                result.PostingIntentId,
+                result.Outcome,
+                result.ReasonCodes,
+                result.EffectiveControls
+                    .Select(control => new EffectiveAccountControlV1(
+                        control.ControlId,
+                        AccountControlDescriptor.ToToken(control.Type),
+                        control.Direction == AccountControlDirection.Both ? "both" : AccountControlDescriptor.ToToken(control.Direction),
+                        control.Status,
+                        control.EffectiveFrom,
+                        control.EffectiveTo))
+                    .ToArray(),
+                result.ControlVersion,
+                result.EvaluatedAt));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            int status = exception.Code == "account_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status409Conflict;
+            return Problem(exception.Code, "Control evaluation rejected", exception.Message, status);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid control evaluation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ControlsEvaluateRequirement,
+        "account.controls.evaluate"));
 }
 
 static AccountEligibilityEvaluationResponseV1 ToEvaluationResponse(string institutionId, AccountEligibilityResult result) =>

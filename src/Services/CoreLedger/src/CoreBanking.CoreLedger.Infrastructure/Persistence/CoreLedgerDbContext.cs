@@ -75,6 +75,12 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public DbSet<LedgerAccountRecord> LedgerAccounts => Set<LedgerAccountRecord>();
 
+    public DbSet<AccountRestrictionRecord> AccountRestrictions => Set<AccountRestrictionRecord>();
+
+    public DbSet<AccountFreezeRecord> AccountFreezes => Set<AccountFreezeRecord>();
+
+    public DbSet<AccountBlockRecord> AccountBlocks => Set<AccountBlockRecord>();
+
     public DbSet<InstitutionAuditRecord> InstitutionAuditEvents => Set<InstitutionAuditRecord>();
 
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
@@ -129,6 +135,9 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<AccountNumberRetirementRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AccountStatusHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<LedgerAccountRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountRestrictionRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountFreezeRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountBlockRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InstitutionAuditRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);

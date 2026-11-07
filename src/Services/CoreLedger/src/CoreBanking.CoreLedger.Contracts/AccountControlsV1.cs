@@ -27,8 +27,29 @@ public sealed record RestrictionResponseV1(
     DateTimeOffset ChangedAt,
     bool Replayed);
 
-public sealed record CreateAccountLienRequestV1(
+public sealed record CreateAccountFreezeRequestV1(
     string RequestId,
+    string FreezeTypeCode,
+    string ReasonCode,
+    string AuthorityReference,
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? EffectiveTo);
+
+public sealed record CreateAccountBlockRequestV1(
+    string RequestId,
+    string BlockTypeCode,
+    IReadOnlyCollection<string> OperationScopeCodes,
+    string ReasonCode,
+    string? AuthorityReference,
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? EffectiveTo);
+
+public sealed record ReleaseAccountControlRequestV1(
+    string ControlKind,
+    string ReasonCode,
+    string? ApprovalReference);
+
+public sealed record CreateAccountLienRequestV1(string RequestId,
     MonetaryAmountV1 Amount,
     string PriorityCode,
     string ReasonCode,
