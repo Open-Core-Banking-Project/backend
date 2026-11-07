@@ -52,21 +52,42 @@ public sealed record ReleaseAccountControlRequestV1(
 public sealed record CreateAccountLienRequestV1(string RequestId,
     MonetaryAmountV1 Amount,
     string PriorityCode,
+    int PriorityRank,
     string ReasonCode,
-    string AuthorityReference,
+    string? AuthorityReference,
     DateTimeOffset EffectiveFrom,
-    DateTimeOffset? EffectiveTo);
+    DateTimeOffset? EffectiveTo,
+    bool UncoveredAcknowledged);
+
+public sealed record ReleaseAccountLienRequestV1(
+    decimal Amount,
+    string ReasonCode,
+    string? AuthorityReference,
+    string? ApprovalReference,
+    long ExpectedOutstandingVersion);
+
+public sealed record SatisfyAccountLienRequestV1(
+    decimal Amount,
+    string SettlementReference);
+
+public sealed record LienAvailabilityPositionV1(
+    decimal TotalOutstandingLiens,
+    decimal ReportedAvailable,
+    decimal UncoveredLienAmount,
+    bool ExceedsAvailable,
+    string SourceVersion,
+    DateTimeOffset AsOf);
 
 public sealed record LienResponseV1(
     string InstitutionId,
     string LienId,
     string AccountId,
     MonetaryAmountV1 Amount,
+    decimal OutstandingAmount,
     string PriorityCode,
+    int PriorityRank,
     string Status,
-    long ControlVersion,
-    DateTimeOffset EffectiveFrom,
-    DateTimeOffset? EffectiveTo,
+    LienAvailabilityPositionV1 Availability,
     DateTimeOffset ChangedAt,
     bool Replayed);
 

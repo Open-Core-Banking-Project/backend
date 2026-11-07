@@ -52,6 +52,25 @@ public static class AccountPermissions
     public static PermissionIdentifier ControlsEvaluate { get; } =
         PermissionIdentifier.Parse("account.controls.evaluate");
 
+    public static PermissionIdentifier LienCreate { get; } =
+        PermissionIdentifier.Parse("account.lien.create");
+
+    public static PermissionIdentifier LienRelease { get; } =
+        PermissionIdentifier.Parse("account.lien.release");
+
+    public static PermissionRequirement LienCreateRequirement { get; } = new()
+    {
+        Permission = LienCreate,
+        RequiresStepUp = true,
+    };
+
+    public static PermissionRequirement LienReleaseRequirement { get; } = new()
+    {
+        Permission = LienRelease,
+        RequiresStepUp = true,
+        IsRestrictedApproval = true,
+    };
+
     public static PermissionRequirement RestrictionApplyRequirement { get; } = new()
     {
         Permission = RestrictionApply,

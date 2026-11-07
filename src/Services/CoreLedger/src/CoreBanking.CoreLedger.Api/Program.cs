@@ -175,6 +175,8 @@ if (useRelationalStore)
     builder.Services.AddScoped<IAccountApprovalService, AccountApprovalService>();
     builder.Services.AddScoped<IAccountActivationService, AccountActivationService>();
     builder.Services.AddScoped<IAccountControlService, AccountControlService>();
+    builder.Services.AddScoped<ILedgerAvailabilitySource, LedgerAvailabilitySource>();
+    builder.Services.AddScoped<IAccountLienService, AccountLienService>();
     builder.Services.AddScoped<IAccountNumberRevealService, AccountNumberRevealService>();
     builder.Services.AddScoped<IAccountOpeningPolicyConfigurationService, AccountOpeningPolicyConfigurationService>();
     builder.Services.AddScoped<IAccountOpeningPolicySource, AccountOpeningPolicySource>();
@@ -1767,7 +1769,189 @@ static void MapAccountEndpoints(WebApplication app)
     .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
         AccountPermissions.ControlsEvaluateRequirement,
         "account.controls.evaluate"));
+
+    // Lien lifecycle: immutable claim, outstanding tracking and dual control. Decision: P1-E04-D11.
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/liens", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        CreateAccountLienRequestV1 request,
+        IAccountLienService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountLienResult result = await service.CreateAsync(
+                new CreateAccountLienCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    request.RequestId,
+                    request.Amount?.Amount ?? 0m,
+                    request.Amount?.Currency ?? string.Empty,
+                    request.PriorityCode,
+                    request.PriorityRank,
+                    request.ReasonCode,
+                    request.AuthorityReference,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    request.UncoveredAcknowledged,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToLienResponse(institutionId, result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Lien rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid lien", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.LienCreateRequirement,
+        "account.lien.create"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/liens/{lienId}/releases", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        string lienId,
+        ReleaseAccountLienRequestV1 request,
+        IAccountLienService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountLienResult result = await service.ReleaseAsync(
+                new ReleaseAccountLienCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    lienId,
+                    request.Amount,
+                    request.ReasonCode,
+                    request.AuthorityReference,
+                    request.ApprovalReference,
+                    request.ExpectedOutstandingVersion,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToLienResponse(institutionId, result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            int status = exception.Code == "account_lien_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status409Conflict;
+            return Problem(exception.Code, "Lien release rejected", exception.Message, status);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid lien release", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.LienReleaseRequirement,
+        "account.lien.release"));
+
+    app.MapPost("/internal/v1/institutions/{institutionId}/accounts/{accountId}/liens/{lienId}/satisfactions", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        string lienId,
+        SatisfyAccountLienRequestV1 request,
+        IAccountLienService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountLienResult result = await service.SatisfyAsync(
+                new SatisfyAccountLienCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    lienId,
+                    request.Amount,
+                    request.SettlementReference,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToLienResponse(institutionId, result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Lien satisfaction rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid lien satisfaction", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ControlsEvaluateRequirement,
+        "account.controls.evaluate"));
+
+    app.MapGet("/api/v1/institutions/{institutionId}/accounts/{accountId}/liens", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        IAccountLienService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            IReadOnlyList<AccountLienResult> liens = await service.ListActiveAsync(
+                InstitutionId.From(institutionId),
+                accountId,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+            return Results.Ok(liens.Select(lien => ToLienResponse(institutionId, lien)).ToArray());
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            int status = exception.Code == "account_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status409Conflict;
+            return Problem(exception.Code, "Lien query rejected", exception.Message, status);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid lien query", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ApplicationViewRequirement,
+        "account.application.view"));
 }
+
+static LienResponseV1 ToLienResponse(string institutionId, AccountLienResult result) =>
+    new(
+        institutionId,
+        result.LienId,
+        result.AccountId,
+        new MonetaryAmountV1(result.Amount, result.CurrencyCode),
+        result.OutstandingAmount,
+        result.PriorityCode,
+        result.PriorityRank,
+        result.Status,
+        new LienAvailabilityPositionV1(
+            result.Availability.TotalOutstandingLiens,
+            result.Availability.ReportedAvailable,
+            result.Availability.UncoveredLienAmount,
+            result.Availability.ExceedsAvailable,
+            result.Availability.SourceVersion,
+            result.Availability.AsOf),
+        result.ChangedAt,
+        result.Replayed);
 
 static AccountEligibilityEvaluationResponseV1 ToEvaluationResponse(string institutionId, AccountEligibilityResult result) =>
     new(

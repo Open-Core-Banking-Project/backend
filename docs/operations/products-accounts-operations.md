@@ -5,10 +5,10 @@ Operational contract for the Core Banking and Ledger product and account configu
 `institution.account-numbering`) and the account application and opening boundary.
 Decisions: P1-E04 slice 14, P1-E04-D06, P1-E04-D07.
 
-Liens, dormancy, closure and statements are not implemented, so this runbook covers the configuration lifecycle,
+Dormancy, closure and statements are not implemented, so this runbook covers the configuration lifecycle,
 reference-fact consumption, account applications with their eligibility evidence, number allocation, approval,
-account opening, activation, account controls and the integrity signals that exist today. Extend it in the same
-change that enables those features; do not document a capability ahead of the code.
+account opening, activation, account controls, liens and the integrity signals that exist today. Extend it in the
+same change that enables those features; do not document a capability ahead of the code.
 
 ## Signals
 
@@ -72,6 +72,15 @@ pending outbox message exists.
 **Product or currency publication failure.** Read the stable code, correct the cause, and re-submit with the
 same idempotency key only when the payload is unchanged. A changed payload needs a new key. Never edit a
 configuration version row directly: published versions are immutable and the hash is the evidence.
+
+**Liens.** A lien reduces availability and never denies a posting by itself. Its claimed amount is immutable: a
+partial release or a ledger satisfaction adds an entry and lowers the outstanding amount, and the lien stays active until
+outstanding reaches zero. Outstanding amounts are never derived from a balance and a released lien is never deleted.
+
+**Lien release.** Statutory, tax and institution releases need an approval reference and a releaser other than the maker
+(`account_lien_release_requires_approval`, `account_lien_dual_control_required`). Every other release refusal
+(`account_lien_over_release`, `account_lien_not_active`) means the request disagrees with the stored outstanding amount -
+re-read the lien, never adjust it by hand.
 
 **Control evaluation.** `allow`, `deny` and `review` are the only outcomes. `deny` names every denying control in
 `control_denied:<type>` codes ordered by the approved precedence; `review` means either the caller's control version was stale
