@@ -1,13 +1,14 @@
 # Products and accounts operations
 
 Operational contract for the Core Banking and Ledger product and account configuration areas
-(`product_eligibility.v1`, `institution.currencies`, `institution.account-opening-policy`) and the account
-application boundary. Decisions: P1-E04 slice 14, P1-E04-D07.
+(`product_eligibility.v1`, `institution.currencies`, `institution.account-opening-policy`,
+`institution.account-numbering`) and the account application and opening boundary.
+Decisions: P1-E04 slice 14, P1-E04-D06, P1-E04-D07.
 
-Account numbers, accounts, restrictions, liens, dormancy and statements are not implemented, so this runbook
-covers the configuration lifecycle, reference-fact consumption, account applications with their eligibility
-evidence, and the integrity signals that exist today. Extend it in the same change that enables those
-features; do not document a capability ahead of the code.
+Restrictions, liens, dormancy, activation and statements are not implemented, so this runbook covers the
+configuration lifecycle, reference-fact consumption, account applications with their eligibility evidence,
+number allocation, account opening and the integrity signals that exist today. Extend it in the same change
+that enables those features; do not document a capability ahead of the code.
 
 ## Signals
 
@@ -20,8 +21,10 @@ monetary value is ever a tag or a log field.
 | `corebanking.product_account.configuration.commands` | counter | Lifecycle command by `area`, `command` (`draft.create`, `simulate`, `submit`, `publish`) and `outcome` (`succeeded`, `replayed`, `rejected`) |
 | `corebanking.product_account.reference_facts.lookups` | counter | Authoritative customer-fact lookups by bounded `outcome` code |
 | `corebanking.product_account.account.commands` | counter | Account-application commands by `command` (`create`, `evaluate`) and `outcome` (`succeeded`, `replayed`, `rejected`) |
-| `corebanking.product_account.configurations.published` | gauge | Published configuration versions across the product, currency and opening-policy areas |
+| `corebanking.product_account.configurations.published` | gauge | Published configuration versions across the product, currency, opening-policy and numbering areas |
 | `corebanking.product_account.configurations.awaiting_publication` | gauge | Approved versions not yet published |
+| `corebanking.product_account.account_numbers.available` | gauge | Account numbers still issuable across the institution's scheme instances |
+| `corebanking.product_account.account_numbers.depletion_band` | gauge | Highest depletion band reached: `0`, `80`, `90` or `95` |
 | `corebanking.product_account.outbox.pending` | gauge | Outbox messages not yet relayed |
 | `corebanking.product_account.outbox.oldest_pending_age_seconds` | gauge | Age of the oldest pending outbox message |
 
@@ -39,6 +42,8 @@ Existing institution instruments remain on `CoreBanking.Institutions` (provision
 | Applications refused by policy | `account.commands{command="evaluate",outcome="rejected"}` rising with `account_opening_policy_unavailable` | The institution has no effective opening ceiling, so opening stays blocked by design. Publish an approved `institution.account-opening-policy` version; never widen the code to allow an open-ended limit |
 | Concurrent opening held | `account.commands{command="evaluate",outcome="rejected"}` with `account_opening_claim_busy` | One claim per customer and counting basis is expected; a sustained rate means a stuck evaluation. Claims expire after 60 seconds and an expired claim is released when the next evaluation runs, so investigate the failing path rather than deleting rows |
 | Applications refused by limit | `account.commands{command="evaluate",outcome="rejected"}` rising with `account_limit_reached` | Read the recorded evaluation: the counted holdings and effective maximum are evidence. Do not edit the snapshot; a legitimate exception needs the approved override path, which is not enabled here |
+| Account numbers depleting | `account_numbers.depletion_band` above zero, or `account_numbers.available` below the approved runway | Follow the band: at `80` plan a wider or newly prefixed scheme version, at `90` obtain the approval, at `95` publish it. Never widen a published scheme in place and never edit the reservation row |
+| Scheme exhausted | `account.commands` or the opening response carries `account_number_scheme_exhausted` | The application stays approved and unassigned; publish an approved scheme version with a wider sequence or new prefix, then retry the opening. Numbers already issued are never renumbered |
 | Outbox backlog | `outbox.pending` above the approved threshold, or `oldest_pending_age_seconds` above the relay budget | Check the relay worker and broker; approvals and publications stay pending until the relay drains |
 | Reconciliation findings | `GET /internal/v1/reconciliation/product-accounts` returns any finding | Follow the finding code below; findings are configuration-integrity failures, never warnings |
 
@@ -65,6 +70,11 @@ pending outbox message exists.
 **Product or currency publication failure.** Read the stable code, correct the cause, and re-submit with the
 same idempotency key only when the payload is unchanged. A changed payload needs a new key. Never edit a
 configuration version row directly: published versions are immutable and the hash is the evidence.
+
+**Number allocation contention.** `account_number_reservation_conflict` means two openings created the
+reservation row at the same time; the retry succeeds once the row exists. A sustained conflict rate means the
+reservation transaction is timing out; investigate before adding retries. The reservation row is guarded by a
+row lock and an optimistic version, so never warm it by hand.
 
 **Opening ceiling missing or invalid.** Every account application refuses with
 `account_opening_policy_unavailable`, `account_opening_policy_integrity_failed` or `account_opening_policy_invalid`.

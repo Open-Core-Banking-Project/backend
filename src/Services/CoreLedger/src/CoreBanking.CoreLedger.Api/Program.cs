@@ -166,6 +166,12 @@ if (useRelationalStore)
     builder.Services.AddScoped<ICurrencyReferenceSource, CurrencyReferenceSource>();
     builder.Services.AddScoped<AuthoritativeEligibilityFactsResolver>();
     builder.Services.AddScoped<ISavingsEligibilityEvaluationService, SavingsEligibilityEvaluationService>();
+    builder.Services.AddScoped<IInstitutionConfigurationAreaLifecycle, InstitutionConfigurationAreaLifecycle>();
+    builder.Services.AddScoped<IAccountNumberingConfigurationService, AccountNumberingConfigurationService>();
+    builder.Services.AddScoped<IAccountNumberSchemeSource, AccountNumberSchemeSource>();
+    builder.Services.AddScoped<IAccountNumberAllocator, AccountNumberAllocator>();
+    builder.Services.AddScoped<IAccountOpeningService, AccountOpeningService>();
+    builder.Services.AddScoped<IAccountNumberRevealService, AccountNumberRevealService>();
     builder.Services.AddScoped<IAccountOpeningPolicyConfigurationService, AccountOpeningPolicyConfigurationService>();
     builder.Services.AddScoped<IAccountOpeningPolicySource, AccountOpeningPolicySource>();
     builder.Services.AddScoped<IAccountHoldingsReader, AccountHoldingsReader>();
@@ -925,7 +931,7 @@ static void MapAccountEndpoints(WebApplication app)
         if (key is null) return IdempotencyKeyRequired();
         try
         {
-            AccountOpeningPolicyDraftResult result = await service.CreateDraftAsync(
+            ConfigurationDraftOutcome result = await service.CreateDraftAsync(
                 new CreateAccountOpeningPolicyDraftCommand(
                     InstitutionId.From(institutionId),
                     Actor(http).Id,
@@ -938,7 +944,7 @@ static void MapAccountEndpoints(WebApplication app)
                 cancellationToken);
             return Results.Ok(result);
         }
-        catch (AccountOpeningPolicyRejectedException exception)
+        catch (InstitutionConfigurationRejectedException exception)
         {
             return Problem(exception.Code, "Account-opening policy rejected", exception.Message, StatusCodes.Status409Conflict);
         }
@@ -962,7 +968,7 @@ static void MapAccountEndpoints(WebApplication app)
         if (key is null) return IdempotencyKeyRequired();
         try
         {
-            AccountOpeningPolicySimulationResult result = await service.SimulateAsync(
+            ConfigurationSimulationOutcome result = await service.SimulateAsync(
                 new SimulateAccountOpeningPolicyCommand(
                     Actor(http).InstitutionId,
                     Actor(http).Id,
@@ -974,7 +980,7 @@ static void MapAccountEndpoints(WebApplication app)
                 cancellationToken);
             return Results.Ok(result);
         }
-        catch (AccountOpeningPolicyRejectedException exception)
+        catch (InstitutionConfigurationRejectedException exception)
         {
             return Problem(exception.Code, "Account-opening policy simulation rejected", exception.Message, StatusCodes.Status409Conflict);
         }
@@ -998,7 +1004,7 @@ static void MapAccountEndpoints(WebApplication app)
         if (key is null) return IdempotencyKeyRequired();
         try
         {
-            AccountOpeningPolicySubmissionResult result = await service.SubmitForApprovalAsync(
+            ConfigurationSubmissionOutcome result = await service.SubmitForApprovalAsync(
                 new SubmitAccountOpeningPolicyCommand(
                     Actor(http).InstitutionId,
                     Actor(http).Id,
@@ -1011,7 +1017,7 @@ static void MapAccountEndpoints(WebApplication app)
                 cancellationToken);
             return Results.Ok(result);
         }
-        catch (AccountOpeningPolicyRejectedException exception)
+        catch (InstitutionConfigurationRejectedException exception)
         {
             return Problem(exception.Code, "Account-opening policy submission rejected", exception.Message, StatusCodes.Status409Conflict);
         }
@@ -1035,7 +1041,7 @@ static void MapAccountEndpoints(WebApplication app)
         if (key is null) return IdempotencyKeyRequired();
         try
         {
-            AccountOpeningPolicyPublicationResult result = await service.PublishAsync(
+            ConfigurationPublicationOutcome result = await service.PublishAsync(
                 new PublishAccountOpeningPolicyCommand(
                     Actor(http).InstitutionId,
                     Actor(http).Id,
@@ -1049,7 +1055,7 @@ static void MapAccountEndpoints(WebApplication app)
                 cancellationToken);
             return Results.Ok(result);
         }
-        catch (AccountOpeningPolicyRejectedException exception)
+        catch (InstitutionConfigurationRejectedException exception)
         {
             return Problem(exception.Code, "Account-opening policy publication rejected", exception.Message, StatusCodes.Status409Conflict);
         }
@@ -1190,6 +1196,248 @@ static void MapAccountEndpoints(WebApplication app)
     .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
         AccountPermissions.ApplicationViewRequirement,
         "account.application.view"));
+
+    // Institution account-numbering lifecycle (area institution.account-numbering).
+    // Decision: P1-E04-D06.
+    app.MapPost("/api/v1/institutions/{institutionId}/configurations/institution.account-numbering/versions", async (
+        HttpContext http,
+        string institutionId,
+        CreateAccountNumberingDraftRequestV1 request,
+        IAccountNumberingConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationDraftOutcome result = await service.CreateDraftAsync(
+                new CreateAccountNumberingDraftCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    request.VersionId,
+                    request.SchemeId,
+                    request.SchemeVersion,
+                    request.Prefix,
+                    request.ProductCodeWidth,
+                    request.BranchCodeWidth,
+                    request.SequenceWidth,
+                    request.CheckDigit,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Account-numbering scheme rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account-numbering scheme", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationCreateRequirement,
+        "institution.configuration.create"));
+
+    app.MapPost("/api/v1/configurations/account-numbering/{versionId}/simulate", async (
+        HttpContext http,
+        string versionId,
+        SimulateAccountNumberingRequestV1 request,
+        IAccountNumberingConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationSimulationOutcome result = await service.SimulateAsync(
+                new SimulateAccountNumberingCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    versionId,
+                    request.SimulationId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Account-numbering simulation rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account-numbering simulation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSimulateRequirement,
+        "institution.configuration.simulate"));
+
+    app.MapPost("/api/v1/configurations/account-numbering/{versionId}/submit", async (
+        HttpContext http,
+        string versionId,
+        SubmitAccountNumberingRequestV1 request,
+        IAccountNumberingConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationSubmissionOutcome result = await service.SubmitForApprovalAsync(
+                new SubmitAccountNumberingCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    request.RequestId,
+                    request.SourceRequestKey,
+                    versionId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Account-numbering submission rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account-numbering submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSubmitRequirement,
+        "institution.configuration.submit"));
+
+    app.MapPost("/api/v1/configurations/account-numbering/{versionId}/publish", async (
+        HttpContext http,
+        string versionId,
+        PublishAccountNumberingRequestV1 request,
+        IAccountNumberingConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationPublicationOutcome result = await service.PublishAsync(
+                new PublishAccountNumberingCommand(
+                    Actor(http).InstitutionId,
+                    Actor(http).Id,
+                    key,
+                    request.PublicationId,
+                    versionId,
+                    request.ContentHash,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Account-numbering publication rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account-numbering publication", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationPublishRequirement,
+        "institution.configuration.publish"));
+
+    // Opening an approved application: one atomic reservation and account creation.
+    // Decisions: P1-E04-D06, P1-E04-D09.
+    app.MapPost("/api/v1/institutions/{institutionId}/account-applications/{applicationId}/open", async (
+        HttpContext http,
+        string institutionId,
+        string applicationId,
+        OpenAccountRequestV1 request,
+        IAccountOpeningService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountOpenedResult result = await service.OpenAsync(
+                new OpenAccountCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    applicationId,
+                    request.ExpectedVersion,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new AccountResponseV1(
+                institutionId,
+                result.AccountId,
+                result.MaskedAccountNumber,
+                result.CustomerId,
+                result.ProductId,
+                result.ProductVersionId,
+                result.BranchId,
+                result.CurrencyCode,
+                result.Status,
+                result.LedgerInitialisationStatus,
+                result.Version,
+                result.OpenedAt,
+                result.Replayed));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Account opening rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account opening", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.ApplicationApproveRequirement,
+        "account.application.approve"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/number-reveal", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        RevealAccountNumberRequestV1 request,
+        IAccountNumberRevealService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            AccountNumberRevealResult result = await service.RevealAsync(
+                new RevealAccountNumberCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    accountId,
+                    request.Reason,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new AccountNumberRevealResponseV1(
+                institutionId, result.AccountId, result.AccountNumber, result.RevealedAt));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            int status = exception.Code == "account_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status409Conflict;
+            return Problem(exception.Code, "Account number reveal rejected", exception.Message, status);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account number reveal", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.NumberRevealRequirement,
+        "account.number.reveal"));
 }
 
 static AccountEligibilityEvaluationResponseV1 ToEvaluationResponse(string institutionId, AccountEligibilityResult result) =>

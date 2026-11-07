@@ -33,6 +33,77 @@ public sealed class AccountApplicationRecord : ITenantOwnedEntity
 }
 
 /// <summary>
+/// One account. It carries its full number, which is never projected into a list response, an event or
+/// a log; contracts expose only the masked form. Decision: P1-E04-D06.
+/// </summary>
+public sealed class AccountRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+    public required string AccountId { get; set; }
+    public required string AccountApplicationId { get; set; }
+    public required string CustomerId { get; set; }
+    public required string ProductId { get; set; }
+    public required string ProductCode { get; set; }
+    public required string ProductVersionId { get; set; }
+    public required string ProductContentHash { get; set; }
+    public required string BranchId { get; set; }
+    public required string CurrencyCode { get; set; }
+    public required string AccountPurposeCode { get; set; }
+    public required string OwnershipTypeCode { get; set; }
+    public required string AccountNumber { get; set; }
+    public required string MaskedAccountNumber { get; set; }
+    public required string SchemeId { get; set; }
+    public required string SchemeVersionId { get; set; }
+    public required string Status { get; set; }
+    public required string LedgerInitialisationStatus { get; set; }
+    public long Version { get; set; }
+    public DateTimeOffset OpenedAt { get; set; }
+}
+
+/// <summary>
+/// The durable allocation state of one published scheme instance. The next value is the only source of
+/// a new number and the row is updated under a lock. Decision: P1-E04-D06.
+/// </summary>
+public sealed class AccountNumberReservationRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+    public required string SchemeVersionId { get; set; }
+    public required string SchemeId { get; set; }
+    public long NextValue { get; set; }
+    public long HighWaterMark { get; set; }
+    public long Capacity { get; set; }
+    public long Version { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// A released sequence is recorded here and never reissued, so a scheme stays gap-detectable.
+/// Decision: P1-E04-D06.
+/// </summary>
+public sealed class AccountNumberRetirementRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+    public required string RetirementId { get; set; }
+    public required string SchemeVersionId { get; set; }
+    public long SequenceValue { get; set; }
+    public required string Reason { get; set; }
+    public required string RetiredByActorId { get; set; }
+    public DateTimeOffset RetiredAt { get; set; }
+}
+
+public sealed class AccountStatusHistoryRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+    public required string HistoryId { get; set; }
+    public required string AccountId { get; set; }
+    public required string Status { get; set; }
+    public required string ReasonCode { get; set; }
+    public required string ActorId { get; set; }
+    public DateTimeOffset OccurredAt { get; set; }
+}
+
+/// <summary>
 /// A short-lived claim that serialises concurrent openings for one customer on one counting basis.
 /// The unique index over the unreleased claim is what stops two evaluations from both passing the
 /// same limit. Decision: P1-E04-D07.

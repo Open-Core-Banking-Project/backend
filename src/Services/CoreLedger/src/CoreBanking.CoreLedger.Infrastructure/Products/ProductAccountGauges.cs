@@ -32,6 +32,14 @@ public static class ProductAccountGauges
             () => Measure(scopeFactory).AwaitingPublication,
             description: "Approved configuration versions that are not published yet.");
         ProductAccountMetrics.Shared.Meter.CreateObservableGauge(
+            "corebanking.product_account.account_numbers.available",
+            () => Measure(scopeFactory).AvailableNumbers,
+            description: "Account numbers still issuable across the published scheme instances of the institution.");
+        ProductAccountMetrics.Shared.Meter.CreateObservableGauge(
+            "corebanking.product_account.account_numbers.depletion_band",
+            () => Measure(scopeFactory).DepletionBand,
+            description: "Highest account-number depletion band reached: 0, 80, 90 or 95 percent.");
+        ProductAccountMetrics.Shared.Meter.CreateObservableGauge(
             "corebanking.product_account.outbox.pending",
             () => Measure(scopeFactory).PendingOutbox,
             description: "Outbox messages that have not been relayed.");
@@ -69,7 +77,22 @@ public static class ProductAccountGauges
                 .Where(record => record.Status == OutboxStatus.Pending)
                 .Select(record => record.CreatedAt)];
             TimeSpan oldest = pending.Length == 0 ? TimeSpan.Zero : clock.GetUtcNow() - pending.Min();
-            return new Snapshot(published, awaiting, pending.LongLength, oldest < TimeSpan.Zero ? TimeSpan.Zero : oldest);
+            var reservations = context.AccountNumberReservations
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Select(record => new { record.Capacity, record.HighWaterMark, record.NextValue })
+                .ToArray();
+            long available = reservations.Sum(record => Math.Max(0, record.Capacity - record.NextValue));
+            int band = reservations.Length == 0
+                ? 0
+                : reservations.Max(record => DepletionBand(record.HighWaterMark, record.Capacity));
+            return new Snapshot(
+                published,
+                awaiting,
+                pending.LongLength,
+                oldest < TimeSpan.Zero ? TimeSpan.Zero : oldest,
+                available,
+                band);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
@@ -78,5 +101,28 @@ public static class ProductAccountGauges
         }
     }
 
-    private readonly record struct Snapshot(long Published, long AwaitingPublication, long PendingOutbox, TimeSpan OldestPendingAge);
+    private static int DepletionBand(long highWaterMark, long capacity)
+    {
+        if (capacity <= 0)
+        {
+            return 0;
+        }
+
+        double used = (double)highWaterMark / capacity;
+        return used switch
+        {
+            >= 0.95 => 95,
+            >= 0.90 => 90,
+            >= 0.80 => 80,
+            _ => 0,
+        };
+    }
+
+    private readonly record struct Snapshot(
+        long Published,
+        long AwaitingPublication,
+        long PendingOutbox,
+        TimeSpan OldestPendingAge,
+        long AvailableNumbers = 0,
+        int DepletionBand = 0);
 }

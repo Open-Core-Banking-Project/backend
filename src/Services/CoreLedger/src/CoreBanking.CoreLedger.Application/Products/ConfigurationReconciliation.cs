@@ -36,10 +36,20 @@ public sealed record ConfigurationReconciliationReport(
     DateTimeOffset GeneratedAt,
     IReadOnlyList<ConfigurationReconciliationFinding> Findings,
     long PendingOutbox,
-    long OldestPendingOutboxAgeSeconds)
+    long OldestPendingOutboxAgeSeconds,
+    IReadOnlyList<AccountNumberSchemeDepletion>? AccountNumberSchemes = null)
 {
     public bool IsHealthy => Findings.Count == 0 && PendingOutbox == 0;
 }
+
+/// <summary>Number depletion of one published scheme instance. Decision: P1-E04-D06.</summary>
+public sealed record AccountNumberSchemeDepletion(
+    string SchemeVersionId,
+    string SchemeId,
+    long Capacity,
+    long Allocated,
+    long Available,
+    int DepletionBand);
 
 public interface IConfigurationReconciliationService
 {

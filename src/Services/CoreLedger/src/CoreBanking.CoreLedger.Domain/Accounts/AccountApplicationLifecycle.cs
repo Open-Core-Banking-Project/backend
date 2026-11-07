@@ -52,4 +52,14 @@ public static class AccountApplicationLifecycle
             throw new InvalidOperationException($"account_application_transition_not_allowed:{current}");
         return eligible ? AccountApplicationStatus.Eligible : AccountApplicationStatus.Ineligible;
     }
+
+    /// <summary>
+    /// Approving an application and opening its account are separate steps: only an approved
+    /// application may produce an account, and it becomes <see cref="AccountApplicationStatus.Open"/>
+    /// in the same transaction that creates the account row. Decision: P1-E04-D09.
+    /// </summary>
+    public static AccountApplicationStatus RecordOpened(AccountApplicationStatus current) =>
+        current == AccountApplicationStatus.Approved
+            ? AccountApplicationStatus.Open
+            : throw new InvalidOperationException($"account_application_transition_not_allowed:{current}");
 }

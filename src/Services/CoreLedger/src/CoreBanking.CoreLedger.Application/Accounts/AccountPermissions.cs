@@ -14,14 +14,30 @@ public static class AccountPermissions
     public static PermissionIdentifier ApplicationView { get; } =
         PermissionIdentifier.Parse("account.application.view");
 
+    public static PermissionIdentifier NumberReveal { get; } =
+        PermissionIdentifier.Parse("account.number.reveal");
+
     public static PermissionRequirement ApplicationCreateRequirement { get; } = new()
     {
         Permission = ApplicationCreate,
         RequiresStepUp = true,
     };
 
+    public static PermissionRequirement ApplicationApproveRequirement { get; } = new()
+    {
+        Permission = PermissionIdentifier.Parse("account.application.approve"),
+        RequiresStepUp = true,
+        IsRestrictedApproval = true,
+    };
+
     public static PermissionRequirement ApplicationViewRequirement { get; } = new()
     {
         Permission = ApplicationView,
+    };
+
+    public static PermissionRequirement NumberRevealRequirement { get; } = new()
+    {
+        Permission = NumberReveal,
+        RequiresStepUp = true,
     };
 }

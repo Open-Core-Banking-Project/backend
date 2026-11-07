@@ -63,6 +63,16 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public DbSet<AccountOpeningClaimRecord> AccountOpeningClaims => Set<AccountOpeningClaimRecord>();
 
+    public DbSet<AccountRecord> Accounts => Set<AccountRecord>();
+
+    public DbSet<AccountNumberReservationRecord> AccountNumberReservations =>
+        Set<AccountNumberReservationRecord>();
+
+    public DbSet<AccountNumberRetirementRecord> AccountNumberRetirements =>
+        Set<AccountNumberRetirementRecord>();
+
+    public DbSet<AccountStatusHistoryRecord> AccountStatusHistory => Set<AccountStatusHistoryRecord>();
+
     public DbSet<InstitutionAuditRecord> InstitutionAuditEvents => Set<InstitutionAuditRecord>();
 
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
@@ -112,6 +122,10 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<AccountApplicationRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AccountEligibilityEvaluationRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AccountOpeningClaimRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountNumberReservationRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountNumberRetirementRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountStatusHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InstitutionAuditRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);

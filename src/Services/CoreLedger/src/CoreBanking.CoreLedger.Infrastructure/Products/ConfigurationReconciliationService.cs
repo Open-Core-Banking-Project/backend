@@ -88,10 +88,41 @@ public sealed class ConfigurationReconciliationService : IConfigurationReconcili
 
         DateTimeOffset now = _timeProvider.GetUtcNow();
         long oldestAge = pending.Length == 0 ? 0 : (long)Math.Max(0, (now - pending.Min()).TotalSeconds);
+        AccountNumberSchemeDepletion[] schemes = (await _context.AccountNumberReservations
+            .AsNoTracking()
+            .Select(record => new { record.SchemeVersionId, record.SchemeId, record.Capacity, record.HighWaterMark, record.NextValue })
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false))
+            .Select(record => new AccountNumberSchemeDepletion(
+                record.SchemeVersionId,
+                record.SchemeId,
+                record.Capacity,
+                record.HighWaterMark,
+                Math.Max(0, record.Capacity - record.NextValue),
+                AccountNumberAllocationBand(record.HighWaterMark, record.Capacity)))
+            .ToArray();
         return new ConfigurationReconciliationReport(
             now,
             ConfigurationReconciliationPolicy.Evaluate(versions, publications),
             pending.LongLength,
-            oldestAge);
+            oldestAge,
+            schemes);
+    }
+
+    private static int AccountNumberAllocationBand(long highWaterMark, long capacity)
+    {
+        if (capacity <= 0)
+        {
+            return 0;
+        }
+
+        double used = (double)highWaterMark / capacity;
+        return used switch
+        {
+            >= 0.95 => 95,
+            >= 0.90 => 90,
+            >= 0.80 => 80,
+            _ => 0,
+        };
     }
 }

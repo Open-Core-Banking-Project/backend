@@ -509,6 +509,109 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("account_eligibility_evaluations", "account");
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountNumberReservationRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("SchemeVersionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("scheme_version_id");
+
+                    b.Property<long>("Capacity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("capacity");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("HighWaterMark")
+                        .HasColumnType("bigint")
+                        .HasColumnName("high_water_mark");
+
+                    b.Property<long>("NextValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("next_value");
+
+                    b.Property<string>("SchemeId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("scheme_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "SchemeVersionId");
+
+                    b.ToTable("account_number_reservations", "account", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_number_reservations_capacity", "capacity > 0");
+
+                            t.HasCheckConstraint("ck_account_number_reservations_high_water", "high_water_mark >= 0");
+
+                            t.HasCheckConstraint("ck_account_number_reservations_next", "next_value >= 1");
+
+                            t.HasCheckConstraint("ck_account_number_reservations_order", "next_value >= high_water_mark AND high_water_mark <= capacity");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountNumberRetirementRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("RetirementId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("retirement_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
+                    b.Property<string>("RetiredByActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("retired_by_actor_id");
+
+                    b.Property<string>("SchemeVersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("scheme_version_id");
+
+                    b.Property<long>("SequenceValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sequence_value");
+
+                    b.HasKey("InstitutionId", "RetirementId");
+
+                    b.HasIndex("InstitutionId", "SchemeVersionId", "SequenceValue")
+                        .IsUnique();
+
+                    b.ToTable("account_number_retirements", "account");
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountOpeningClaimRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -566,6 +669,188 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .HasFilter("released_at IS NULL");
 
                     b.ToTable("account_opening_claims", "account");
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AccountApplicationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_application_id");
+
+                    b.Property<string>("AccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("account_number");
+
+                    b.Property<string>("AccountPurposeCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("account_purpose_code");
+
+                    b.Property<string>("BranchId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<string>("CustomerId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("LedgerInitialisationStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("ledger_initialisation_status");
+
+                    b.Property<string>("MaskedAccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("masked_account_number");
+
+                    b.Property<DateTimeOffset>("OpenedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opened_at");
+
+                    b.Property<string>("OwnershipTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ownership_type_code");
+
+                    b.Property<string>("ProductCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("product_code");
+
+                    b.Property<string>("ProductContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("product_content_hash");
+
+                    b.Property<string>("ProductId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductVersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("product_version_id");
+
+                    b.Property<string>("SchemeId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("scheme_id");
+
+                    b.Property<string>("SchemeVersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("scheme_version_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "AccountId");
+
+                    b.HasIndex("InstitutionId", "AccountApplicationId")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "AccountNumber")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "CustomerId", "Status");
+
+                    b.ToTable("accounts", "account", t =>
+                        {
+                            t.HasCheckConstraint("ck_accounts_ledger_initialisation", "ledger_initialisation_status IN ('not_initialised', 'initialised', 'failed')");
+
+                            t.HasCheckConstraint("ck_accounts_status", "status IN ('Open', 'Active', 'Restricted', 'Frozen', 'Dormant', 'PendingClosure', 'Closed')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountStatusHistoryRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("HistoryId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("history_id");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("InstitutionId", "HistoryId");
+
+                    b.HasIndex("InstitutionId", "AccountId", "OccurredAt");
+
+                    b.ToTable("account_status_history", "account");
                 });
 
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.BranchRecord", b =>
@@ -1822,6 +2107,24 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                     b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountApplicationRecord", null)
                         .WithMany()
                         .HasForeignKey("InstitutionId", "AccountApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountApplicationRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "AccountApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountStatusHistoryRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
