@@ -94,6 +94,11 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public DbSet<AccountClosureProposalRecord> AccountClosureProposals => Set<AccountClosureProposalRecord>();
 
+    public DbSet<AccountStatementRequestRecord> AccountStatementRequests => Set<AccountStatementRequestRecord>();
+
+    public DbSet<AccountStatementArtifactReferenceRecord> AccountStatementArtifactReferences =>
+        Set<AccountStatementArtifactReferenceRecord>();
+
     public DbSet<InstitutionAuditRecord> InstitutionAuditEvents => Set<InstitutionAuditRecord>();
 
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
@@ -157,6 +162,8 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<AccountDormancyNoticeRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AccountDormancyLeaseRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AccountClosureProposalRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountStatementRequestRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountStatementArtifactReferenceRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InstitutionAuditRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);

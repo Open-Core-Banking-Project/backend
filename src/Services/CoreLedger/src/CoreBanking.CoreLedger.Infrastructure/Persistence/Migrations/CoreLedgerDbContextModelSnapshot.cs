@@ -1659,6 +1659,199 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountStatementArtifactReferenceRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("ReferenceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("reference_id");
+
+                    b.Property<int>("AccessCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_count");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("ArtifactReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("artifact_reference");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<DateTimeOffset?>("LastAccessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_accessed_at");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("RequesterActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("requester_actor_id");
+
+                    b.Property<string>("RequesterTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("requester_type_code");
+
+                    b.HasKey("InstitutionId", "ReferenceId");
+
+                    b.HasIndex("InstitutionId", "RequestId")
+                        .IsUnique();
+
+                    b.ToTable("account_statement_artifact_references", "account", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_statement_artifact_references_expiry", "expires_at > issued_at");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountStatementRequestRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("RequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset?>("ArtifactReadyAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("artifact_ready_at");
+
+                    b.Property<string>("ArtifactReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("artifact_reference");
+
+                    b.Property<string>("FormatCode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("format_code");
+
+                    b.Property<string>("IntegrityReference")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("integrity_reference");
+
+                    b.Property<string>("LedgerQueryReference")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("ledger_query_reference");
+
+                    b.Property<bool>("LegalHold")
+                        .HasColumnType("boolean")
+                        .HasColumnName("legal_hold");
+
+                    b.Property<DateOnly>("PeriodFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("period_from");
+
+                    b.Property<DateOnly>("PeriodTo")
+                        .HasColumnType("date")
+                        .HasColumnName("period_to");
+
+                    b.Property<string>("PolicyVersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("policy_version_id");
+
+                    b.Property<string>("PurposeCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("purpose_code");
+
+                    b.Property<string>("RefusalCodes")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("refusal_codes");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("RequesterActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("requester_actor_id");
+
+                    b.Property<string>("RequesterTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("requester_type_code");
+
+                    b.Property<DateTimeOffset?>("RetentionExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retention_expires_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "RequestId");
+
+                    b.HasIndex("InstitutionId", "AccountId", "RequestedAt");
+
+                    b.ToTable("account_statement_requests", "account", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_statement_requests_format", "format_code IN ('pdf', 'csv')");
+
+                            t.HasCheckConstraint("ck_account_statement_requests_period", "period_to >= period_from");
+
+                            t.HasCheckConstraint("ck_account_statement_requests_status", "status IN ('refused', 'awaiting_artifact', 'ready', 'expired')");
+
+                            t.HasCheckConstraint("ck_account_statement_requests_version", "version >= 1");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountStatusHistoryRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -3096,6 +3289,24 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRestrictionRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountStatementArtifactReferenceRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountStatementRequestRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "RequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountStatementRequestRecord", b =>
                 {
                     b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", null)
                         .WithMany()

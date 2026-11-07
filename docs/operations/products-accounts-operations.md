@@ -5,9 +5,9 @@ Operational contract for the Core Banking and Ledger product and account configu
 `institution.account-numbering`) and the account application and opening boundary.
 Decisions: P1-E04 slice 14, P1-E04-D06, P1-E04-D07.
 
-Statements are not implemented, so this runbook covers the configuration lifecycle, reference-fact consumption,
-account applications with their eligibility evidence, number allocation, approval, account opening, activation,
-account controls, liens, dormancy and reactivation, closure and the integrity signals that exist today. Extend it in
+This runbook covers the configuration lifecycle, reference-fact consumption, account applications with their
+eligibility evidence, number allocation, approval, account opening, activation, account controls, liens, dormancy and
+reactivation, closure, account summaries, statement requests and the integrity signals that exist today. Extend it in
 the same change that enables those features; do not document a capability ahead of the code.
 
 ## Signals
@@ -72,6 +72,30 @@ pending outbox message exists.
 **Product or currency publication failure.** Read the stable code, correct the cause, and re-submit with the
 same idempotency key only when the payload is unchanged. A changed payload needs a new key. Never edit a
 configuration version row directly: published versions are immutable and the hash is the evidence.
+
+**Account summary.** The summary is a read model, never a financial source. `ledger_unavailable` and an absent
+balances block mean the ledger could not answer; nothing is inferred and no zero is shown, so read the ledger before
+telling a customer their balance. A summary is never accepted as evidence in a dispute or as statement content.
+
+**Statement requests.** A request is validated against the published `statement.policy`: the period must start on or
+after the account opening date and end on or before the current business date, must not be inverted or exceed the
+configured span, and the format and purpose must be on the allow-list. `statement_format_not_supported` and
+`statement_purpose_not_supported` mean the code is not approved - never retry with a different code without an
+approved policy change. `statement_policy_missing` means no policy is published for the institution, so every request
+is refused until one is. `statement_period_invalid` names the period problem, and the current business date is the
+upper bound, so a request cannot run ahead of the calendar.
+
+**Statement source.** `statement_source_unavailable` is expected until the ledger's posted-history query exists: the
+request is recorded as refused with no artifact and no content. A statement is never built from a summary, a cache or a
+re-derived balance, so do not work around this code. Once the ledger query is available the request moves to
+`awaiting_artifact` and reconciliation stops reporting it.
+
+**Artifact references.** A reference is opaque, bound to the requesting party and the account, and expires within
+minutes; re-download requires a new authorised step, and every issue and access writes an audit row that never contains
+statement content. An expired artifact still answers with its request and an `expired` status, because the request
+record outlives the artifact. `statement_request_without_artifact` in reconciliation means a request was accepted and no
+artifact arrived inside the window: treat it as an incident, check the document capability and re-request rather than
+editing the record.
 
 **Dormancy assessment.** An assessment is recorded once per account, business date and rule version, and a repeated
 run returns the recorded outcome rather than assessing the same day twice. The clock is the institution business date

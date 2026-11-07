@@ -47,5 +47,10 @@ public static class DevelopmentAuthorisationSeed
         store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.ClosurePropose);
         store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ClosurePropose);
         store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ClosureApprove);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.SummaryView);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.SummaryView);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.StatementRequest);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.StatementRequest);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.StatementRetrieve);
     }
 }

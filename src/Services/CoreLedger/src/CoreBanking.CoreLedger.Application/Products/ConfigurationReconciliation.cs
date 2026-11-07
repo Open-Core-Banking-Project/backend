@@ -72,6 +72,14 @@ public sealed record ClosureReconciliationFacts(
     decimal LedgerBalance,
     string? ConditionSnapshotHash);
 
+/// <summary>One statement request as account reconciliation reads it. Decision: P1-E04-D15.</summary>
+public sealed record StatementReconciliationFacts(
+    string RequestId,
+    string AccountId,
+    string Status,
+    DateTimeOffset RequestedAt,
+    bool HasArtifact);
+
 /// <summary>
 /// Detects account states that must never survive a settled system: an open or active account without a
 /// proven ledger initialisation, an approved application that never produced an account, a closed account whose
@@ -84,17 +92,25 @@ public static class AccountReconciliationPolicy
     public const string ApprovedWithoutAccountCode = "approved_application_without_account";
     public const string ClosedWithResidualBalanceCode = "closed_account_with_residual_balance";
     public const string ClosureWithoutSnapshotCode = "closure_without_condition_snapshot";
+    public const string StatementWithoutArtifactCode = "statement_request_without_artifact";
+
+    /// <summary>A request accepted but still without an artifact after this much time is a finding.</summary>
+    public static readonly TimeSpan StatementArtifactWindow = TimeSpan.FromHours(24);
 
     private static readonly string[] InitialisedStatuses = ["Open", "Active", "Restricted", "Frozen", "Dormant", "PendingClosure", "Closed"];
 
     public static IReadOnlyList<ConfigurationReconciliationFinding> Evaluate(
         IReadOnlyCollection<AccountReconciliationFacts> accounts,
         IReadOnlyCollection<ApplicationReconciliationFacts> applications,
-        IReadOnlyCollection<ClosureReconciliationFacts>? closures = null)
+        IReadOnlyCollection<ClosureReconciliationFacts>? closures = null,
+        IReadOnlyCollection<StatementReconciliationFacts>? statements = null,
+        DateTimeOffset? now = null)
     {
         ArgumentNullException.ThrowIfNull(accounts);
         ArgumentNullException.ThrowIfNull(applications);
         closures ??= [];
+        statements ??= [];
+        DateTimeOffset asOf = now ?? DateTimeOffset.UtcNow;
 
         List<ConfigurationReconciliationFinding> findings = [];
         findings.AddRange(accounts
@@ -136,6 +152,16 @@ public static class AccountReconciliationPolicy
                 ClosureWithoutSnapshotCode,
                 account.AccountApplicationId,
                 account.AccountId)));
+        findings.AddRange(statements
+            .Where(statement => !statement.HasArtifact
+                && !string.Equals(statement.Status, "refused", StringComparison.Ordinal)
+                && statement.RequestedAt <= asOf - StatementArtifactWindow)
+            .OrderBy(statement => statement.RequestId, StringComparer.Ordinal)
+            .Take(ConfigurationReconciliationPolicy.MaximumFindingsPerCode)
+            .Select(statement => new ConfigurationReconciliationFinding(
+                StatementWithoutArtifactCode,
+                statement.RequestId,
+                statement.AccountId)));
         return findings;
     }
 }

@@ -20,6 +20,36 @@ public static class AccountPermissions
     public static PermissionIdentifier ActivationCreate { get; } =
         PermissionIdentifier.Parse("account.activation.create");
 
+    public static PermissionIdentifier SummaryView { get; } =
+        PermissionIdentifier.Parse("account.summary.view");
+
+    public static PermissionIdentifier StatementRequest { get; } =
+        PermissionIdentifier.Parse("account.statement.request");
+
+    public static PermissionIdentifier StatementRetrieve { get; } =
+        PermissionIdentifier.Parse("account.statement.retrieve");
+
+    public static PermissionRequirement SummaryViewRequirement { get; } = new()
+    {
+        Permission = SummaryView,
+    };
+
+    /// <summary>
+    /// Authorising a statement request needs the account scope; the institution always comes from the validated
+    /// token. A signed artifact reference is a separate, audited retrieval step. Decision: P1-E04-D15.
+    /// </summary>
+    public static PermissionRequirement StatementRequestRequirement { get; } = new()
+    {
+        Permission = StatementRequest,
+        RequiresStepUp = true,
+    };
+
+    public static PermissionRequirement StatementRetrieveRequirement { get; } = new()
+    {
+        Permission = StatementRetrieve,
+        RequiresStepUp = true,
+    };
+
     public static PermissionIdentifier DormancyAssess { get; } =
         PermissionIdentifier.Parse("account.dormancy.assess");
 

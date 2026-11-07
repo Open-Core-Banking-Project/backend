@@ -39,12 +39,12 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 ## Snapshot
 
 - Slices: **176** across **12** epics.
-- Implemented: **44** — **26** awaiting evidence review and **18** with a recorded human approval.
-- In progress: **21**. Not started: **101**. Blocked approvals: **10**.
+- Implemented: **45** — **27** awaiting evidence review and **18** with a recorded human approval.
+- In progress: **21**. Not started: **100**. Blocked approvals: **10**.
 - Decisions: **189** total — 125 open, 4 partially approved, 19 with no recorded status, 41 resolved.
-- Slices the controller may start now without a new decision: **2** — `P1-E04-S13` after `P1-E04-D10`, `D11`, `D12`, `D13` and `D15` were approved, plus `P1-E04-S15`.
+- Slices the controller may start now without a new decision: **1** — `P1-E04-S15`, which additionally needs the live stack.
 
-Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 and 2026-11-07 after `P1-E02-D07`, `P1-E04-D17` and `P1-E04-D06`, `D07`, `D09`, `D10`, `D11`, `D12`, `D13` and `D15` were approved and slices `P1-E04-S6` to `P1-E04-S12` and `P1-E04-S14` closed. Verification is recorded separately in the
+Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 and 2026-11-07 after `P1-E02-D07`, `P1-E04-D17` and `P1-E04-D06`, `D07`, `D09`, `D10`, `D11`, `D12`, `D13` and `D15` were approved and slices `P1-E04-S6` to `P1-E04-S14` closed. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
 
 ## Epic summary
@@ -54,7 +54,7 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 | P1-E01 Institution and Tenancy | Implemented | 12 | 11 | 11 | 0 | 1 | 0 | 9 |
 | P1-E02 Identity, Roles and Permissions | In Progress | 15 | 2 | 14 | 1 | 0 | 0 | 2 |
 | P1-E03 Customer and Onboarding | Implemented | 15 | 15 | 3 | 12 | 0 | 0 | 0 |
-| P1-E04 Products and Accounts | Approved | 15 | 0 | 12 | 0 | 1 | 2 | 5 |
+| P1-E04 Products and Accounts | Approved | 15 | 0 | 13 | 0 | 1 | 1 | 5 |
 | P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
 | P1-E06 Workflow and Maker-Checker | Approved | 13 | 0 | 4 | 0 | 1 | 8 | 12 |
 | P1-E07 Payments, Collections and VTU | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
@@ -71,10 +71,11 @@ application, eligibility evidence, approval, number allocation, account opening,
 activation. The remaining product policy decisions were approved on 2026-11-07 (`P1-E04-D10`, `D11`, `D12`, `D13`,
 `D15`). `P1-E04-S10` (typed restrictions, freezes and blocks plus the ledger control-evaluation contract) is
 implemented and awaiting review, `P1-E04-S11` (lien lifecycle with ledger-reported availability) is implemented
-too, and `P1-E04-S12` (dormancy, reactivation and closure prerequisites) is implemented, so the controller now selects
-`P1-E04-S13` (account summaries and statement handoff). `P1-E04-S15` (security,
-performance, backup/restore and Phase 1 end-to-end evidence) stays available but needs the live stack, and
-`P1-E04-D14` (existing-account product migration) and `P1-E04-D16` (capacity, latency, RTO and RPO) remain open.
+too, `P1-E04-S12` (dormancy, reactivation and closure prerequisites) is implemented, and `P1-E04-S13` (account
+summaries and statement handoff) is implemented, so every implementation slice of the epic is claimed. `P1-E04-S15`
+(security, performance, backup/restore and Phase 1 end-to-end evidence) is the only slice left and it needs the live
+stack, the capacity inputs and a kept Docker database. `P1-E04-D14` (existing-account product migration) and
+`P1-E04-D16` (capacity, latency, RTO and RPO) remain open.
 
 ## Human gates before the loop can advance
 
@@ -200,7 +201,7 @@ Owning service: Customer and Onboarding · document status `Implemented` · 3 im
 
 ### P1-E04 — Products and Accounts
 
-Owning service: Core Banking and Ledger · document status `Approved` · 12 implemented, 0 in progress, 1 blocked, 2 not started.
+Owning service: Core Banking and Ledger · document status `Approved` · 13 implemented, 0 in progress, 1 blocked, 1 not started.
 
 | Slice | Scope | Status | Approval | Unresolved decisions attached | Evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -216,7 +217,7 @@ Owning service: Core Banking and Ledger · document status `Approved` · 12 impl
 | 10 | Implement typed restrictions, freezes and blocks plus ledger control-evaluation contract. | ✔ implemented (claim) | pending | — | Deny-dominant precedence policy, scoped half-open restriction periods, allow/deny/review evaluation with stale-version and manual-release review, dual-control release and audit; live-stack verification pending |
 | 11 | Implement lien lifecycle and ledger availability-control handoff without Account balance arithmetic. | ✔ implemented (claim) | pending | — | Allow-listed lien priority with deterministic ordering, immutable amount with separate outstanding, append-only release and satisfaction entries, dual control for statutory, tax and institution releases, ledger availability snapshot with only the shortfall computed here; live-stack verification pending |
 | 12 | Implement dormancy assessment/reactivation and controlled closure prerequisites. | ✔ implemented (claim) | pending | — | Business-date assessment recorded once per account, business date and rule version behind a per-account lease with ordered catch-up, reactivation under the rule, and closure through proposal, bound approval and final re-check with a fixed post-close allow-list; live-stack verification pending |
-| 13 | Implement account summaries and statement-request authorisation/handoff. | · not started | — | P1-E04-D15 | — |
+| 13 | Implement account summaries and statement-request authorisation/handoff. | ✔ implemented (claim) | pending | — | Read-only summary carrying the ledger answer or nothing, `statement.policy` allow-lists, authorised handoff with query and integrity references, opaque party-bound artifact references and the `statement_request_without_artifact` finding; live-stack verification pending |
 | 14 | Add audit, observability, reconciliation, alerts and recovery runbooks. | ✔ implemented (claim) | pending | — | Configuration reconciliation report with five stable finding codes; `CoreBanking.ProductAccounts` counters and outbox-age gauges; per-code eligibility-resolution telemetry; institution audit rows on every Savings and currency submit/publish; products and accounts operations runbook |
 | 15 | Complete security, performance, backup/restore and Phase 1 end-to-end evidence. | · not started | — | — | — |
 
@@ -658,6 +659,7 @@ Every decision the epic documents still require, with its owner and the slice it
 | 2026-11-06 | Currency lifecycle build, format and drift | Release build, `dotnet format --verify-no-changes`, `scripts/migrations-verify.ps1` Core Ledger | Build 0 warnings/0 errors; formatting clean; model snapshot consistent with no schema change |
 | 2026-11-07 | P1-E04 slice 11 lien lifecycle | Core Ledger unit suite, Release solution build, `dotnet format --verify-no-changes`, `scripts/migrations-verify.ps1` | 271 Core Ledger unit tests pass; build 0 warnings/0 errors; formatting clean; every model snapshot consistent after `AddAccountLiens` |
 | 2026-11-07 | P1-E04 slice 12 dormancy and closure | Core Ledger and Workflow unit suites, Release solution build, `dotnet format --verify-no-changes`, `scripts/migrations-verify.ps1` | 308 Core Ledger and 29 Workflow unit tests pass; build 0 warnings/0 errors; formatting clean; every model snapshot consistent after `AddAccountDormancyAndClosure` |
+| 2026-11-07 | P1-E04 slice 13 summaries and statements | Core Ledger unit suite, Release solution build, `dotnet format --verify-no-changes`, `scripts/migrations-verify.ps1` | 325 Core Ledger unit tests pass; build 0 warnings/0 errors; formatting clean; every model snapshot consistent after `AddAccountStatementRequests` |
 
 ## Maintenance
 

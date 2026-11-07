@@ -186,6 +186,11 @@ if (useRelationalStore)
     builder.Services.AddScoped<IAccountClosureService, AccountClosureService>();
     builder.Services.AddScoped<IAccountClosureApprovalApplier>(provider =>
         (IAccountClosureApprovalApplier)provider.GetRequiredService<IAccountClosureService>());
+    builder.Services.AddScoped<IStatementPolicyConfigurationService, StatementPolicyConfigurationService>();
+    builder.Services.AddScoped<IStatementPolicySource, StatementPolicySource>();
+    builder.Services.AddScoped<ILedgerStatementQuerySource, LedgerStatementQuerySource>();
+    builder.Services.AddScoped<IAccountSummaryService, AccountSummaryService>();
+    builder.Services.AddScoped<IAccountStatementService, AccountStatementService>();
     builder.Services.AddScoped<IAccountNumberRevealService, AccountNumberRevealService>();
     builder.Services.AddScoped<IAccountOpeningPolicyConfigurationService, AccountOpeningPolicyConfigurationService>();
     builder.Services.AddScoped<IAccountOpeningPolicySource, AccountOpeningPolicySource>();
@@ -2210,6 +2215,308 @@ static void MapAccountEndpoints(WebApplication app)
         AccountPermissions.DormancyReactivateRequirement,
         "account.dormancy.reactivate"));
 
+    // Institution statement-policy lifecycle (area statement.policy). Decision: P1-E04-D15.
+    app.MapPost("/api/v1/institutions/{institutionId}/configurations/statement.policy/versions", async (
+        HttpContext http,
+        string institutionId,
+        CreateStatementPolicyDraftRequestV1 request,
+        IStatementPolicyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationDraftOutcome result = await service.CreateDraftAsync(
+                new CreateStatementPolicyDraftCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    request.VersionId,
+                    request.PolicyId,
+                    request.PolicyVersion,
+                    request.MaximumSpanDays,
+                    request.RetentionDays,
+                    request.ArtifactReferenceMinutes,
+                    request.Formats,
+                    request.Purposes,
+                    request.ReceiptFormats,
+                    request.PeriodKinds,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Statement policy rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid statement policy", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationCreateRequirement,
+        "institution.configuration.create"));
+
+    app.MapPost("/api/v1/configurations/statement-policy/{versionId}/simulate", async (
+        HttpContext http,
+        string versionId,
+        SimulateStatementPolicyRequestV1 request,
+        IStatementPolicyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationSimulationOutcome result = await service.SimulateAsync(
+                new SimulateStatementPolicyCommand(
+                    InstitutionId.From(InstitutionIdOf(http)),
+                    Actor(http).Id,
+                    key,
+                    versionId,
+                    request.SimulationId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Statement policy simulation rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid statement policy simulation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSimulateRequirement,
+        "institution.configuration.simulate"));
+
+    app.MapPost("/api/v1/configurations/statement-policy/{versionId}/submit", async (
+        HttpContext http,
+        string versionId,
+        SubmitStatementPolicyRequestV1 request,
+        IStatementPolicyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationSubmissionOutcome result = await service.SubmitForApprovalAsync(
+                new SubmitStatementPolicyCommand(
+                    InstitutionId.From(InstitutionIdOf(http)),
+                    Actor(http).Id,
+                    key,
+                    request.RequestId,
+                    request.SourceRequestKey,
+                    versionId,
+                    request.ContentHash,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Statement policy submission rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid statement policy submission", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationSubmitRequirement,
+        "institution.configuration.submit"));
+
+    app.MapPost("/api/v1/configurations/statement-policy/{versionId}/publish", async (
+        HttpContext http,
+        string versionId,
+        PublishStatementPolicyRequestV1 request,
+        IStatementPolicyConfigurationService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            ConfigurationPublicationOutcome result = await service.PublishAsync(
+                new PublishStatementPolicyCommand(
+                    InstitutionId.From(InstitutionIdOf(http)),
+                    Actor(http).Id,
+                    key,
+                    request.PublicationId,
+                    versionId,
+                    request.ContentHash,
+                    request.EffectiveFrom,
+                    request.EffectiveTo,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (InstitutionConfigurationRejectedException exception)
+        {
+            return Problem(exception.Code, "Statement policy publication rejected", exception.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid statement policy publication", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        InstitutionPermissions.ConfigurationPublishRequirement,
+        "institution.configuration.publish"));
+
+    // The read-only account summary and the authorised statement request. Decisions: P1-E04-D11, P1-E04-D15.
+    app.MapGet("/api/v1/institutions/{institutionId}/accounts/{accountId}/summary", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        IAccountSummaryService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            AccountSummaryResult result = await service.GetAsync(
+                InstitutionId.From(institutionId),
+                accountId,
+                cancellationToken);
+            return Results.Ok(ToSummaryResponse(result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Account summary rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid account summary query", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.SummaryViewRequirement,
+        "account.summary.view"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/statement-requests", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        CreateAccountStatementRequestV1 request,
+        IAccountStatementService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            AccountStatementRequestResult result = await service.RequestAsync(
+                new CreateAccountStatementRequestCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    request.RequestId,
+                    request.PeriodFrom,
+                    request.PeriodTo,
+                    request.FormatCode,
+                    request.PurposeCode,
+                    request.RequesterType,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(ToStatementResponse(result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Statement request rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid statement request", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.StatementRequestRequirement,
+        "account.statement.request"));
+
+    app.MapGet("/api/v1/institutions/{institutionId}/accounts/{accountId}/statement-requests/{requestId}", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        string requestId,
+        IAccountStatementService service,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            AccountStatementRequestResult result = await service.GetAsync(
+                InstitutionId.From(institutionId),
+                accountId,
+                requestId,
+                cancellationToken);
+            return Results.Ok(ToStatementResponse(result));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Statement request query rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid statement request query", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.StatementRequestRequirement,
+        "account.statement.request"));
+
+    app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/statement-requests/{requestId}/artifact-references", async (
+        HttpContext http,
+        string institutionId,
+        string accountId,
+        string requestId,
+        AuthoriseStatementArtifactRequestV1 request,
+        IAccountStatementService service,
+        CancellationToken cancellationToken) =>
+    {
+        string? key = RequiredHeader(http, "Idempotency-Key");
+        if (key is null) return IdempotencyKeyRequired();
+        try
+        {
+            StatementArtifactAuthorisationResult result = await service.AuthoriseArtifactAsync(
+                new AuthoriseStatementArtifactCommand(
+                    InstitutionId.From(institutionId),
+                    Actor(http).Id,
+                    key,
+                    accountId,
+                    requestId,
+                    request.RequesterType,
+                    CorrelationId(http)),
+                cancellationToken);
+            return Results.Ok(new StatementArtifactReferenceResponseV1(
+                institutionId,
+                result.RequestId,
+                result.AccountId,
+                result.ArtifactReference,
+                result.IntegrityReference,
+                result.ExpiresAt,
+                result.RetentionExpiresAt,
+                result.Status,
+                result.Replayed));
+        }
+        catch (AccountApplicationRejectedException exception)
+        {
+            return Problem(exception.Code, "Statement artifact authorisation rejected", exception.Message, RejectedStatus(exception.Code));
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem("request.invalid", "Invalid statement artifact authorisation", exception.Message, StatusCodes.Status400BadRequest);
+        }
+    })
+    .AddEndpointFilter(new ProtectedInstitutionOperationFilter(
+        AccountPermissions.StatementRetrieveRequirement,
+        "account.statement.retrieve"));
+
     // Closure proposals and their six approved steps. Decision: P1-E04-D13.
     app.MapPost("/api/v1/institutions/{institutionId}/accounts/{accountId}/closure-proposals", async (
         HttpContext http,
@@ -2376,6 +2683,51 @@ static int RejectedStatus(string code) => code switch
     "account_not_found" or "account_closure_proposal_not_found" => StatusCodes.Status404NotFound,
     _ => StatusCodes.Status409Conflict,
 };
+
+static AccountSummaryResponseV1 ToSummaryResponse(AccountSummaryResult result) =>
+    new(
+        result.InstitutionId,
+        result.AccountId,
+        result.MaskedAccountNumber,
+        result.CustomerId,
+        result.ProductId,
+        result.ProductVersionId,
+        result.BranchId,
+        result.CurrencyCode,
+        result.Status,
+        result.AccountVersion,
+        result.BalanceAvailability,
+        result.Balances is null
+            ? null
+            : new AccountBalanceSummaryV1(
+                new MonetaryAmountV1(result.Balances.LedgerBalance, result.CurrencyCode),
+                new MonetaryAmountV1(result.Balances.Available, result.CurrencyCode),
+                new MonetaryAmountV1(result.Balances.Holds, result.CurrencyCode),
+                new MonetaryAmountV1(result.OutstandingLienAmount, result.CurrencyCode),
+                [],
+                new BalanceSourceV1(
+                    result.LedgerAccountReference ?? string.Empty,
+                    result.Balances.SourceVersion,
+                    result.Balances.AsOf)));
+
+static AccountStatementRequestResponseV1 ToStatementResponse(AccountStatementRequestResult result) =>
+    new(
+        result.InstitutionId,
+        result.RequestId,
+        result.AccountId,
+        result.PeriodFrom,
+        result.PeriodTo,
+        result.FormatCode,
+        result.PurposeCode,
+        result.Status,
+        result.LedgerQueryReference,
+        result.IntegrityReference,
+        result.ArtifactReference,
+        result.ArtifactReadyAt,
+        result.RefusalCodes,
+        result.RequesterTypeCode,
+        result.RequestedAt,
+        result.Replayed);
 
 static DormancyAssessmentResponseV1 ToDormancyAssessmentResponse(string institutionId, DormancyAssessmentResult result) =>
     new(

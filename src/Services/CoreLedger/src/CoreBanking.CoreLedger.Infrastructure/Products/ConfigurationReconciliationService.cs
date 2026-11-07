@@ -152,7 +152,20 @@ public sealed class ConfigurationReconciliationService : IConfigurationReconcili
                 record.LedgerBalance,
                 record.ConditionSnapshotHash))
             .ToArray();
-        return AccountReconciliationPolicy.Evaluate(accounts, applications, closures);
+        StatementReconciliationFacts[] statements = (await _context.AccountStatementRequests
+            .AsNoTracking()
+            .Select(record => new { record.RequestId, record.AccountId, record.Status, record.RequestedAt, record.ArtifactReadyAt })
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false))
+            .Select(record => new StatementReconciliationFacts(
+                record.RequestId,
+                record.AccountId,
+                record.Status,
+                record.RequestedAt,
+                record.ArtifactReadyAt != null))
+            .ToArray();
+        return AccountReconciliationPolicy.Evaluate(
+            accounts, applications, closures, statements, _timeProvider.GetUtcNow());
     }
 
     private static int AccountNumberAllocationBand(long highWaterMark, long capacity)
