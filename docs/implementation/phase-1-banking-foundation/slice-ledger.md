@@ -40,9 +40,9 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 
 - Slices: **176** across **12** epics.
 - Implemented: **45** — **27** awaiting evidence review and **18** with a recorded human approval.
-- In progress: **21**. Not started: **100**. Blocked approvals: **10**.
+- In progress: **22**. Not started: **99**. Blocked approvals: **10**.
 - Decisions: **189** total — 125 open, 4 partially approved, 19 with no recorded status, 41 resolved.
-- Slices the controller may start now without a new decision: **1** — `P1-E04-S15`, which additionally needs the live stack.
+- Slices the controller may start now without a new decision: **1** — `P1-E04-S15`, which is now `in progress` and cannot be claimed without the live stack and the approved `P1-E04-D16` targets.
 
 Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 and 2026-11-07 after `P1-E02-D07`, `P1-E04-D17` and `P1-E04-D06`, `D07`, `D09`, `D10`, `D11`, `D12`, `D13` and `D15` were approved and slices `P1-E04-S6` to `P1-E04-S14` closed. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
@@ -73,8 +73,9 @@ activation. The remaining product policy decisions were approved on 2026-11-07 (
 implemented and awaiting review, `P1-E04-S11` (lien lifecycle with ledger-reported availability) is implemented
 too, `P1-E04-S12` (dormancy, reactivation and closure prerequisites) is implemented, and `P1-E04-S13` (account
 summaries and statement handoff) is implemented, so every implementation slice of the epic is claimed. `P1-E04-S15`
-(security, performance, backup/restore and Phase 1 end-to-end evidence) is the only slice left and it needs the live
-stack, the capacity inputs and a kept Docker database. `P1-E04-D14` (existing-account product migration) and
+(security, performance, backup/restore and Phase 1 end-to-end evidence) is the only slice left; it is now `in progress`
+with a database-free harness and an acceptance mapping, and it cannot be claimed without the live stack and the approved
+`P1-E04-D16` targets. `P1-E04-D14` (existing-account product migration) and
 `P1-E04-D16` (capacity, latency, RTO and RPO) remain open.
 
 ## Human gates before the loop can advance
@@ -201,7 +202,7 @@ Owning service: Customer and Onboarding · document status `Implemented` · 3 im
 
 ### P1-E04 — Products and Accounts
 
-Owning service: Core Banking and Ledger · document status `Approved` · 13 implemented, 0 in progress, 1 blocked, 1 not started.
+Owning service: Core Banking and Ledger · document status `Approved` · 13 implemented, 1 in progress, 1 blocked, 0 not started.
 
 | Slice | Scope | Status | Approval | Unresolved decisions attached | Evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -219,7 +220,7 @@ Owning service: Core Banking and Ledger · document status `Approved` · 13 impl
 | 12 | Implement dormancy assessment/reactivation and controlled closure prerequisites. | ✔ implemented (claim) | pending | — | Business-date assessment recorded once per account, business date and rule version behind a per-account lease with ordered catch-up, reactivation under the rule, and closure through proposal, bound approval and final re-check with a fixed post-close allow-list; live-stack verification pending |
 | 13 | Implement account summaries and statement-request authorisation/handoff. | ✔ implemented (claim) | pending | — | Read-only summary carrying the ledger answer or nothing, `statement.policy` allow-lists, authorised handoff with query and integrity references, opaque party-bound artifact references and the `statement_request_without_artifact` finding; live-stack verification pending |
 | 14 | Add audit, observability, reconciliation, alerts and recovery runbooks. | ✔ implemented (claim) | pending | — | Configuration reconciliation report with five stable finding codes; `CoreBanking.ProductAccounts` counters and outbox-age gauges; per-code eligibility-resolution telemetry; institution audit rows on every Savings and currency submit/publish; products and accounts operations runbook |
-| 15 | Complete security, performance, backup/restore and Phase 1 end-to-end evidence. | · not started | — | — | — |
+| 15 | Complete security, performance, backup/restore and Phase 1 end-to-end evidence. | ◐ in progress | pending | P1-E04-D16 | Database-free harness `scripts/phase1-evidence.ps1` and the acceptance mapping in `04-slice-15-evidence.md`; PostgreSQL, performance and recovery results outstanding |
 
 ### P1-E05 — Core Ledger and Financial Posting
 
