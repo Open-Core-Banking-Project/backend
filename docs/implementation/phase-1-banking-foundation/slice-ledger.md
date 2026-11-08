@@ -42,7 +42,8 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 - Implemented: **45** — **27** awaiting evidence review and **18** with a recorded human approval.
 - In progress: **22**. Not started: **99**. Blocked approvals: **10**.
 - Decisions: **189** total — 125 open, 4 partially approved, 19 with no recorded status, 41 resolved.
-- Slices the controller may start now without a new decision: **1** — `P1-E04-S15`, which is now `in progress` and cannot be claimed without the live stack and the approved `P1-E04-D16` targets.
+- Slices the controller may start now without a new decision: **1** — `P1-E04-S15`, which is `in progress` with live
+  PostgreSQL evidence for slices 7 to 9 and still cannot be claimed without the approved `P1-E04-D16` targets.
 
 Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 2026-11-06 and 2026-11-07 after `P1-E02-D07`, `P1-E04-D17` and `P1-E04-D06`, `D07`, `D09`, `D10`, `D11`, `D12`, `D13` and `D15` were approved and slices `P1-E04-S6` to `P1-E04-S14` closed. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked.
@@ -73,9 +74,11 @@ activation. The remaining product policy decisions were approved on 2026-11-07 (
 implemented and awaiting review, `P1-E04-S11` (lien lifecycle with ledger-reported availability) is implemented
 too, `P1-E04-S12` (dormancy, reactivation and closure prerequisites) is implemented, and `P1-E04-S13` (account
 summaries and statement handoff) is implemented, so every implementation slice of the epic is claimed. `P1-E04-S15`
-(security, performance, backup/restore and Phase 1 end-to-end evidence) is the only slice left; it is now `in progress`
-with a database-free harness and an acceptance mapping, and it cannot be claimed without the live stack and the approved
-`P1-E04-D16` targets. `P1-E04-D14` (existing-account product migration) and
+(security, performance, backup/restore and Phase 1 end-to-end evidence) is the only slice left; it is `in progress`
+with a database-free harness, an acceptance mapping and, since 2026-11-08, live PostgreSQL evidence for slices 7 to 13
+(22 database tests covering the application, opening, approval, control, lien, summary and statement boundaries).
+It still cannot be claimed without the approved `P1-E04-D16` targets and the end-to-end journey.
+`P1-E04-D14` (existing-account product migration) and
 `P1-E04-D16` (capacity, latency, RTO and RPO) remain open.
 
 ## Human gates before the loop can advance
@@ -127,13 +130,18 @@ backup-restore evidence that no agent can produce. See [00-phase-overview.md](00
 | 2026-11-02 | P1-E02 slice 14 identity observability final increment | Identity test/worker builds, focused meter test, Identity non-database suite and format gate | Builds passed; 1 focused meter and 198 non-database tests passed; the four bounded reconciliation counters are registered on the shared OTLP collector path |
 | 2026-11-03 | P1-E04 slice 2 Products and Accounts contracts | Focused contract/architecture tests, complete Core Ledger unit suite, repository architecture suite and affected-file format gate | 5 focused, 107 Core Ledger and 15 architecture tests passed; Account, Control and Statement contracts, mass-assignment refusal and financial-boundary separation verified; account commands exclude trusted state, summary balances remain distinct and Ledger sourced, and statement handoff carries no financial history |
 | 2026-11-06 | P1-E04 slice 14 audit, observability, reconciliation and recovery | Release solution build, full non-database suite, Core Ledger unit suite, `dotnet format --verify-no-changes` and `scripts/migrations-verify.ps1` for Core Ledger | Build passed with 0 warnings/0 errors; 581 non-database and 136 Core Ledger tests passed, including 10 reconciliation tests; all five finding codes, outbox-age gauges, per-code resolution telemetry and audit rows on both lifecycles verified |
+| 2026-11-08 | P1-E04 slices 7–9 and 15 database evidence | `scripts/db-verify.ps1` (nine migrations applied by their migration principal, database suites as each application principal), the new Core Ledger `Category=Database` suite, non-database suites and `dotnet format --verify-no-changes` | Database gate passed: Core Ledger 8, Customer Onboarding 102, Identity 105, Workflow 6, Audit Reconciliation 2 and 54 effective-privilege tests. The new Core Ledger suite proves stored-row eligibility evidence, replay, approval binding with its outbox fact, tenant isolation, one number and one ledger account per opening, six-way concurrent allocation with no duplicate or gap, and the refusal of a non-approved application. The run found and fixed three defects: the `account` schema had no application-principal privileges, an unrestricted residency rule threw during evaluation, and concurrent first openings lost the reservation race. 776 non-database tests passed, migration-model drift is consistent for all nine contexts and the format gate passes |
+| 2026-11-08 | P1-E04 slices 10, 11 and 13 database evidence | Core Ledger `Category=Database` suite, full non-database suites, `dotnet format --verify-no-changes` and `scripts/db-verify.ps1` | 22 Core Ledger PostgreSQL tests passed, adding scoped control denial, stale-version review, dual-control freeze release, four-way concurrent control-version allocation, lien immutability with append-only partial release, over-release refusal, dual-control statutory release, ledger-answer-or-nothing summaries and refused statements with no artifact. The run found two further defects: the control-version query was not translatable by EF Core 10 (so control, dormancy, closure and summary calls all failed at runtime) and concurrent control changes shared one version. 776 non-database tests still pass and the format gate is clean |
+| 2026-11-08 | P1-E04 slices 12 and 15 database evidence | Core Ledger `Category=Database` suite and full non-database suites | 30 Core Ledger PostgreSQL tests passed, adding business-date dormancy assessment, the recorded not-assessable outcome, the dormant transition and reactivation, and the closure proposal, approval, refusal and re-check sequence. 776 non-database tests still pass |
 
-Gaps found by the verification run: CoreLedger exposes no `Category=Database` or `Category=Integration` tests, so
-runtime concurrency evidence (INS-002 concurrent duplicate institution code, INS-004 provisioning acknowledgement,
-INS-005 service-unavailable retry) is model-level only; PostgreSQL contention tests do not exist yet. The security
-suite requires the local stack and fails closed without it, which is expected but must be part of review instructions.
-The Identity database and integration suites run serially because they share one database and assert on the shared
-outbox table; parallel classes produced false failures before `xunit.runner.json` disabled collection parallelism.
+Gaps found by the verification runs: Payments and VTU, Channels and Engagement, Risk Reporting and Integration Hub still
+expose no `Category=Database` or `Category=Integration` tests, so their runtime concurrency evidence
+(INS-002 concurrent duplicate institution code, INS-004 provisioning acknowledgement, INS-005 service-unavailable retry)
+is model-level only. Core Ledger now has database tests for every account slice: application, opening, approval, controls,
+liens, dormancy, reactivation, closure, summaries and statements. The security suite
+requires the local stack and fails closed without it, which is expected but must be part of review instructions. The
+Identity database and integration suites run serially because they share one database and assert on the shared outbox
+table; parallel classes produced false failures before `xunit.runner.json` disabled collection parallelism.
 
 ## Slice detail
 

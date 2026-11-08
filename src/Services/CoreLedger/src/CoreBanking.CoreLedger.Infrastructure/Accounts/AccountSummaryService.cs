@@ -110,29 +110,6 @@ public sealed class AccountSummaryService : IAccountSummaryService
             balances?.AsOf ?? now);
     }
 
-    private async Task<long> CurrentControlVersionAsync(string accountId, CancellationToken cancellationToken)
-    {
-        long restriction = await _context.AccountRestrictions
-            .AsNoTracking()
-            .Where(record => record.AccountId == accountId)
-            .Select(record => record.ControlVersion)
-            .DefaultIfEmpty(0)
-            .MaxAsync(cancellationToken)
-            .ConfigureAwait(false);
-        long freeze = await _context.AccountFreezes
-            .AsNoTracking()
-            .Where(record => record.AccountId == accountId)
-            .Select(record => record.ControlVersion)
-            .DefaultIfEmpty(0)
-            .MaxAsync(cancellationToken)
-            .ConfigureAwait(false);
-        long block = await _context.AccountBlocks
-            .AsNoTracking()
-            .Where(record => record.AccountId == accountId)
-            .Select(record => record.ControlVersion)
-            .DefaultIfEmpty(0)
-            .MaxAsync(cancellationToken)
-            .ConfigureAwait(false);
-        return Math.Max(restriction, Math.Max(freeze, block));
-    }
+    private Task<long> CurrentControlVersionAsync(string accountId, CancellationToken cancellationToken) =>
+        AccountControlVersionReader.ReadAsync(_context, accountId, cancellationToken);
 }

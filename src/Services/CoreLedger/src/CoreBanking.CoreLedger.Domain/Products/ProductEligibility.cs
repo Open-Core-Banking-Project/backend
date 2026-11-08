@@ -93,6 +93,13 @@ public sealed class EligibilityCodeCriterion
         return AllowsAny || _allowedValues.Contains(value.Trim());
     }
 
+    /// <summary>
+    /// An absent optional fact satisfies an unrestricted rule and never satisfies an allow-list, so a
+    /// product that restricts the fact must have it and a product that does not must still evaluate.
+    /// </summary>
+    public bool AllowsOptional(string? value) =>
+        AllowsAny || (!string.IsNullOrWhiteSpace(value) && _allowedValues.Contains(value.Trim()));
+
     internal object ToContract() => AllowsAny
         ? new { mode = "any", values = Array.Empty<string>() }
         : new { mode = "allow", values = AllowedValues };
@@ -477,7 +484,7 @@ internal static class ProductEligibilityEvaluator
         new("risk_rating", riskRating, rules.RiskRatings.Allows(riskRating)),
         new("age_years", ageYears.ToString(System.Globalization.CultureInfo.InvariantCulture), rules.Ages.Allows(ageYears)),
         new("branch", branchCode, rules.Branches.Allows(branchCode)),
-        new("residency_country", residencyCountryCode ?? string.Empty, rules.ResidencyCountries.Allows(residencyCountryCode ?? string.Empty)),
+        new("residency_country", residencyCountryCode ?? string.Empty, rules.ResidencyCountries.AllowsOptional(residencyCountryCode)),
         new("currency", currencyCode, rules.Currencies.Allows(currencyCode)),
     ];
 }

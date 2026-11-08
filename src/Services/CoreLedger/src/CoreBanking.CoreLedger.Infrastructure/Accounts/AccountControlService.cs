@@ -204,6 +204,9 @@ public sealed class AccountControlService : IAccountControlService
         string direction,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await _context.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
         await EnsureAccountControllableAsync(command.InstitutionId, command.AccountId, cancellationToken).ConfigureAwait(false);
         DateTimeOffset now = _timeProvider.GetUtcNow();
         long controlVersion = await NextControlVersionAsync(command.AccountId, cancellationToken).ConfigureAwait(false);
@@ -231,6 +234,7 @@ public sealed class AccountControlService : IAccountControlService
         AddAudit(command.InstitutionId, command.ActorId, AccountPermissions.RestrictionApply.Value, "account.restriction.apply", restrictionId, command.ReasonCode, command.CorrelationId, now);
         AddRestrictionEvent(command, record, cancellationToken: cancellationToken);
         await SaveAsync("account_control_conflict", "The account controls changed while the restriction was being applied.", cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return System.Text.Json.JsonSerializer.Serialize(ToResult(record, "restriction", now, replayed: false));
     }
 
@@ -239,6 +243,9 @@ public sealed class AccountControlService : IAccountControlService
         string typeCode,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await _context.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
         await EnsureAccountControllableAsync(command.InstitutionId, command.AccountId, cancellationToken).ConfigureAwait(false);
         DateTimeOffset now = _timeProvider.GetUtcNow();
         long controlVersion = await NextControlVersionAsync(command.AccountId, cancellationToken).ConfigureAwait(false);
@@ -262,6 +269,7 @@ public sealed class AccountControlService : IAccountControlService
         _context.AccountFreezes.Add(record);
         AddAudit(command.InstitutionId, command.ActorId, AccountPermissions.RestrictionApply.Value, "account.freeze.apply", freezeId, command.ReasonCode, command.CorrelationId, now);
         await SaveAsync("account_control_conflict", "The account controls changed while the freeze was being applied.", cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return System.Text.Json.JsonSerializer.Serialize(ToResult(record, "freeze", now, replayed: false));
     }
 
@@ -270,6 +278,9 @@ public sealed class AccountControlService : IAccountControlService
         string typeCode,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await _context.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
         await EnsureAccountControllableAsync(command.InstitutionId, command.AccountId, cancellationToken).ConfigureAwait(false);
         if (string.Equals(typeCode, "legal", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(command.AuthorityReference))
         {
@@ -299,6 +310,7 @@ public sealed class AccountControlService : IAccountControlService
         _context.AccountBlocks.Add(record);
         AddAudit(command.InstitutionId, command.ActorId, AccountPermissions.RestrictionApply.Value, "account.block.apply", blockId, command.ReasonCode, command.CorrelationId, now);
         await SaveAsync("account_control_conflict", "The account controls changed while the block was being applied.", cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return System.Text.Json.JsonSerializer.Serialize(ToResult(record, "block", now, replayed: false));
     }
 
@@ -306,6 +318,11 @@ public sealed class AccountControlService : IAccountControlService
         ReleaseAccountControlCommand command,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await _context.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await LockAccountAsync(command.InstitutionId, command.AccountId, cancellationToken).ConfigureAwait(false);
+
         DateTimeOffset now = _timeProvider.GetUtcNow();
         string controlId = command.ControlId.Trim();
         string kind = command.ControlKind.Trim().ToLowerInvariant();
@@ -317,6 +334,7 @@ public sealed class AccountControlService : IAccountControlService
             _ => throw Reject("account_control_kind_invalid", "The control kind must be restriction, freeze or block."),
         };
         await SaveAsync("account_control_conflict", "The account controls changed while the control was being released.", cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return System.Text.Json.JsonSerializer.Serialize(result);
     }
 
@@ -472,50 +490,48 @@ public sealed class AccountControlService : IAccountControlService
         return controls;
     }
 
-    private async Task<long> CurrentControlVersionAsync(string accountId, CancellationToken cancellationToken)
-    {
-        long restriction = await _context.AccountRestrictions
-            .AsNoTracking()
-            .Where(record => record.AccountId == accountId)
-            .Select(record => record.ControlVersion)
-            .DefaultIfEmpty(0)
-            .MaxAsync(cancellationToken)
-            .ConfigureAwait(false);
-        long freeze = await _context.AccountFreezes
-            .AsNoTracking()
-            .Where(record => record.AccountId == accountId)
-            .Select(record => record.ControlVersion)
-            .DefaultIfEmpty(0)
-            .MaxAsync(cancellationToken)
-            .ConfigureAwait(false);
-        long block = await _context.AccountBlocks
-            .AsNoTracking()
-            .Where(record => record.AccountId == accountId)
-            .Select(record => record.ControlVersion)
-            .DefaultIfEmpty(0)
-            .MaxAsync(cancellationToken)
-            .ConfigureAwait(false);
-        return Math.Max(restriction, Math.Max(freeze, block));
-    }
+    private Task<long> CurrentControlVersionAsync(string accountId, CancellationToken cancellationToken) =>
+        AccountControlVersionReader.ReadAsync(_context, accountId, cancellationToken);
 
     private async Task<long> NextControlVersionAsync(string accountId, CancellationToken cancellationToken) =>
         await CurrentControlVersionAsync(accountId.Trim(), cancellationToken).ConfigureAwait(false) + 1;
 
+    /// <summary>
+    /// Takes the account row lock for the rest of the caller's transaction and refuses a closed account, so two
+    /// operators changing the same account serialise and each control receives the next version instead of
+    /// sharing one. Decision: P1-E04-D10.
+    /// </summary>
     private async Task EnsureAccountControllableAsync(
         InstitutionId institutionId,
         string accountId,
         CancellationToken cancellationToken)
     {
-        AccountRecord account = await _context.Accounts
-            .AsNoTracking()
-            .SingleOrDefaultAsync(record => record.AccountId == accountId.Trim(), cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw Reject("account_not_found", "The account is not available in this institution.");
+        AccountRecord account = await LockAccountAsync(institutionId, accountId, cancellationToken).ConfigureAwait(false);
         if (string.Equals(account.Status, ClosedAccountStatus, StringComparison.Ordinal))
         {
             throw Reject("account_closed", "A closed account cannot receive a new control.");
         }
     }
+
+    /// <summary>
+    /// Reads the account row under <c>FOR UPDATE</c>. The tenant predicate is bound explicitly because the raw
+    /// statement is not composed with the query filter, which would wrap it and make <c>FOR UPDATE</c> unreadable
+    /// to PostgreSQL.
+    /// </summary>
+    private async Task<AccountRecord> LockAccountAsync(
+        InstitutionId institutionId,
+        string accountId,
+        CancellationToken cancellationToken) =>
+        (await _context.Accounts
+            .FromSqlRaw(
+                "SELECT * FROM account.accounts WHERE institution_id = {0} AND account_id = {1} FOR UPDATE",
+                institutionId.Value,
+                accountId.Trim())
+            .IgnoreQueryFilters()
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false))
+        .SingleOrDefault()
+        ?? throw Reject("account_not_found", "The account is not available in this institution.");
 
     private void AddRestrictionEvent(
         ApplyAccountRestrictionCommand command,

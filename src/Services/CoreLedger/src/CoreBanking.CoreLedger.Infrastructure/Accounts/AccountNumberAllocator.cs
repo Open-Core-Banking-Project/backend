@@ -114,7 +114,9 @@ public sealed class AccountNumberAllocator : IAccountNumberAllocator
 
     /// <summary>
     /// Takes the lock and the next sequence. The caller owns the transaction, so the reservation and the
-    /// account row commit together. Decision: P1-E04-D06.
+    /// account row commit together. A concurrent first opening for the same scheme is not a failure: the
+    /// rejected insert is detached and the winner's row is read under the same lock, so every opening
+    /// still receives a number. Decision: P1-E04-D06.
     /// </summary>
     private async Task<AccountNumberReservationRecord> LockOrCreateAsync(
         InstitutionId institutionId,
@@ -122,15 +124,8 @@ public sealed class AccountNumberAllocator : IAccountNumberAllocator
         string schemeVersionId,
         CancellationToken cancellationToken)
     {
-        AccountNumberReservationRecord? reservation = (await _context.AccountNumberReservations
-            .FromSqlRaw(
-                "SELECT * FROM account.account_number_reservations " +
-                "WHERE institution_id = {0} AND scheme_version_id = {1} FOR UPDATE",
-                institutionId.Value,
-                schemeVersionId)
-            .ToArrayAsync(cancellationToken)
-            .ConfigureAwait(false))
-            .SingleOrDefault();
+        AccountNumberReservationRecord? reservation =
+            await SelectForUpdateAsync(institutionId, schemeVersionId, cancellationToken).ConfigureAwait(false);
         if (reservation is not null)
         {
             return reservation;
@@ -156,7 +151,13 @@ public sealed class AccountNumberAllocator : IAccountNumberAllocator
         }
         catch (DbUpdateException exception)
         {
-            throw new AccountApplicationRejectedException(
+            // Entity Framework rolls the failed statement back to its savepoint, so the transaction is
+            // still usable: discard the losing insert and take the row the other opening committed.
+            _context.Entry(reservation).State = EntityState.Detached;
+
+            AccountNumberReservationRecord? winner =
+                await SelectForUpdateAsync(institutionId, schemeVersionId, cancellationToken).ConfigureAwait(false);
+            return winner ?? throw new AccountApplicationRejectedException(
                 "account_number_reservation_conflict",
                 "Another opening created the reservation for this scheme at the same time.",
                 exception);
@@ -164,4 +165,18 @@ public sealed class AccountNumberAllocator : IAccountNumberAllocator
 
         return reservation;
     }
+
+    private async Task<AccountNumberReservationRecord?> SelectForUpdateAsync(
+        InstitutionId institutionId,
+        string schemeVersionId,
+        CancellationToken cancellationToken) =>
+        (await _context.AccountNumberReservations
+            .FromSqlRaw(
+                "SELECT * FROM account.account_number_reservations " +
+                "WHERE institution_id = {0} AND scheme_version_id = {1} FOR UPDATE",
+                institutionId.Value,
+                schemeVersionId)
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false))
+        .SingleOrDefault();
 }
