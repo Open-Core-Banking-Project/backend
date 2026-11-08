@@ -640,7 +640,14 @@ Financial configuration is immutable after effective use. Missing or stale criti
 
 ## 19. Implementation slices
 
+Implementation progress as of 2026-11-08: no posting code exists. `CoreBanking.CoreLedger` holds the institution, product
+and account modules only, and `CoreBanking.CoreLedger.Contracts` holds no posting contract, so slices 2 to 15 are
+greenfield. Slice 1 is unblocked for approval input rather than for implementation: nine decision briefs now propose the
+answers this epic needs before the first journal can be written, and they are listed in section 23. No journal, balance,
+hold, period or processing table exists, and no account can post until a chart classification is approved and backfilled.
+
 1. Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decisions.
+   **Briefs drafted 2026-11-08, awaiting approval:** `P1-E05-D01` to `P1-E05-D09` in [decisions/](decisions/).
 2. Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence access outside the module.
 3. Implement ledger-account and approved mapping-version lifecycle with balanced simulation.
 4. Implement transaction/journal/line domain invariants and database append-only/balance guards.
@@ -735,17 +742,19 @@ Property-based tests generate balanced/unbalanced journals, component combinatio
 
 ## 23. Open decisions
 
+Decision briefs are drafted for the nine decisions that block slices 1 to 3 and are awaiting approval in [decisions/](decisions/). Each states the decision requested, the current implementation state, a recommended position for the approving body to accept, change or reject, and the deferred questions that remain open. Drafting a brief does not approve it: ADR-0005 stays `Proposed` until D01 is signed off.
+
 | Decision | Impact | Owner | Required by | Status |
 | --- | --- | --- | --- | --- |
-| ADR-0005 consistency, balances and transaction boundary | Core implementation safety | Architecture/Finance | Slice 1 | Open |
-| Chart of accounts and legal-entity balancing scopes | Every journal/account | Finance | Slice 3 | Open |
-| Phase 1 accounting event catalogue/mappings | Allowed postings/components | Finance/Domain owners | Slice 3 | Open |
-| Monetary precision, rate scale and rounding | Totals and calculations | Finance | Slice 3 | Open |
-| Debit/credit sign and balance representation | Storage/query/rebuild | Finance/Architecture | Slice 1 | Open |
-| Available-funds, overdraft, hold, lien and pending formula | Concurrent debit outcome | Finance/Risk/Product | Slice 1 | Open |
-| PostgreSQL isolation/locking/retry policy | Contention and correctness | Architecture/DBA | Slice 1 | Open |
-| External/source reference uniqueness scopes | Deduplication/traceability | Domain owners/Finance | Slice 2 | Open |
-| Fee/tax/commission/interest/waiver accounting treatment | Explicit components/mappings | Finance/Tax/Product | Slice 3 | Open |
+| ADR-0005 consistency, balances and transaction boundary | Core implementation safety | Architecture/Finance | Slice 1 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D01](decisions/P1-E05-D01-ledger-consistency-balances-and-transaction-boundary.md) |
+| Chart of accounts and legal-entity balancing scopes | Every journal/account | Finance | Slice 3 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D02](decisions/P1-E05-D02-chart-of-accounts-and-balancing-scopes.md) |
+| Phase 1 accounting event catalogue/mappings | Allowed postings/components | Finance/Domain owners | Slice 3 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D03](decisions/P1-E05-D03-accounting-event-catalogue-and-mappings.md) |
+| Monetary precision, rate scale and rounding | Totals and calculations | Finance | Slice 3 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D04](decisions/P1-E05-D04-monetary-precision-and-rounding.md) |
+| Debit/credit sign and balance representation | Storage/query/rebuild | Finance/Architecture | Slice 1 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D05](decisions/P1-E05-D05-debit-credit-sign-and-balance-representation.md) |
+| Available-funds, overdraft, hold, lien and pending formula | Concurrent debit outcome | Finance/Risk/Product | Slice 1 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D06](decisions/P1-E05-D06-available-funds-and-control-formula.md) |
+| PostgreSQL isolation/locking/retry policy | Contention and correctness | Architecture/DBA | Slice 1 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D07](decisions/P1-E05-D07-postgresql-isolation-locking-and-retry.md) |
+| External/source reference uniqueness scopes | Deduplication/traceability | Domain owners/Finance | Slice 2 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D08](decisions/P1-E05-D08-reference-uniqueness-scopes.md) |
+| Fee/tax/commission/interest/waiver accounting treatment | Explicit components/mappings | Finance/Tax/Product | Slice 3 | Brief drafted 2026-11-08, awaiting approval: [P1-E05-D09](decisions/P1-E05-D09-fee-tax-and-waiver-treatment.md) |
 | Reversal/partial reversal and component policy | Corrections and provider flows | Finance/Operations | Slice 9 | Open |
 | Manual journal/customer-account permissions | Privileged financial risk | Finance/Security | Slice 10 | Open |
 | Backdate/value-date windows and recalculation impact | Period/accrual correctness | Finance/Compliance | Slice 11 | Open |

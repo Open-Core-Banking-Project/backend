@@ -3,7 +3,7 @@ phase: "Phase 1 - Banking Foundation"
 artifact: Slice and decision ledger
 status: Active
 approval_model: Human approves each slice
-snapshot: 2026-11-07
+snapshot: 2026-11-08
 source_documents: 01..12 epic implementation documents
 ---
 
@@ -76,10 +76,15 @@ too, `P1-E04-S12` (dormancy, reactivation and closure prerequisites) is implemen
 summaries and statement handoff) is implemented, so every implementation slice of the epic is claimed. `P1-E04-S15`
 (security, performance, backup/restore and Phase 1 end-to-end evidence) is the only slice left; it is `in progress`
 with a database-free harness, an acceptance mapping and, since 2026-11-08, live PostgreSQL evidence for slices 7 to 13
-(22 database tests covering the application, opening, approval, control, lien, summary and statement boundaries).
+(30 database tests covering the application, opening, approval, control, lien, summary, statement, dormancy, reactivation and closure boundaries).
 It still cannot be claimed without the approved `P1-E04-D16` targets and the end-to-end journey.
 `P1-E04-D14` (existing-account product migration) and
 `P1-E04-D16` (capacity, latency, RTO and RPO) remain open.
+
+Epic P1-E05 (Core Ledger and Financial Posting) is decision-gated rather than code-gated. Core Ledger currently holds
+only the institution, product and account modules, so no posting, journal, balance, hold, period or processing code
+exists. Briefs for `P1-E05-D01` to `P1-E05-D09` were drafted on 2026-11-08 and await approval; until the approving
+bodies sign them off, no slice of that epic can start.
 
 ## Human gates before the loop can advance
 
@@ -87,7 +92,7 @@ It still cannot be claimed without the approved `P1-E04-D16` targets and the end
 | --- | --- | --- | --- |
 | P1-E01 slice 1: approve decisions | P1-E01 | epic closure and production use | 9 decisions · Architecture/Security, Architecture/Operations, Finance/Product +6 more |
 | P1-E04 slice 1: approve decisions | P1-E04 | slices 2-15 | 10 decisions · Finance/Product, Finance/Tax/Compliance, Institution/Core operations +9 more |
-| P1-E05 slice 1: approve decisions | P1-E05 | slices 2-15 | 17 decisions · Architecture/Finance, Finance, Finance/Domain owners +12 more |
+| P1-E05 slice 1: approve decisions | P1-E05 | slices 2-15 | 17 decisions · Architecture/Finance, Finance, Finance/Domain owners +12 more · briefs for D01 to D09 drafted 2026-11-08, awaiting approval |
 | P1-E06 slice 1: approve decisions | P1-E06 | slices 2-13 | 12 decisions · Architecture/Operations, Risk/Compliance/Domain owners, Identity/Security +8 more |
 | P1-E07 slice 1: approve decisions | P1-E07 | slices 2-15 | 17 decisions · Product/Payments, Finance/Payments/Ledger, Integration/Payments/Provider owner +13 more |
 | P1-E08 slice 1: approve decisions | P1-E08 | slices 2-15 | 16 decisions · Product/Integration, Architecture/Domain owners, Security/Platform +13 more |
@@ -236,21 +241,21 @@ Owning service: Core Banking and Ledger · document status `Draft` · 0 implemen
 
 | Slice | Scope | Status | Approval | Unresolved decisions attached | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decision… | ⛔ blocked | — | P1-E05-D01, P1-E05-D02, P1-E05-D03, P1-E05-D04, P1-E05-D05, P1-E05-D06, P1-E05-D07, P1-E05-D08, P1-E05-D09, P1-E05-D10, P1-E05-D11, P1-E05-D12, P1-E05-D13, P1-E05-D14, P1-E05-D15, P1-E05-D16, P1-E05-D17 | 17 unresolved decisions in the epic document |
-| 2 | Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence ac… | · not started | — | P1-E05-D08 | Domain scaffolding exists in CoreLedger; no slice claim |
-| 3 | Implement ledger-account and approved mapping-version lifecycle with balanced simulation. | · not started | — | P1-E05-D02, P1-E05-D03, P1-E05-D04, P1-E05-D09 | Domain scaffolding exists in CoreLedger; no slice claim |
-| 4 | Implement transaction/journal/line domain invariants and database append-only/balance guards. | · not started | — | — | Domain scaffolding exists in CoreLedger; no slice claim |
-| 5 | Implement scoped idempotency claim/outcome and canonical request hashing under concurrency. | · not started | — | — | Domain scaffolding exists in CoreLedger; no slice claim |
-| 6 | Implement atomic single-currency posting transaction with balance rows, movements, audit and outbox. | · not started | — | — | Domain scaffolding exists in CoreLedger; no slice claim |
-| 7 | Integrate account controls and prove concurrent debit/available-funds safety using real PostgreSQL contention… | · not started | — | — | Domain scaffolding exists in CoreLedger; no slice claim |
-| 8 | Implement hold lifecycle and capture-to-posting linkage. | · not started | — | — | Domain scaffolding exists in CoreLedger; no slice claim |
-| 9 | Implement full reversal plus original/reversal trace and duplicate/concurrent reversal prevention. | · not started | — | P1-E05-D10 | Domain scaffolding exists in CoreLedger; no slice claim |
-| 10 | Implement manual journal/adjustment and Workflow decision application. | · not started | — | P1-E05-D11 | Domain scaffolding exists in CoreLedger; no slice claim |
-| 11 | Implement accounting periods, date policies and controlled backdated/value-dated posting. | · not started | — | P1-E05-D12, P1-E05-D13 | Domain scaffolding exists in CoreLedger; no slice claim |
-| 12 | Implement EOD run graph, batches, checkpoints, restart and balancing summaries for approved Phase 1 steps. | · not started | — | P1-E05-D14 | Domain scaffolding exists in CoreLedger; no slice claim |
-| 13 | Implement authoritative balance/history/statement-data queries and controlled document handoff. | · not started | — | P1-E05-D15 | Domain scaffolding exists in CoreLedger; no slice claim |
-| 14 | Implement balance rebuild, reconciliation feeds, dashboards, alerts and operational runbooks. | · not started | — | — | Domain scaffolding exists in CoreLedger; no slice claim |
-| 15 | Execute security, concurrency, resilience, performance, backup/restore and end-to-end acceptance evidence. | · not started | — | — | Domain scaffolding exists in CoreLedger; no slice claim |
+| 1 | Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decision… | ⛔ blocked | — | P1-E05-D01, P1-E05-D02, P1-E05-D03, P1-E05-D04, P1-E05-D05, P1-E05-D06, P1-E05-D07, P1-E05-D08, P1-E05-D09, P1-E05-D10, P1-E05-D11, P1-E05-D12, P1-E05-D13, P1-E05-D14, P1-E05-D15, P1-E05-D16, P1-E05-D17 | 17 unresolved decisions in the epic document; briefs for P1-E05-D01 to P1-E05-D09 were drafted 2026-11-08 and await approval |
+| 2 | Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence ac… | · not started | — | P1-E05-D08 | Decision brief P1-E05-D08 drafted 2026-11-08 and awaiting approval; ledger and posting modules do not exist yet |
+| 3 | Implement ledger-account and approved mapping-version lifecycle with balanced simulation. | · not started | — | P1-E05-D02, P1-E05-D03, P1-E05-D04, P1-E05-D09 | Decision briefs P1-E05-D02 to P1-E05-D04 and P1-E05-D09 drafted 2026-11-08 and awaiting approval; ledger and posting modules do not exist yet |
+| 4 | Implement transaction/journal/line domain invariants and database append-only/balance guards. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 5 | Implement scoped idempotency claim/outcome and canonical request hashing under concurrency. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 6 | Implement atomic single-currency posting transaction with balance rows, movements, audit and outbox. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 7 | Integrate account controls and prove concurrent debit/available-funds safety using real PostgreSQL contention… | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 8 | Implement hold lifecycle and capture-to-posting linkage. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 9 | Implement full reversal plus original/reversal trace and duplicate/concurrent reversal prevention. | · not started | — | P1-E05-D10 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 10 | Implement manual journal/adjustment and Workflow decision application. | · not started | — | P1-E05-D11 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 11 | Implement accounting periods, date policies and controlled backdated/value-dated posting. | · not started | — | P1-E05-D12, P1-E05-D13 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 12 | Implement EOD run graph, batches, checkpoints, restart and balancing summaries for approved Phase 1 steps. | · not started | — | P1-E05-D14 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 13 | Implement authoritative balance/history/statement-data queries and controlled document handoff. | · not started | — | P1-E05-D15 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 14 | Implement balance rebuild, reconciliation feeds, dashboards, alerts and operational runbooks. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 15 | Execute security, concurrency, resilience, performance, backup/restore and end-to-end acceptance evidence. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
 
 ### P1-E06 — Workflow and Maker-Checker
 
@@ -489,15 +494,15 @@ Every decision the epic documents still require, with its owner and the slice it
 
 | ID | Decision | Owner | Required by | State | Brief |
 | --- | --- | --- | --- | --- | --- |
-| P1-E05-D01 | ADR-0005 consistency, balances and transaction boundary | Architecture/Finance | Slice 1 | open | — |
-| P1-E05-D02 | Chart of accounts and legal-entity balancing scopes | Finance | Slice 3 | open | — |
-| P1-E05-D03 | Phase 1 accounting event catalogue/mappings | Finance/Domain owners | Slice 3 | open | — |
-| P1-E05-D04 | Monetary precision, rate scale and rounding | Finance | Slice 3 | open | — |
-| P1-E05-D05 | Debit/credit sign and balance representation | Finance/Architecture | Slice 1 | open | — |
-| P1-E05-D06 | Available-funds, overdraft, hold, lien and pending formula | Finance/Risk/Product | Slice 1 | open | — |
-| P1-E05-D07 | PostgreSQL isolation/locking/retry policy | Architecture/DBA | Slice 1 | open | — |
-| P1-E05-D08 | External/source reference uniqueness scopes | Domain owners/Finance | Slice 2 | open | — |
-| P1-E05-D09 | Fee/tax/commission/interest/waiver accounting treatment | Finance/Tax/Product | Slice 3 | open | — |
+| P1-E05-D01 | ADR-0005 consistency, balances and transaction boundary | Architecture/Finance | Slice 1 | drafted, awaiting approval | [brief](decisions/P1-E05-D01-ledger-consistency-balances-and-transaction-boundary.md) |
+| P1-E05-D02 | Chart of accounts and legal-entity balancing scopes | Finance | Slice 3 | drafted, awaiting approval | [brief](decisions/P1-E05-D02-chart-of-accounts-and-balancing-scopes.md) |
+| P1-E05-D03 | Phase 1 accounting event catalogue/mappings | Finance/Domain owners | Slice 3 | drafted, awaiting approval | [brief](decisions/P1-E05-D03-accounting-event-catalogue-and-mappings.md) |
+| P1-E05-D04 | Monetary precision, rate scale and rounding | Finance | Slice 3 | drafted, awaiting approval | [brief](decisions/P1-E05-D04-monetary-precision-and-rounding.md) |
+| P1-E05-D05 | Debit/credit sign and balance representation | Finance/Architecture | Slice 1 | drafted, awaiting approval | [brief](decisions/P1-E05-D05-debit-credit-sign-and-balance-representation.md) |
+| P1-E05-D06 | Available-funds, overdraft, hold, lien and pending formula | Finance/Risk/Product | Slice 1 | drafted, awaiting approval | [brief](decisions/P1-E05-D06-available-funds-and-control-formula.md) |
+| P1-E05-D07 | PostgreSQL isolation/locking/retry policy | Architecture/DBA | Slice 1 | drafted, awaiting approval | [brief](decisions/P1-E05-D07-postgresql-isolation-locking-and-retry.md) |
+| P1-E05-D08 | External/source reference uniqueness scopes | Domain owners/Finance | Slice 2 | drafted, awaiting approval | [brief](decisions/P1-E05-D08-reference-uniqueness-scopes.md) |
+| P1-E05-D09 | Fee/tax/commission/interest/waiver accounting treatment | Finance/Tax/Product | Slice 3 | drafted, awaiting approval | [brief](decisions/P1-E05-D09-fee-tax-and-waiver-treatment.md) |
 | P1-E05-D10 | Reversal/partial reversal and component policy | Finance/Operations | Slice 9 | open | — |
 | P1-E05-D11 | Manual journal/customer-account permissions | Finance/Security | Slice 10 | open | — |
 | P1-E05-D12 | Backdate/value-date windows and recalculation impact | Finance/Compliance | Slice 11 | open | — |
