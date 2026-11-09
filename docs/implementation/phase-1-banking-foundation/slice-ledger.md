@@ -138,6 +138,7 @@ backup-restore evidence that no agent can produce. See [00-phase-overview.md](00
 | 2026-11-08 | P1-E04 slices 7–9 and 15 database evidence | `scripts/db-verify.ps1` (nine migrations applied by their migration principal, database suites as each application principal), the new Core Ledger `Category=Database` suite, non-database suites and `dotnet format --verify-no-changes` | Database gate passed: Core Ledger 8, Customer Onboarding 102, Identity 105, Workflow 6, Audit Reconciliation 2 and 54 effective-privilege tests. The new Core Ledger suite proves stored-row eligibility evidence, replay, approval binding with its outbox fact, tenant isolation, one number and one ledger account per opening, six-way concurrent allocation with no duplicate or gap, and the refusal of a non-approved application. The run found and fixed three defects: the `account` schema had no application-principal privileges, an unrestricted residency rule threw during evaluation, and concurrent first openings lost the reservation race. 776 non-database tests passed, migration-model drift is consistent for all nine contexts and the format gate passes |
 | 2026-11-08 | P1-E04 slices 10, 11 and 13 database evidence | Core Ledger `Category=Database` suite, full non-database suites, `dotnet format --verify-no-changes` and `scripts/db-verify.ps1` | 22 Core Ledger PostgreSQL tests passed, adding scoped control denial, stale-version review, dual-control freeze release, four-way concurrent control-version allocation, lien immutability with append-only partial release, over-release refusal, dual-control statutory release, ledger-answer-or-nothing summaries and refused statements with no artifact. The run found two further defects: the control-version query was not translatable by EF Core 10 (so control, dormancy, closure and summary calls all failed at runtime) and concurrent control changes shared one version. 776 non-database tests still pass and the format gate is clean |
 | 2026-11-08 | P1-E04 slices 12 and 15 database evidence | Core Ledger `Category=Database` suite and full non-database suites | 30 Core Ledger PostgreSQL tests passed, adding business-date dormancy assessment, the recorded not-assessable outcome, the dormant transition and reactivation, and the closure proposal, approval, refusal and re-check sequence. 776 non-database tests still pass |
+| 2026-11-08 | P1-E04 slice 15 backup and restore evidence | `scripts/restore-drill.ps1` (new): a container-side dump of every service database, restored into a scratch database with a per-table row-count comparison, then cleaned up | All nine databases restored with a matching row count in every table: Core Ledger 42 tables/2208 rows, Customer Onboarding 36/86204, Identity 33/1440, Payments 6/2, Channels 6/2, Workflow 9/16, Risk 6/2, Integration 8/3, Audit 8/72. Measured on one workstation, so no RTO or RPO is claimed: point-in-time recovery, WAL archiving, an off-site copy and the `P1-E04-D16` targets are still outstanding |
 
 Gaps found by the verification runs: Payments and VTU, Channels and Engagement, Risk Reporting and Integration Hub still
 expose no `Category=Database` or `Category=Integration` tests, so their runtime concurrency evidence
@@ -147,6 +148,8 @@ liens, dormancy, reactivation, closure, summaries and statements. The security s
 requires the local stack and fails closed without it, which is expected but must be part of review instructions. The
 Identity database and integration suites run serially because they share one database and assert on the shared outbox
 table; parallel classes produced false failures before `xunit.runner.json` disabled collection parallelism.
+Backup and restore evidence exists as a dump/restore round trip only; no recovery objective can be measured until
+`P1-E04-D16` is approved and WAL archiving exists.
 
 ## Slice detail
 
@@ -233,7 +236,7 @@ Owning service: Core Banking and Ledger · document status `Approved` · 13 impl
 | 12 | Implement dormancy assessment/reactivation and controlled closure prerequisites. | ✔ implemented (claim) | pending | — | Business-date assessment recorded once per account, business date and rule version behind a per-account lease with ordered catch-up, reactivation under the rule, and closure through proposal, bound approval and final re-check with a fixed post-close allow-list; live-stack verification pending |
 | 13 | Implement account summaries and statement-request authorisation/handoff. | ✔ implemented (claim) | pending | — | Read-only summary carrying the ledger answer or nothing, `statement.policy` allow-lists, authorised handoff with query and integrity references, opaque party-bound artifact references and the `statement_request_without_artifact` finding; live-stack verification pending |
 | 14 | Add audit, observability, reconciliation, alerts and recovery runbooks. | ✔ implemented (claim) | pending | — | Configuration reconciliation report with five stable finding codes; `CoreBanking.ProductAccounts` counters and outbox-age gauges; per-code eligibility-resolution telemetry; institution audit rows on every Savings and currency submit/publish; products and accounts operations runbook |
-| 15 | Complete security, performance, backup/restore and Phase 1 end-to-end evidence. | ◐ in progress | pending | P1-E04-D16 | Database-free harness `scripts/phase1-evidence.ps1` and the acceptance mapping in `04-slice-15-evidence.md`; PostgreSQL, performance and recovery results outstanding |
+| 15 | Complete security, performance, backup/restore and Phase 1 end-to-end evidence. | ◐ in progress | pending | P1-E04-D16 | Database-free harness `scripts/phase1-evidence.ps1`, the acceptance mapping in `04-slice-15-evidence.md`, 30 Core Ledger PostgreSQL tests and a dump/restore drill across all nine databases; performance, recovery objectives and the end-to-end journey outstanding |
 
 ### P1-E05 — Core Ledger and Financial Posting
 
@@ -486,9 +489,9 @@ Every decision the epic documents still require, with its owner and the slice it
 | P1-E04-D11 | Lien priority, partial use and release authority | Legal/Finance/Core | Slice 11 | open | — |
 | P1-E04-D12 | Dormancy qualifying activity and business-date policy | Compliance/Product | Slice 12 | open | — |
 | P1-E04-D13 | Closure prerequisites and permitted post-close events | Finance/Operations | Slice 12 | open | — |
-| P1-E04-D14 | Existing-account product migration policy | Product/Legal | Before migration feature | unresolved | — |
+| P1-E04-D14 | Existing-account product migration policy | Product/Legal | Before migration feature | drafted, awaiting approval | [brief](decisions/P1-E04-D14-existing-account-product-migration.md) |
 | P1-E04-D15 | Statement periods, formats, retention and delivery | Product/Compliance | Slice 13 | open | — |
-| P1-E04-D16 | Capacity, latency, RTO and RPO targets | Product/Platform | Before release testing | open | — |
+| P1-E04-D16 | Capacity, latency, RTO and RPO targets | Product/Platform | Before release testing | drafted, awaiting approval | [brief](decisions/P1-E04-D16-capacity-latency-and-recovery-targets.md) |
 
 ### P1-E05 decisions
 

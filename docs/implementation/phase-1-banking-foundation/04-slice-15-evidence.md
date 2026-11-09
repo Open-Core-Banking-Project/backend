@@ -7,9 +7,13 @@ the PostgreSQL, concurrency and effective-privilege results below are observed r
 
 Two inputs are still missing, so the slice stays `in progress`:
 
-- the capacity, latency, RTO and RPO figures need `P1-E04-D16`, which is still open, and without them a performance or
-  recovery result has no pass condition;
-- the end-to-end Phase 1 journey touches `P1-E04-D14` (existing-account product migration), which is still open.
+- the capacity, latency, RTO and RPO figures need `P1-E04-D16`, which is still awaiting approval, and without them a
+  performance or recovery result has no pass condition;
+- the end-to-end Phase 1 journey touches `P1-E04-D14` (existing-account product migration), which is also awaiting
+  approval.
+
+Both now have decision briefs (`P1-E04-D14`, `P1-E04-D16`) that state what must be agreed and deliberately publish no
+numbers, so the remaining gap is human sign-off rather than an undesigned slice.
 
 Nothing in this document changes a slice status beyond `in progress`, and no figure is quoted that was not observed.
 
@@ -21,6 +25,7 @@ Nothing in this document changes a slice status beyond `in progress`, and no fig
 | --- | --- | --- |
 | Repository gate | `scripts/verify.ps1` | restore, Release build, migration-model drift for all nine contexts, non-database suites, formatting |
 | Database gate | `scripts/db-verify.ps1` | migrations applied with each migration principal, database and integration suites as each application principal, effective privileges per schema |
+| Restore drill | `scripts/restore-drill.ps1` | a dump of each service database restores into a fresh database with a matching row count in every table |
 | Per-service suites | `dotnet test <project> --filter Category!=Database&Category!=Integration` | one recorded Passed/Failed count per service instead of one solution-wide figure |
 | Permission grammar | literal scan of `PermissionIdentifier.Parse` | every capability is exactly `domain.resource.action`; the current report shows 59 capabilities and no exception |
 | Supply chain | `dotnet list package --vulnerable --include-transitive` | vulnerable direct and transitive packages, or an explicit `unknown` when the feed cannot be reached |
@@ -84,6 +89,30 @@ The Core Ledger suite (`src/Services/CoreLedger/tests/CoreBanking.CoreLedger.Uni
 - a ledger answer outside the 60-second freshness ceiling is refused with `balance_source_stale`;
 - approval with a balance that moved after submission leaves the account in `pending_closure` with the refusal recorded,
   and only a settled re-check closes it.
+
+### Backup and restore evidence, 2026-11-08
+
+`scripts/restore-drill.ps1` dumps each service database with the cluster administrator inside the compose container,
+restores it into a scratch database and compares the row count of every table. All nine databases passed:
+
+| Service | Tables | Rows | Dump ms | Restore ms |
+| --- | --- | --- | --- | --- |
+| Core Ledger | 42 | 2208 | 1897 | 4530 |
+| Customer Onboarding | 36 | 86204 | 9689 | 8686 |
+| Identity and Access | 33 | 1440 | 1371 | 2310 |
+| Payments and VTU | 6 | 2 | 853 | 636 |
+| Channels and Engagement | 6 | 2 | 741 | 783 |
+| Operations and Workflow | 9 | 16 | 930 | 1003 |
+| Risk Reporting | 6 | 2 | 721 | 648 |
+| Integration Hub | 8 | 3 | 818 | 900 |
+| Audit and Reconciliation | 8 | 72 | 1034 | 1356 |
+
+Every table's row count matched after restore, the scratch databases and the container password file were removed
+afterwards, and the drill needs no application principal, so a recovery does not depend on service credentials.
+
+These durations are **observations on one workstation**, not targets: they exclude detection, decision, environment
+provisioning, service start-up and verification, and there is no WAL archiving, off-site copy or restore-to-timestamp
+path on the local stack. No RTO or RPO is claimed anywhere in this document, because `P1-E04-D16` has not set one.
 
 ### Defects this run found and fixed
 
@@ -157,18 +186,25 @@ system was observed.
 | ACC-027, ACC-029 | Partial | the capability grammar, the policy refusals and the artifact authorisation that answers with no reference for a refused request are proven; the deployed 403 needs a running API host |
 | ACC-028 | Blocked | the ledger posted-history query is `P1-E05`, so the request is refused with `statement_source_unavailable` (now asserted against a real request row) |
 | ACC-031 | Partial | contracts expose only masked numbers and control reasons are not returned, and the opening suite proves the outbox payload excludes the full number; log and live event inspection still needs a running host |
-| ACC-032, ACC-033, ACC-034 | Blocked | trace propagation, restore/replay and the end-to-end journey need a running host, and ACC-033 also needs the `P1-E04-D16` RTO/RPO targets |
+| ACC-032 | Blocked | trace propagation needs a running API host |
+| ACC-033 | Partial | `scripts/restore-drill.ps1` proves every service database dumps and restores with matching row counts; point-in-time recovery, an off-site copy and an approved RTO/RPO (`P1-E04-D16`) are outstanding |
+| ACC-034 | Blocked | the end-to-end journey needs a running host and the `P1-E04-D14` migration policy |
 
 ## What must happen for slice 15 to be claimed
 
 1. ~~Start the stack and run `scripts/db-verify.ps1`.~~ Done on 2026-11-08; repeat it on the acceptance commit.
 2. Approve `P1-E04-D16`: account volume, contention profile, latency budget, RTO and RPO. Without those numbers a
-   performance or recovery result has no pass condition and must not be written down.
-3. Resolve `P1-E04-D14` for the existing-account product migration, which the end-to-end journey touches.
+   performance or recovery result has no pass condition and must not be written down. The brief that asks for them is
+   `P1-E04-D16-capacity-latency-and-recovery-targets.md`.
+3. Resolve `P1-E04-D14` for the existing-account product migration, which the end-to-end journey touches. The brief that
+   asks for it is `P1-E04-D14-existing-account-product-migration.md`.
 4. ~~Give the account controls, liens, dormancy and statement slices their own `Category=Database` evidence.~~ Every
    account slice now has it: application, opening, approval, controls, liens, dormancy, reactivation, closure, summaries
    and statements.
-5. Re-run `scripts/phase1-evidence.ps1` on the final commit so the recorded counts belong to the acceptance commit, and
+5. ~~Produce backup and restore evidence.~~ Done on 2026-11-08 by `scripts/restore-drill.ps1` for all nine databases.
+   Repeat it on the acceptance commit, and add WAL archiving plus a restore-to-timestamp drill before any RPO is
+   published.
+6. Re-run `scripts/phase1-evidence.ps1` on the final commit so the recorded counts belong to the acceptance commit, and
    record the database, performance and recovery results beside it.
 
 Until the remaining steps are done, the slice stays `in progress` and the epic stays below `Implemented`.
