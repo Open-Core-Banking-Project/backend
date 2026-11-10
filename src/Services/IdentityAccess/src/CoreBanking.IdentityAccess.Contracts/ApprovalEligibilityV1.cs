@@ -54,6 +54,28 @@ public sealed record ApprovalEligibilityRequestV1
 }
 
 /// <summary>
+/// Service-authenticated eligibility question. The trusted approval service supplies both stable
+/// actor identifiers from its stored request and validated human actor context; Identity resolves
+/// current entitlements itself and never accepts a permission list from the caller.
+/// </summary>
+public sealed record ServiceApprovalEligibilityRequestV1
+{
+    public int SchemaVersion { get; init; } = IdentityAccessContractV1.SchemaVersion;
+
+    public required string InstitutionId { get; init; }
+
+    public required string SourceSystem { get; init; }
+
+    public required string SourceRequestId { get; init; }
+
+    public required string RequiredPermission { get; init; }
+
+    public required string MakerActorId { get; init; }
+
+    public required string CandidateActorId { get; init; }
+}
+
+/// <summary>
 /// Data-minimised answer. It states whether the caller may decide the request and why, and never
 /// returns the maker's grants, roles, session or personal data.
 /// </summary>

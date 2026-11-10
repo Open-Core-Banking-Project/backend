@@ -154,6 +154,24 @@ public sealed class TrustedDeviceService : ITrustedDeviceService
             .OrderByDescending(device => device.CreatedAt)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
+        if (query.OtherIdentityRequested)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(query.CorrelationId);
+            _context.OperatorActionAuditEvents.Add(new OperatorActionAuditRecord
+            {
+                InstitutionId = query.Actor.InstitutionId.Value,
+                AuditEventId = Guid.NewGuid().ToString("N"),
+                ActorId = query.Actor.Id.Value,
+                Action = "identity_devices_viewed",
+                ResourceType = "identity_devices",
+                ResourceId = query.IdentityId,
+                Reason = "authorised_sensitive_device_read",
+                CorrelationId = query.CorrelationId,
+                OccurredAt = now,
+            });
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         return [.. records.Select(record => ToView(record, now))];
     }
 
@@ -295,6 +313,7 @@ public sealed class TrustedDeviceService : ITrustedDeviceService
                 evidence.IssuedAt,
                 evidence.ExpiresAt,
                 evidence.ConsumedAt,
+                evidence.InvalidatedAt,
                 evidence.Purpose,
                 TrustedDevice.RegistrationPurpose,
                 evidence.SessionId,

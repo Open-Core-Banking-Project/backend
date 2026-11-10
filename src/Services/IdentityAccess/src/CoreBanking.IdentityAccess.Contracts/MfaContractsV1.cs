@@ -23,6 +23,10 @@ public static class MfaContractV1
     public const string EnrolmentNotFound = "mfa.enrolment_not_found";
     public const string ProviderUnavailable = "mfa.provider_unavailable";
     public const string StepUpEvidenceRequired = "mfa.step_up_evidence_required";
+
+    public const string RevocationUserRequested = "user_requested";
+    public const string RevocationDeviceLost = "device_lost";
+    public const string RevocationSuspectedCompromise = "suspected_compromise";
 }
 
 /// <summary>Registers a second factor for the authenticated actor.</summary>
@@ -51,6 +55,28 @@ public sealed record MfaEnrolmentResultV1
     public required string Status { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
+}
+
+/// <summary>Revokes one factor belonging to the authenticated actor.</summary>
+public sealed record MfaRevocationRequestV1
+{
+    public int SchemaVersion { get; init; } = MfaContractV1.SchemaVersion;
+
+    /// <summary>One of <c>user_requested</c>, <c>device_lost</c> or <c>suspected_compromise</c>.</summary>
+    public required string ReasonCode { get; init; }
+}
+
+public sealed record MfaRevocationResultV1
+{
+    public int SchemaVersion { get; init; } = MfaContractV1.SchemaVersion;
+
+    public required string EnrolmentId { get; init; }
+
+    public required string Status { get; init; }
+
+    public required DateTimeOffset RevokedAt { get; init; }
+
+    public bool AlreadyRevoked { get; init; }
 }
 
 /// <summary>Completes a step-up challenge for one purpose.</summary>

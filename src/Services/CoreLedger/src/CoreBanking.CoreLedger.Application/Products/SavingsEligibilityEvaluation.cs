@@ -10,7 +10,9 @@ namespace CoreBanking.CoreLedger.Application.Products;
 public sealed record EvaluateSavingsEligibilityCommand(
     InstitutionId InstitutionId,
     string ProductCode,
-    AuthoritativeProductEligibilityFacts Facts,
+    string CustomerId,
+    string? BranchId,
+    string CurrencyCode,
     DateTimeOffset EvaluatedAt);
 
 public sealed record SavingsEligibilityEvaluationResult(

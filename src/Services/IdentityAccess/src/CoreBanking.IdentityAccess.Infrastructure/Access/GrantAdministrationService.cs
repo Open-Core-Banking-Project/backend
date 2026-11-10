@@ -59,18 +59,22 @@ public sealed class GrantAdministrationService
             throw new GrantAdministrationException(GrantContractV1.InvalidGrant, "The assignment end must be in the future.");
         }
 
-        bool roleExists = await _context.Roles.AnyAsync(
-            role => role.RoleId == roleId && role.Status == RecordStatus.Active,
+        RoleRecord? role = await _context.Roles.SingleOrDefaultAsync(
+            record => record.RoleId == roleId && record.Status == RecordStatus.Active,
             cancellationToken).ConfigureAwait(false);
-        if (!roleExists)
+        if (role is null)
         {
             throw new GrantAdministrationException(GrantContractV1.RoleNotFound, "The role is not available.");
         }
 
-        string[] rolePermissions = await _context.RolePermissions
-            .Where(permission => permission.RoleId == roleId)
+        string[] rolePermissions = await _context.RoleVersionPermissions
+            .Where(permission => permission.RoleId == roleId && permission.RoleVersion == role.Version)
             .Select(permission => permission.PermissionCode)
             .ToArrayAsync(cancellationToken).ConfigureAwait(false);
+        if (rolePermissions.Length == 0)
+        {
+            throw new GrantAdministrationException(GrantContractV1.RoleNotFound, "The published role version is unavailable.");
+        }
 
         HashSet<string> prospective = await EffectivePermissionsAsync(identityId, now, cancellationToken).ConfigureAwait(false);
         prospective.UnionWith(rolePermissions);
@@ -90,6 +94,7 @@ public sealed class GrantAdministrationService
                 InstitutionId = institutionId.Value,
                 IdentityId = identityId,
                 RoleId = roleId,
+                RoleVersion = role.Version,
                 RegionId = regionId,
                 BranchId = branchId,
                 ChannelId = channelId,
@@ -101,6 +106,7 @@ public sealed class GrantAdministrationService
         else
         {
             existing.RegionId = regionId;
+            existing.RoleVersion = role.Version;
             existing.BranchId = branchId;
             existing.ChannelId = channelId;
             existing.ValidFrom = now;
@@ -286,8 +292,9 @@ public sealed class GrantAdministrationService
     {
         string[] fromRoles = await (
                 from assignment in _context.IdentityRoles
-                join permission in _context.RolePermissions
-                    on new { assignment.InstitutionId, assignment.RoleId } equals new { permission.InstitutionId, permission.RoleId }
+                join permission in _context.RoleVersionPermissions
+                    on new { assignment.InstitutionId, assignment.RoleId, assignment.RoleVersion }
+                    equals new { permission.InstitutionId, permission.RoleId, permission.RoleVersion }
                 where assignment.IdentityId == identityId
                     && assignment.ValidFrom <= now
                     && (assignment.ValidTo == null || assignment.ValidTo > now)

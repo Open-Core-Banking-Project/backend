@@ -1,5 +1,6 @@
 using System;
 using CoreBanking.BuildingBlocks.Domain.Identity;
+using CoreBanking.CoreLedger.Application.Accounts;
 using CoreBanking.CoreLedger.Application.Institutions;
 using CoreBanking.CoreLedger.Application.Products;
 
@@ -28,5 +29,28 @@ public static class DevelopmentAuthorisationSeed
         store.Grant(ActorId.From(ProductPublisherActorValue), institutionId, ProductPermissions.Publish);
         store.Grant(ActorId.From(ProductMakerActorValue), institutionId, ProductPermissions.Update);
         store.Grant(ActorId.From(ProductMakerActorValue), institutionId, ProductPermissions.Simulate);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, InstitutionPermissions.ConfigurationCreate);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, InstitutionPermissions.ConfigurationPublish);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.ApplicationCreate);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.ApplicationView);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ApplicationView);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ApplicationApproveRequirement.Permission);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.NumberReveal);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.RestrictionApply);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.RestrictionRelease);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ControlsEvaluate);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.LienCreate);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.LienRelease);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ActivationCreate);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.DormancyAssess);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.DormancyReactivate);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.ClosurePropose);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ClosurePropose);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.ClosureApprove);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.SummaryView);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.SummaryView);
+        store.Grant(ActorId.From(MakerActorValue), institutionId, AccountPermissions.StatementRequest);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.StatementRequest);
+        store.Grant(ActorId.From(ApproverActorValue), institutionId, AccountPermissions.StatementRetrieve);
     }
 }

@@ -54,8 +54,49 @@ public static class ApprovalProfiles
         "customer.merge.request",
         "customer.merge.approve");
 
+    public static ApprovalProfile IdentityRolePublication { get; } = Create(
+        "identity.role.publish.v1",
+        "identity-role-publication-v1",
+        "identity-access",
+        "identity.role.version",
+        "identity.permission.assign");
+
+    /// <summary>
+    /// Institution configuration publication, including the <c>institution.currencies</c> area. The
+    /// approver permission is the Configuration Approver capability approved in Epic 1 section 5.
+    /// Decision: P1-E04-D17.
+    /// </summary>
+    public static ApprovalProfile InstitutionConfigurationPublication { get; } = Create(
+        "institution.configuration.publish.v1",
+        "institution-configuration-publication-v1",
+        "core-ledger",
+        "institution.configuration.version",
+        "institution.configuration.approve");
+
+    /// <summary>
+    /// Opening an account from an eligible application. The approver decides the exact application version
+    /// and eligibility snapshot, and the maker can never approve it. Decision: P1-E04-D09.
+    /// </summary>
+    public static ApprovalProfile AccountOpening { get; } = Create(
+        "account.open.v1",
+        "account-open-approval-v1",
+        "core-ledger",
+        "account.application",
+        "account.application.approve");
+
+    /// <summary>
+    /// Closing an account. The approver decides the exact closure proposal version and the condition snapshot the
+    /// maker saw, and the maker can never approve it. Decision: P1-E04-D13.
+    /// </summary>
+    public static ApprovalProfile AccountClosure { get; } = Create(
+        "account.close.v1",
+        "account-close-approval-v1",
+        "core-ledger",
+        "account.closure.proposal",
+        "account.closure.approve");
+
     public static IReadOnlyList<ApprovalProfile> All { get; } =
-        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge];
+        [SavingsEligibilityPublication, CustomerClassification, CustomerMerge, IdentityRolePublication, InstitutionConfigurationPublication, AccountOpening, AccountClosure];
 
     /// <summary>The source services that may submit a request, derived from the approved profiles.</summary>
     public static IReadOnlyList<string> SourceServices { get; } =

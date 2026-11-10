@@ -1,7 +1,7 @@
 ---
 id: ADR-0005
 title: "Ledger consistency, balances and posting transaction boundary"
-status: Proposed
+status: Accepted
 date: 2026-10-16
 owners: [Architecture, Finance]
 required_by: "Phase 1 - Core Ledger and Financial Posting, slice 1"
@@ -9,15 +9,15 @@ architecture_item: 5
 referenced_by:
   - docs/implementation/phase-1-banking-foundation/05-core-ledger-and-posting.md
 supersedes: []
-approved_by: []
-approved_on: null
+approved_by: [Project owner]
+approved_on: 2026-11-09
 ---
 
 # ADR-0005: Ledger consistency, balances and posting transaction boundary
 
 ## Status
 
-`Proposed` - not approved. `05-core-ledger-and-posting.md` states that this ADR must be approved before production implementation and is required by slice 1. It is the gate for any production financial posting.
+`Accepted` on 2026-11-09 by the project owner through approval of `P1-E05-D01` to `P1-E05-D09`.
 
 ## Context
 
@@ -28,16 +28,21 @@ approved_on: null
 
 ## Decision
 
-Not yet decided. This ADR must settle, at minimum:
+The approved position is defined by decision briefs `P1-E05-D01` to `P1-E05-D09`:
 
-- Consistency model for balances: transactional balance rows, append-only movements plus projection, or an approved combination, and how a balance is rebuilt from posted records.
-- Balance representation: debit/credit sign convention, ledger balance versus available balance, holds, liens, blocks, restrictions and pending authorised amounts as distinct components; when snapshots update; and the single authoritative read path.
-- Posting transaction boundary: what commits atomically (transaction, journal, lines, movements, balances, idempotency outcome, audit evidence and outbox record) and what may not.
-- Concurrency and locking: isolation level, optimistic concurrency versions, the use of `SELECT ... FOR UPDATE` or equivalent serialisation of balance-affecting operations, deadlock-retry policy and retry limits.
-- Overdraft and available-funds policy: whether overdraft, credit limits, uncollected funds and pending authorisations participate in the available-funds calculation, and how insufficiency is rejected.
-- Account-control freshness: which account, product and configuration state must be current before posting, and the fail-closed behaviour when freshness cannot be proven.
-- Reconciliation approach: how ledger-to-balance, ledger-to-event and ledger-to-statement reconciliation is performed and evidenced.
-- Monetary precision and scale per amount and rate, and rounding points.
+- Append-only balance movements are the financial record; transactionally updated account-balance rows are the
+  authoritative read accelerator and are rebuildable from a verified checkpoint plus ordered movements.
+- Transaction, journal, lines, movements, balances, idempotency outcome, audit and outbox commit atomically.
+- PostgreSQL `READ COMMITTED`, deterministic ascending account locks, optimistic versions and bounded retries only for
+  `40001`/`40P01` protect concurrent posting.
+- Phase 1 extends no overdraft. Available funds use the approved D06 formula and fail closed on stale controls or
+  configuration.
+- Positive line amounts use an explicit debit/credit indicator; amounts use `numeric(19,4)`, rates `numeric(9,8)`, and
+  rounding is explicit at component boundaries.
+- Balancing scope is institution, legal entity and currency. Mappings resolve approved roles and never a suspense
+  fallback.
+- References, components and duplicate/replay behaviour follow D08/D09. Reconciliation compares journals, movements,
+  balance accelerators, outbox facts and statement history.
 
 ## Alternatives considered
 
@@ -63,13 +68,13 @@ Not yet decided. This ADR must settle, at minimum:
 
 ## Open questions
 
-- Whether overdraft is in scope for Phase 1 enforcement or only represented.
 - The approved accounting period, business-date and backdate windows (separately owned by Finance, but interacting with this decision).
 - The retention and partitioning policy applied to ledger tables.
 
 ## Approval gate
 
-Do not implement production posting, balance mutation, migration scripts that encode a balance representation, or overdraft behaviour until this ADR is `Accepted`. The epic allows domain, contract and test work with synthetic mappings while production posting stays disabled.
+The ADR gate is satisfied. Production enablement still requires approved chart/mapping data, later slice evidence and
+all release gates; acceptance of this ADR does not itself enable a posting endpoint.
 
 ## Related documents
 

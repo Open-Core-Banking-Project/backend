@@ -56,7 +56,7 @@ internal static class ServiceCatalogue
     private static readonly ServiceDescriptor[] Descriptors =
     [
         new("CoreLedger", "core_ledger_db", "coreledger_app", "coreledger_migrator",
-            ["institution", "product", "integration"], ["audit"]),
+            ["institution", "product", "account", "integration"], ["audit"]),
         new("CustomerOnboarding", "customer_onboarding_db", "customeronboarding_app", "customeronboarding_migrator",
             ["party", "onboarding", "customer", "kyc", "privacy", "platform", "integration"], ["audit"]),
         new("IdentityAccess", "identity_access_db", "identityaccess_app", "identityaccess_migrator",

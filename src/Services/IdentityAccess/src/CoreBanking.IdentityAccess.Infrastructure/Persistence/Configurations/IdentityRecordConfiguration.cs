@@ -107,6 +107,7 @@ internal sealed class ServiceClientRecordConfiguration : IEntityTypeConfiguratio
         builder.Property(client => client.ServiceClientId).HasColumnName("service_client_id");
         builder.Property(client => client.ClientName).HasColumnName("client_name");
         builder.Property(client => client.Audience).HasColumnName("audience");
+        builder.Property(client => client.Permissions).HasColumnName("permissions").HasColumnType("text[]");
         builder.Property(client => client.CredentialReference).HasColumnName("credential_reference").HasMaxLength(200);
         builder.Property(client => client.CredentialExpiresAt).HasColumnName("credential_expires_at");
         builder.Property(client => client.PreviousCredentialReference).HasColumnName("previous_credential_reference").HasMaxLength(200);

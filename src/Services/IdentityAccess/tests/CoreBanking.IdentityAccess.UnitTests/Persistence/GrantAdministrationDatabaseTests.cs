@@ -61,6 +61,7 @@ public sealed class GrantAdministrationDatabaseTests : IDisposable
 
         await using IdentityAccessDbContext verification = CreateContext(_institution);
         Assert.Equal(1, (await verification.EntitlementVersions.SingleAsync()).Version);
+        Assert.Equal(1, (await verification.IdentityRoles.SingleAsync()).RoleVersion);
         OutboxRecordWrapper eventRecord = await SingleEntitlementEventAsync(verification);
         Assert.Equal(_target.Value, eventRecord.BusinessReference);
         Assert.Equal(1, ReadNewVersion(eventRecord.Envelope));
@@ -87,6 +88,28 @@ public sealed class GrantAdministrationDatabaseTests : IDisposable
         await using IdentityAccessDbContext verification = CreateContext(_institution);
         Assert.Single(verification.IdentityRoles);
         Assert.Equal(1, (await verification.EntitlementVersions.SingleAsync()).Version);
+    }
+
+    [Fact]
+    public async Task Access_review_reports_the_pinned_role_version_and_appends_sensitive_read_evidence()
+    {
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            await CreateService(context).AssignRoleAsync(
+                _institution, _admin, _target.Value, RoleId, null, "branch-1", null, null, "review-grant", CancellationToken.None);
+        }
+
+        await using IdentityAccessDbContext reviewContext = CreateContext(_institution);
+        AccessReviewResultV1 review = await new AccessReviewService(reviewContext, _time).ReviewAsync(
+            _institution, _admin, _target.Value, "review-correlation", CancellationToken.None);
+
+        AccessReviewRoleV1 role = Assert.Single(review.Roles);
+        Assert.Equal(1, role.RoleVersion);
+        Assert.Equal([UpdatePermission], role.Permissions);
+        Assert.Equal("branch-1", role.BranchId);
+        Assert.Single(
+            reviewContext.OperatorActionAuditEvents.Local,
+            evidence => evidence.Action == "identity_access_reviewed" && evidence.ResourceId == _target.Value);
     }
 
     [Fact]
@@ -210,6 +233,8 @@ public sealed class GrantAdministrationDatabaseTests : IDisposable
         context.TemporaryGrants.ExecuteDelete();
         context.IdentityRoles.ExecuteDelete();
         context.ConflictRules.ExecuteDelete();
+        context.RoleVersionPermissions.ExecuteDelete();
+        context.RoleVersions.ExecuteDelete();
         context.RolePermissions.ExecuteDelete();
         context.Roles.ExecuteDelete();
         context.EntitlementVersions.ExecuteDelete();
@@ -217,6 +242,8 @@ public sealed class GrantAdministrationDatabaseTests : IDisposable
         context.Identities.ExecuteDelete();
 
         using IdentityAccessDbContext other = CreateContext(_otherInstitution);
+        other.RoleVersionPermissions.ExecuteDelete();
+        other.RoleVersions.ExecuteDelete();
         other.RolePermissions.ExecuteDelete();
         other.Roles.ExecuteDelete();
     }
@@ -289,6 +316,26 @@ public sealed class GrantAdministrationDatabaseTests : IDisposable
         {
             InstitutionId = institution.Value,
             RoleId = roleId,
+            PermissionCode = permissionCode,
+        });
+        context.RoleVersions.Add(new RoleVersionRecord
+        {
+            InstitutionId = institution.Value,
+            RoleId = roleId,
+            Version = 1,
+            RoleCode = roleId,
+            RoleName = name,
+            ContentHash = new string('a', 64),
+            ApprovalRequestId = "seed-request-" + roleId,
+            WorkflowDecisionReference = "seed-decision-" + roleId,
+            PublishedBy = _admin.Value,
+            PublishedAt = _time.GetUtcNow(),
+        });
+        context.RoleVersionPermissions.Add(new RoleVersionPermissionRecord
+        {
+            InstitutionId = institution.Value,
+            RoleId = roleId,
+            RoleVersion = 1,
             PermissionCode = permissionCode,
         });
         context.SaveChanges();

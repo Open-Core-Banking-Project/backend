@@ -42,6 +42,11 @@ on demand. Findings are counts only — no actor, tenant or credential values.
 A non-zero count raises the corresponding `identity.reconciliation.*` counter. Alert on any increase
 outside a known change window.
 
+The counters are published on the `CoreBanking.IdentityAccess` meter. The shared observability
+registration exports this meter through OTLP to the configured collector. If the collector cannot
+see the instruments, treat the deployment as incomplete; do not add an application-managed SIEM
+connection or an alternate unreviewed exporter.
+
 ## 3. Step-up and MFA
 
 - Step-up evidence is bound to actor, session, device and purpose, lasts five minutes and is consumed once.
@@ -83,6 +88,22 @@ outside a known change window.
   start-up. Neither value may exist in a deployed environment.
 
 ## 6. Alerts
+
+### Provider-neutral dashboard contract
+
+Before production enablement, the selected telemetry backend must render these panels from the OTLP
+collector stream. Backend-specific queries, retention and thresholds remain platform configuration.
+
+| Panel | Signals | Required view |
+| --- | --- | --- |
+| Entitlement integrity | Four `identity.reconciliation.*` counters | Increase by signal and deployment over the review window |
+| Messaging delivery | `messaging.outbox.publish_failures`, retries, dead letters and backlog gauges | Current backlog, oldest age and failure trend |
+| Service identity | Authorisation denials carrying `auth.service_identity_not_valid` | Rate by service/deployment only; never actor or institution labels |
+| Step-up and encryption | `auth.step_up_required`, `payload_decryption_unavailable`, `payload_encryption_invalid` evidence | Bounded outcome counts with correlation-based drill-down to append-only evidence |
+| Audit pipeline | audit-write and collector/export failure signals | Any loss or sustained failure visible to the on-call operator |
+
+Dashboard links and alert destinations belong in deployment configuration after the platform adapter
+is approved. They must not contain credentials, actor identifiers, institution identifiers or payloads.
 
 | Signal | Condition | First action |
 | --- | --- | --- |

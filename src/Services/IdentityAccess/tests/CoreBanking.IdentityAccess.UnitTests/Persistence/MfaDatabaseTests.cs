@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Application.Security;
@@ -9,6 +10,7 @@ using CoreBanking.IdentityAccess.Contracts;
 using CoreBanking.IdentityAccess.Domain.Authentication;
 using CoreBanking.IdentityAccess.Infrastructure.Identity;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
+using CoreBanking.IdentityAccess.Infrastructure.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -63,6 +65,19 @@ public sealed class MfaDatabaseTests : IDisposable
 
         await using IdentityAccessDbContext verification = CreateContext(_institution);
         Assert.Equal(MfaContractV1.StatusActive, (await verification.MfaEnrolments.SingleAsync()).Status);
+        Assert.Contains(
+            verification.AuthenticationEvents,
+            record => record.EventType == "mfa_enrolment_started"
+                && record.Outcome == AuthenticationOutcome.Succeeded
+                && record.Detail == MfaContractV1.Totp);
+        Assert.Contains(
+            verification.AuthenticationEvents,
+            record => record.EventType == "mfa_step_up_verified"
+                && record.Outcome == AuthenticationOutcome.Succeeded
+                && record.Detail == MfaContractV1.Totp);
+        Assert.DoesNotContain(
+            verification.AuthenticationEvents,
+            record => record.Detail == ValidCode || record.Detail == "provider-reference-1");
     }
 
     [Fact]
@@ -106,6 +121,11 @@ public sealed class MfaDatabaseTests : IDisposable
         await using IdentityAccessDbContext verification = CreateContext(_institution);
         Assert.Empty(verification.StepUpEvidence);
         Assert.Equal(MfaContractV1.StatusPending, (await verification.MfaEnrolments.SingleAsync()).Status);
+        AuthenticationEventRecord rejected = Assert.Single(
+            verification.AuthenticationEvents.Where(record => record.EventType == "mfa_step_up_rejected"));
+        Assert.Equal(AuthenticationOutcome.Failed, rejected.Outcome);
+        Assert.Equal(MfaContractV1.FactorInvalid, rejected.Detail);
+        Assert.DoesNotContain("000000", rejected.Detail, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -130,6 +150,120 @@ public sealed class MfaDatabaseTests : IDisposable
             Assert.False(await CreateService(context, new StubVerifier(ValidCode))
                 .TryConsumeAsync(actor, Purpose, CancellationToken.None));
         }
+    }
+
+    [Fact]
+    public async Task Concurrent_consumers_cannot_both_use_the_same_evidence()
+    {
+        AuthenticatedActor actor = await IssueEvidenceAsync("session-concurrent", "device-concurrent");
+
+        await using IdentityAccessDbContext firstContext = CreateContext(_institution);
+        await using IdentityAccessDbContext secondContext = CreateContext(_institution);
+        MfaService first = CreateService(firstContext, new StubVerifier(ValidCode));
+        MfaService second = CreateService(secondContext, new StubVerifier(ValidCode));
+
+        Task<bool> firstAttempt = first.TryConsumeAsync(actor, Purpose, CancellationToken.None);
+        Task<bool> secondAttempt = second.TryConsumeAsync(actor, Purpose, CancellationToken.None);
+        bool[] outcomes = await Task.WhenAll(firstAttempt, secondAttempt);
+
+        Assert.Single(outcomes, consumed => consumed);
+        Assert.Single(outcomes, consumed => !consumed);
+
+        await using IdentityAccessDbContext verification = CreateContext(_institution);
+        Assert.NotNull((await verification.StepUpEvidence.SingleAsync()).ConsumedAt);
+    }
+
+    [Fact]
+    public async Task Revocation_is_idempotent_invalidates_unused_evidence_and_allows_reenrolment()
+    {
+        MfaEnrolmentResultV1 enrolment;
+        AuthenticatedActor actor = Actor("session-revoke", "device-revoke");
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            MfaService service = CreateService(context, new StubVerifier(ValidCode));
+            enrolment = await service.EnrolAsync(
+                _institution,
+                _actor,
+                MfaFactorKind.Totp,
+                "provider-reference-revoke",
+                CancellationToken.None);
+            await service.VerifyStepUpAsync(
+                _institution,
+                _actor,
+                actor.SessionId!,
+                actor.DeviceId,
+                Purpose,
+                ValidCode,
+                "correlation-revoke",
+                CancellationToken.None);
+        }
+
+        MfaRevocationResultV1 first;
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            first = await CreateService(context, new StubVerifier(ValidCode)).RevokeAsync(
+                _institution,
+                _actor,
+                enrolment.EnrolmentId,
+                MfaContractV1.RevocationSuspectedCompromise,
+                CancellationToken.None);
+            Assert.False(await CreateService(context, new StubVerifier(ValidCode))
+                .TryConsumeAsync(actor, Purpose, CancellationToken.None));
+        }
+
+        MfaRevocationResultV1 repeated;
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            repeated = await CreateService(context, new StubVerifier(ValidCode)).RevokeAsync(
+                _institution,
+                _actor,
+                enrolment.EnrolmentId,
+                MfaContractV1.RevocationSuspectedCompromise,
+                CancellationToken.None);
+            MfaEnrolmentResultV1 replacement = await CreateService(context, new StubVerifier(ValidCode)).EnrolAsync(
+                _institution,
+                _actor,
+                MfaFactorKind.Totp,
+                "provider-reference-replacement",
+                CancellationToken.None);
+            Assert.Equal(MfaContractV1.StatusPending, replacement.Status);
+        }
+
+        Assert.False(first.AlreadyRevoked);
+        Assert.True(repeated.AlreadyRevoked);
+        Assert.Equal(first.RevokedAt, repeated.RevokedAt);
+
+        await using IdentityAccessDbContext verification = CreateContext(_institution);
+        StepUpEvidenceRecord invalidated = await verification.StepUpEvidence.SingleAsync();
+        Assert.Equal(first.RevokedAt, invalidated.InvalidatedAt);
+        Assert.Equal(MfaContractV1.RevocationSuspectedCompromise, invalidated.InvalidationReasonCode);
+        Assert.Single(
+            verification.AuthenticationEvents.Where(record => record.EventType == "mfa_enrolment_revoked"));
+        Assert.DoesNotContain(
+            verification.AuthenticationEvents,
+            record => record.Detail == "provider-reference-revoke" || record.Detail == ValidCode);
+    }
+
+    [Fact]
+    public async Task Another_actor_cannot_revoke_the_factor()
+    {
+        await using IdentityAccessDbContext context = CreateContext(_institution);
+        MfaService service = CreateService(context, new StubVerifier(ValidCode));
+        MfaEnrolmentResultV1 enrolment = await service.EnrolAsync(
+            _institution,
+            _actor,
+            MfaFactorKind.Totp,
+            "provider-reference-owner",
+            CancellationToken.None);
+
+        MfaException exception = await Assert.ThrowsAsync<MfaException>(() => service.RevokeAsync(
+            _institution,
+            ActorId.From("other-mfa-actor"),
+            enrolment.EnrolmentId,
+            MfaContractV1.RevocationUserRequested,
+            CancellationToken.None));
+
+        Assert.Equal(MfaContractV1.EnrolmentNotFound, exception.Code);
     }
 
     [Fact]
@@ -177,6 +311,7 @@ public sealed class MfaDatabaseTests : IDisposable
         using IdentityAccessDbContext context = CreateContext(_institution);
         context.StepUpEvidence.ExecuteDelete();
         context.MfaEnrolments.ExecuteDelete();
+        context.AuthenticationEvents.ExecuteDelete();
     }
 
     private async Task<AuthenticatedActor> IssueEvidenceAsync(string sessionId, string? deviceId)
@@ -187,17 +322,19 @@ public sealed class MfaDatabaseTests : IDisposable
         await service.VerifyStepUpAsync(
             _institution, _actor, sessionId, deviceId, Purpose, ValidCode, "correlation-evidence", CancellationToken.None);
 
-        return new AuthenticatedActor
-        {
-            Id = _actor,
-            Type = ActorType.Human,
-            InstitutionId = _institution,
-            SessionId = sessionId,
-            DeviceId = deviceId,
-            EntitlementVersion = 1,
-            Strength = AuthenticationStrength.MultiFactor,
-        };
+        return Actor(sessionId, deviceId);
     }
+
+    private AuthenticatedActor Actor(string sessionId, string? deviceId) => new()
+    {
+        Id = _actor,
+        Type = ActorType.Human,
+        InstitutionId = _institution,
+        SessionId = sessionId,
+        DeviceId = deviceId,
+        EntitlementVersion = 1,
+        Strength = AuthenticationStrength.MultiFactor,
+    };
 
     private MfaService CreateService(IdentityAccessDbContext context, IMfaFactorVerifier verifier) =>
         new(context, verifier, _time);

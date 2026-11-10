@@ -49,12 +49,17 @@ public sealed class MfaPolicyTests
     [Fact]
     public void Consumed_evidence_is_invalid() =>
         Assert.False(StepUpEvidenceRules.IsValidFor(
-            Now, Now.AddMinutes(5), Now, Purpose, Purpose, "session-1", "session-1", "device-1", "device-1", Now));
+            Now, Now.AddMinutes(5), Now, null, Purpose, Purpose, "session-1", "session-1", "device-1", "device-1", Now));
 
     [Fact]
     public void Evidence_issued_in_the_future_is_invalid() =>
         Assert.False(StepUpEvidenceRules.IsValidFor(
-            Now.AddMinutes(1), Now.AddMinutes(6), null, Purpose, Purpose, "session-1", "session-1", "device-1", "device-1", Now));
+            Now.AddMinutes(1), Now.AddMinutes(6), null, null, Purpose, Purpose, "session-1", "session-1", "device-1", "device-1", Now));
+
+    [Fact]
+    public void Invalidated_evidence_is_invalid() =>
+        Assert.False(StepUpEvidenceRules.IsValidFor(
+            Now, Now.AddMinutes(5), null, Now, Purpose, Purpose, "session-1", "session-1", "device-1", "device-1", Now));
 
     private static bool IsValid(
         DateTimeOffset issuedAt,
@@ -68,6 +73,7 @@ public sealed class MfaPolicyTests
         StepUpEvidenceRules.IsValidFor(
             issuedAt,
             issuedAt.Add(MfaPolicy.StepUpValidity),
+            null,
             null,
             purpose,
             requestedPurpose,

@@ -19,6 +19,37 @@ public static class SavingsEligibilityPublicationProfile
     public static string DefinitionHash => ApprovalProfiles.SavingsEligibilityPublication.DefinitionHash;
 }
 
+/// <summary>
+/// The institution configuration publication profile, used by the currency configuration area. The
+/// approver permission is the Configuration Approver capability approved in Epic 1 section 5.
+/// Decision: P1-E04-D17.
+/// </summary>
+public static class InstitutionConfigurationPublicationProfile
+{
+    public const string WorkflowKey = "institution.configuration.publish.v1";
+    public const string WorkflowVersionId = "institution-configuration-publication-v1";
+    public const string SubjectType = "institution.configuration.version";
+    public const string SourceService = "core-ledger";
+    public const string RequiredPermission = "institution.configuration.approve";
+
+    public static string DefinitionHash => ApprovalProfiles.InstitutionConfigurationPublication.DefinitionHash;
+}
+
+/// <summary>
+/// The account closure profile, used by the closure proposal. The approver decides the exact proposal version
+/// and condition snapshot the maker saw, and the maker can never approve it. Decision: P1-E04-D13.
+/// </summary>
+public static class AccountClosureProfile
+{
+    public const string WorkflowKey = "account.close.v1";
+    public const string WorkflowVersionId = "account-close-approval-v1";
+    public const string SubjectType = "account.closure.proposal";
+    public const string SourceService = "core-ledger";
+    public const string RequiredPermission = "account.closure.approve";
+
+    public static string DefinitionHash => ApprovalProfiles.AccountClosure.DefinitionHash;
+}
+
 public enum ApprovalRequestStatus
 {
     Submitted,

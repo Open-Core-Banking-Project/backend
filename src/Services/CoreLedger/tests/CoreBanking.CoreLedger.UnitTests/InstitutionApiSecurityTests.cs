@@ -24,6 +24,14 @@ public sealed class InstitutionApiSecurityTests
         Assert.Equal("institution.calendar.manage", InstitutionPermissions.CalendarManage.Value);
         Assert.Equal("institution.business_date.advance", InstitutionPermissions.BusinessDateAdvance.Value);
         Assert.Equal("platform.provisioning.repair", InstitutionPermissions.ProvisioningRepair.Value);
+        Assert.Equal("institution.configuration.create", InstitutionPermissions.ConfigurationCreate.Value);
+        Assert.Equal("institution.configuration.simulate", InstitutionPermissions.ConfigurationSimulate.Value);
+        Assert.Equal("institution.configuration.submit", InstitutionPermissions.ConfigurationSubmit.Value);
+        Assert.Equal("institution.configuration.publish", InstitutionPermissions.ConfigurationPublish.Value);
+        Assert.Equal("institution.configuration.audit", InstitutionPermissions.ConfigurationAuditView.Value);
+        Assert.True(InstitutionPermissions.ConfigurationSubmitRequirement.IsRestrictedApproval);
+        Assert.True(InstitutionPermissions.ConfigurationPublishRequirement.IsRestrictedApproval);
+        Assert.True(InstitutionPermissions.ConfigurationAuditViewRequirement.RequiresStepUp);
         Assert.True(InstitutionPermissions.CreateRequirement.RequiresStepUp);
         Assert.True(InstitutionPermissions.ActivateRequirement.RequiresStepUp);
         Assert.True(InstitutionPermissions.ActivateRequirement.IsRestrictedApproval);

@@ -27,13 +27,68 @@ public sealed class ApprovalProfileTests
         Assert.Equal(
             "8af7874ad1e2c63ebcf210a75acd533e12372136f22a38e0f97ad4c321e4cb37",
             ApprovalProfiles.CustomerMerge.DefinitionHash);
+        Assert.Equal(
+            "b2698b7a16fe0e43a8341a5d8311484ce9943f21171cf38b73a697de20e3d3ae",
+            ApprovalProfiles.IdentityRolePublication.DefinitionHash);
+        Assert.Equal(
+            "9438680d220904f00a9e0d18f3fce2c2e4408a1a8a4800648dceff5f2e6c686a",
+            ApprovalProfiles.InstitutionConfigurationPublication.DefinitionHash);
+        Assert.Equal(
+            "ff57256f23594216f48e7044ecb97b9ad1d3149772dffb55b9ef92a32e8a7b62",
+            ApprovalProfiles.AccountOpening.DefinitionHash);
+        Assert.Equal(
+            "77d2bfc028a198a906f8a848eb9d84b5a51df1678133a252f4cf5ecc7d3db437",
+            ApprovalProfiles.AccountClosure.DefinitionHash);
+    }
+
+    [Fact]
+    public void The_account_closure_profile_is_registered_with_the_approved_capability()
+    {
+        ApprovalProfile? profile = ApprovalProfiles.Find(AccountClosureProfile.WorkflowKey);
+
+        Assert.NotNull(profile);
+        Assert.Same(ApprovalProfiles.AccountClosure, profile);
+        Assert.Equal(AccountClosureProfile.WorkflowVersionId, profile!.WorkflowVersionId);
+        Assert.Equal(AccountClosureProfile.SourceService, profile.SourceService);
+        Assert.Equal(AccountClosureProfile.SubjectType, profile.SubjectType);
+        Assert.Equal(AccountClosureProfile.RequiredPermission, profile.RequiredPermission);
+        Assert.Equal(AccountClosureProfile.DefinitionHash, profile.DefinitionHash);
+    }
+
+    [Fact]
+    public void The_account_opening_profile_is_registered_with_the_approved_capability()
+    {
+        ApprovalProfile? profile = ApprovalProfiles.Find("account.open.v1");
+
+        Assert.NotNull(profile);
+        Assert.Same(ApprovalProfiles.AccountOpening, profile);
+        Assert.Equal("account-open-approval-v1", profile!.WorkflowVersionId);
+        Assert.Equal("core-ledger", profile.SourceService);
+        Assert.Equal("account.application", profile.SubjectType);
+        Assert.Equal("account.application.approve", profile.RequiredPermission);
+        Assert.Equal(ApprovalProfiles.Pattern, "one-level");
+        Assert.Equal(ApprovalProfiles.MakerPolicy, "maker-excluded");
+    }
+
+    [Fact]
+    public void The_institution_configuration_profile_is_registered_with_the_approved_capability()
+    {
+        ApprovalProfile? profile = ApprovalProfiles.Find(InstitutionConfigurationPublicationProfile.WorkflowKey);
+
+        Assert.NotNull(profile);
+        Assert.Same(ApprovalProfiles.InstitutionConfigurationPublication, profile);
+        Assert.Equal(InstitutionConfigurationPublicationProfile.SubjectType, profile!.SubjectType);
+        Assert.Equal(InstitutionConfigurationPublicationProfile.SourceService, profile.SourceService);
+        Assert.Equal(InstitutionConfigurationPublicationProfile.RequiredPermission, profile.RequiredPermission);
+        Assert.Equal(InstitutionConfigurationPublicationProfile.DefinitionHash, profile.DefinitionHash);
+        Assert.Contains(profile, ApprovalProfiles.All);
     }
 
     [Fact]
     public void The_source_services_are_derived_from_the_catalogue()
     {
-        Assert.Equal(["core-ledger", "customer-onboarding"], ApprovalProfiles.SourceServices.ToArray());
-        Assert.Equal(3, ApprovalProfiles.All.Count);
+        Assert.Equal(["core-ledger", "customer-onboarding", "identity-access"], ApprovalProfiles.SourceServices.ToArray());
+        Assert.Equal(7, ApprovalProfiles.All.Count);
         Assert.Equal(
             ApprovalProfiles.SavingsEligibilityPublication.DefinitionHash,
             SavingsEligibilityPublicationProfile.DefinitionHash);

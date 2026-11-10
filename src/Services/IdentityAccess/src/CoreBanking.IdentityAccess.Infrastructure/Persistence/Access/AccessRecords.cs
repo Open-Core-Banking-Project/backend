@@ -25,6 +25,28 @@ public sealed class RoleRecord : ITenantOwnedEntity
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
+
+    public long ConcurrencyVersion { get; set; }
+
+    /// <summary>The Workflow request that froze this draft for maker-checker review.</summary>
+    public string? ApprovalRequestId { get; set; }
+
+    /// <summary>Hash of the exact role version and permission set submitted to Workflow.</summary>
+    public string? ApprovalContentHash { get; set; }
+
+    public string? SubmittedBy { get; set; }
+
+    public DateTimeOffset? SubmittedAt { get; set; }
+
+    public string? WorkflowDecisionReference { get; set; }
+
+    public string? Decision { get; set; }
+
+    public string? DecidedBy { get; set; }
+
+    public DateTimeOffset? DecidedAt { get; set; }
+
+    public DateTimeOffset? PublishedAt { get; set; }
 }
 
 /// <summary>
@@ -52,6 +74,42 @@ public sealed class RolePermissionRecord : ITenantOwnedEntity
     public required string PermissionCode { get; set; }
 }
 
+/// <summary>An immutable published snapshot of one role version.</summary>
+public sealed class RoleVersionRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+
+    public required string RoleId { get; set; }
+
+    public long Version { get; set; }
+
+    public required string RoleCode { get; set; }
+
+    public required string RoleName { get; set; }
+
+    public required string ContentHash { get; set; }
+
+    public required string ApprovalRequestId { get; set; }
+
+    public required string WorkflowDecisionReference { get; set; }
+
+    public required string PublishedBy { get; set; }
+
+    public DateTimeOffset PublishedAt { get; set; }
+}
+
+/// <summary>A permission frozen into one immutable published role version.</summary>
+public sealed class RoleVersionPermissionRecord : ITenantOwnedEntity
+{
+    public required string InstitutionId { get; set; }
+
+    public required string RoleId { get; set; }
+
+    public long RoleVersion { get; set; }
+
+    public required string PermissionCode { get; set; }
+}
+
 /// <summary>
 /// One role assignment, with the contextual dimensions that narrow it. The institution column is
 /// part of the key and of both foreign keys, so an assignment cannot reference another tenant's
@@ -64,6 +122,9 @@ public sealed class IdentityRoleRecord : ITenantOwnedEntity
     public required string IdentityId { get; set; }
 
     public required string RoleId { get; set; }
+
+    /// <summary>The immutable published role version this assignment grants.</summary>
+    public long RoleVersion { get; set; }
 
     public string? RegionId { get; set; }
 

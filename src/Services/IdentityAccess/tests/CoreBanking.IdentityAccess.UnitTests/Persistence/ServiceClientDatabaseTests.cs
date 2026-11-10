@@ -23,6 +23,7 @@ namespace CoreBanking.IdentityAccess.UnitTests.Persistence;
 public sealed class ServiceClientDatabaseTests : IDisposable
 {
     private const string ConnectionStringVariableName = "ConnectionStrings__IdentityAccess";
+    private static readonly string[] EntitlementReaderPermission = ["service.identity.entitlements_read"];
 
     private readonly string _connectionString;
     private readonly InstitutionId _institution = InstitutionId.From("client-" + Guid.NewGuid().ToString("N")[..12]);
@@ -54,14 +55,28 @@ public sealed class ServiceClientDatabaseTests : IDisposable
             "corebanking.identity-access",
             "vault://identity/core-ledger",
             _time.GetUtcNow().AddDays(30),
+            EntitlementReaderPermission,
             CancellationToken.None);
 
         Assert.Equal(ServiceClientContractV1.StatusActive, result.Status);
         Assert.Equal("corebanking.identity-access", result.Audience);
+        Assert.Equal(EntitlementReaderPermission, result.Permissions);
 
         await using IdentityAccessDbContext verification = CreateContext(_institution);
         ServiceClientRecord record = await verification.ServiceClients.SingleAsync();
         Assert.Equal("vault://identity/core-ledger", record.CredentialReference);
+        Assert.Equal(EntitlementReaderPermission, record.Permissions);
+        RelationalEntitlementStore store = new(verification, _time);
+        Assert.Equal(1, store.GetCurrentVersion(
+            ActorId.From(result.ServiceClientId), _institution, ActorType.Service));
+        EntitlementSnapshot snapshot = Assert.IsType<EntitlementSnapshot>(store.FindSnapshot(
+            ActorId.From(result.ServiceClientId), _institution, ActorType.Service));
+        PermissionGrant grant = Assert.Single(snapshot.Grants);
+        Assert.Equal("service.identity.entitlements_read", grant.Permission.Value);
+        Assert.Null(store.FindSnapshot(
+            ActorId.From(result.ServiceClientId), _institution, ActorType.Human));
+        Assert.False(await verification.EntitlementVersions
+            .AnyAsync(candidate => candidate.IdentityId == result.ServiceClientId));
         Assert.DoesNotContain(record.CredentialReference, result.ToString() ?? string.Empty, StringComparison.Ordinal);
     }
 
@@ -106,6 +121,25 @@ public sealed class ServiceClientDatabaseTests : IDisposable
         _time.Advance(TimeSpan.FromMinutes(6));
 
         Assert.False(await IsUsableAsync(clientId));
+    }
+
+    [Fact]
+    public async Task A_client_token_for_another_audience_is_not_usable()
+    {
+        string clientId;
+        await using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            clientId = (await CreateService(context).RegisterAsync(
+                _institution, _admin, "Audience client", "corebanking-identity-api",
+                "vault://identity/audience", _time.GetUtcNow().AddDays(30), CancellationToken.None)).ServiceClientId;
+        }
+
+        await using IdentityAccessDbContext validation = CreateContext(_institution);
+        bool usable = await CreateService(validation).IsUsableAsync(
+            ServiceActor(clientId) with { Audience = "corebanking-ledger-api" },
+            CancellationToken.None);
+
+        Assert.False(usable);
     }
 
     [Fact]
@@ -155,14 +189,7 @@ public sealed class ServiceClientDatabaseTests : IDisposable
 
         await using IdentityAccessDbContext otherValidation = CreateContext(_otherInstitution);
         bool usable = await CreateService(otherValidation).IsUsableAsync(
-            new AuthenticatedActor
-            {
-                Id = ActorId.From(clientId),
-                Type = ActorType.Service,
-                InstitutionId = _otherInstitution,
-                EntitlementVersion = 0,
-                Strength = AuthenticationStrength.SingleFactor,
-            },
+            ServiceActor(clientId) with { InstitutionId = _otherInstitution },
             CancellationToken.None);
 
         Assert.False(usable);
@@ -172,22 +199,26 @@ public sealed class ServiceClientDatabaseTests : IDisposable
     {
         using IdentityAccessDbContext context = CreateContext(_institution);
         context.ServiceClients.ExecuteDelete();
+        context.EntitlementVersions.ExecuteDelete();
     }
 
     private async Task<bool> IsUsableAsync(string clientId)
     {
         await using IdentityAccessDbContext context = CreateContext(_institution);
         return await CreateService(context).IsUsableAsync(
-            new AuthenticatedActor
-            {
-                Id = ActorId.From(clientId),
-                Type = ActorType.Service,
-                InstitutionId = _institution,
-                EntitlementVersion = 0,
-                Strength = AuthenticationStrength.SingleFactor,
-            },
+            ServiceActor(clientId),
             CancellationToken.None);
     }
+
+    private AuthenticatedActor ServiceActor(string clientId) => new()
+    {
+        Id = ActorId.From(clientId),
+        Type = ActorType.Service,
+        InstitutionId = _institution,
+        Audience = "corebanking.identity-access",
+        EntitlementVersion = 0,
+        Strength = AuthenticationStrength.SingleFactor,
+    };
 
     private ServiceClientAdministrationService CreateService(IdentityAccessDbContext context) => new(context, _time);
 

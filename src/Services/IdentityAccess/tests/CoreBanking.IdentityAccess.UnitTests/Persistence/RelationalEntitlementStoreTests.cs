@@ -61,6 +61,46 @@ public sealed class RelationalEntitlementStoreTests : IDisposable
     }
 
     [Fact]
+    public void An_existing_assignment_keeps_the_published_version_it_was_granted_against()
+    {
+        SeedActor(_institution);
+        SeedRoleWithPermission(_institution, "role-versioned");
+
+        using (IdentityAccessDbContext context = CreateContext(_institution))
+        {
+            RoleRecord role = context.Roles.Single();
+            role.Version = 2;
+            role.UpdatedAt = DateTimeOffset.UtcNow;
+            context.RoleVersions.Add(new RoleVersionRecord
+            {
+                InstitutionId = _institution.Value,
+                RoleId = role.RoleId,
+                Version = 2,
+                RoleCode = role.RoleCode,
+                RoleName = role.RoleName,
+                ContentHash = new string('b', 64),
+                ApprovalRequestId = "seed-request-v2",
+                WorkflowDecisionReference = "seed-decision-v2",
+                PublishedBy = "test",
+                PublishedAt = DateTimeOffset.UtcNow,
+            });
+            context.RoleVersionPermissions.Add(new RoleVersionPermissionRecord
+            {
+                InstitutionId = _institution.Value,
+                RoleId = role.RoleId,
+                RoleVersion = 2,
+                PermissionCode = "audit.event.view",
+            });
+            context.SaveChanges();
+        }
+
+        EntitlementSnapshot snapshot = Assert.IsType<EntitlementSnapshot>(
+            CreateStore(_institution).FindSnapshot(_actor, _institution));
+        PermissionGrant grant = Assert.Single(snapshot.Grants);
+        Assert.Equal(PermissionCode, grant.Permission.Value);
+    }
+
+    [Fact]
     public void An_actor_without_an_entitlement_version_has_no_snapshot()
     {
         SeedIdentity(_institution);
@@ -244,12 +284,33 @@ public sealed class RelationalEntitlementStoreTests : IDisposable
             RoleId = roleId,
             PermissionCode = PermissionCode,
         });
+        context.RoleVersions.Add(new RoleVersionRecord
+        {
+            InstitutionId = institution.Value,
+            RoleId = roleId,
+            Version = 1,
+            RoleCode = roleId,
+            RoleName = roleId,
+            ContentHash = new string('a', 64),
+            ApprovalRequestId = "seed-request-" + roleId,
+            WorkflowDecisionReference = "seed-decision-" + roleId,
+            PublishedBy = "test",
+            PublishedAt = now,
+        });
+        context.RoleVersionPermissions.Add(new RoleVersionPermissionRecord
+        {
+            InstitutionId = institution.Value,
+            RoleId = roleId,
+            RoleVersion = 1,
+            PermissionCode = PermissionCode,
+        });
 
         context.IdentityRoles.Add(new IdentityRoleRecord
         {
             InstitutionId = institution.Value,
             IdentityId = _actor.Value,
             RoleId = roleId,
+            RoleVersion = 1,
             ValidFrom = now.AddMinutes(-5),
             AssignedBy = "test",
         });
@@ -263,6 +324,8 @@ public sealed class RelationalEntitlementStoreTests : IDisposable
 
         context.TemporaryGrants.ExecuteDelete();
         context.IdentityRoles.ExecuteDelete();
+        context.RoleVersionPermissions.ExecuteDelete();
+        context.RoleVersions.ExecuteDelete();
         context.RolePermissions.ExecuteDelete();
         context.PermissionConditions.ExecuteDelete();
         context.Roles.ExecuteDelete();

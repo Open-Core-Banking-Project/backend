@@ -119,6 +119,7 @@ public sealed class SessionSecurityService
         string providerSessionReference,
         DateTimeOffset expiresAt,
         long expectedVersion,
+        string correlationId,
         CancellationToken cancellationToken)
     {
         SessionRecord? session = await _context.Sessions.SingleOrDefaultAsync(record => record.SessionId == sessionId, cancellationToken).ConfigureAwait(false);
@@ -127,6 +128,7 @@ public sealed class SessionSecurityService
         // already refuse the exchange, and renewing locally would resurrect a session the platform
         // has already stopped honouring.
         if (session is null
+            || session.InstitutionId != institutionId.Value
             || session.IdentityId != actorId.Value
             || session.ConcurrencyVersion != expectedVersion
             || session.ExpiresAt <= now
@@ -138,19 +140,38 @@ public sealed class SessionSecurityService
         string fingerprint = IdentityLifecycleService.FingerprintProviderSubject("keycloak", "session", providerSessionReference);
         if (!string.Equals(fingerprint, session.ProviderSessionFingerprint, StringComparison.Ordinal))
         {
+            string eventId = Guid.NewGuid().ToString("N");
             session.Status = SessionLifecycleState.Compromised;
             session.RevokedAt = now;
             session.ProviderRevocationRequestedAt = now;
+            session.RevocationEventId = eventId;
             session.ConcurrencyVersion++;
+            AddAuthenticationEvent(
+                institutionId.Value,
+                actorId.Value,
+                "session_refresh_reuse_detected",
+                AuthenticationOutcome.Failed,
+                "provider_session_reference_mismatch",
+                now);
+            AddProviderRevocationWork(session, eventId, correlationId, "refresh_reuse_detected", now);
+            await using var transaction = await _context.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
             await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw new SessionSecurityException("session_refresh_reuse_detected", "The session refresh was refused.");
         }
         session.ExpiresAt = expiresAt;
         session.LastActivityAt = now;
-        session.Status = SessionLifecycleState.Active;
+        session.Status = SessionLifecycleState.Refreshed;
         session.ConcurrencyVersion++;
+        AddAuthenticationEvent(
+            institutionId.Value,
+            actorId.Value,
+            "session_refreshed",
+            AuthenticationOutcome.Succeeded,
+            "provider_confirmed",
+            now);
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return new SessionDetailsV1(session.SessionId, "active", session.DeviceId, session.AuthenticationStrength.ToString().ToLowerInvariant(), session.IssuedAt, session.ExpiresAt, session.LastActivityAt);
+        return new SessionDetailsV1(session.SessionId, "refreshed", session.DeviceId, session.AuthenticationStrength.ToString().ToLowerInvariant(), session.IssuedAt, session.ExpiresAt, session.LastActivityAt);
     }
 
     /// <summary>
@@ -357,6 +378,37 @@ public sealed class SessionSecurityService
             OccurredAt = occurredAt,
         });
 
+    private void AddProviderRevocationWork(
+        SessionRecord session,
+        string eventId,
+        string correlationId,
+        string reasonCode,
+        DateTimeOffset requestedAt) =>
+        _context.OutboxMessages.Add(new OutboxRecord
+        {
+            InstitutionId = session.InstitutionId,
+            MessageId = Guid.NewGuid().ToString("N"),
+            EventId = eventId,
+            EventType = EventType,
+            SchemaVersion = 1,
+            Topic = EventContract.TopicFor(Producer, "identity", 1),
+            BusinessReference = session.SessionId,
+            CorrelationId = correlationId,
+            TraceParent = Activity.Current?.Id,
+            TraceState = Activity.Current?.TraceStateString,
+            Producer = Producer,
+            Envelope = EventContract.Serialize(new
+            {
+                sessionId = session.SessionId,
+                status = "revoked",
+                reasonCode,
+            }),
+            Status = OutboxStatus.Pending,
+            Attempts = 0,
+            NextAttemptAt = requestedAt,
+            CreatedAt = requestedAt,
+        });
+
     private async Task<string?> RevokeOnceAsync(InstitutionId institutionId, ActorId actorId, string sessionId, string correlationId, CancellationToken cancellationToken)
     {
         SessionRecord? session = await _context.Sessions.SingleOrDefaultAsync(record => record.SessionId == sessionId, cancellationToken).ConfigureAwait(false);
@@ -394,25 +446,7 @@ public sealed class SessionSecurityService
             Detail = "self_service",
             OccurredAt = now,
         });
-        _context.OutboxMessages.Add(new OutboxRecord
-        {
-            InstitutionId = institutionId.Value,
-            MessageId = Guid.NewGuid().ToString("N"),
-            EventId = eventId,
-            EventType = EventType,
-            SchemaVersion = 1,
-            Topic = EventContract.TopicFor(Producer, "identity", 1),
-            BusinessReference = sessionId,
-            CorrelationId = correlationId,
-            TraceParent = Activity.Current?.Id,
-            TraceState = Activity.Current?.TraceStateString,
-            Producer = Producer,
-            Envelope = EventContract.Serialize(new { sessionId, status = "revoked" }),
-            Status = OutboxStatus.Pending,
-            Attempts = 0,
-            NextAttemptAt = now,
-            CreatedAt = now,
-        });
+        AddProviderRevocationWork(session, eventId, correlationId, "self_service", now);
         await using var transaction = await _context.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);

@@ -10,7 +10,7 @@ modules:
   - Receipt and Confirmation Rendering
   - Secure Retrieval
   - Retention and Legal Hold
-status: Draft
+status: Approved
 requirements:
   - RPT-001
   - RPT-002

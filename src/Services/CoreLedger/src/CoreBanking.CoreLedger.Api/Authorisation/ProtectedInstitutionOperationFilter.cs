@@ -45,6 +45,12 @@ public sealed partial class ProtectedInstitutionOperationFilter : IEndpointFilte
             if (actor is not null)
             {
                 tenantContext.Establish(actor.InstitutionId);
+                if (actor.EntitlementVersion > 0
+                    && services.GetService<RefreshingEntitlementStore>() is { } projection)
+                {
+                    await projection.RefreshAsync(
+                        actor.Id, actor.InstitutionId, actor.EntitlementVersion, http.RequestAborted);
+                }
             }
 
             AuthorisationPolicy policy = services.GetRequiredService<AuthorisationPolicy>();

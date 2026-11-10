@@ -43,6 +43,13 @@ public sealed record EntitlementSnapshot
 public interface IEffectivePermissionSource
 {
     EntitlementSnapshot? FindSnapshot(ActorId actorId, InstitutionId institutionId);
+
+    /// <summary>
+    /// Resolves grants for an explicit actor kind. The default preserves existing human-only
+    /// sources; persistence implementations override it to keep service grants separate.
+    /// </summary>
+    EntitlementSnapshot? FindSnapshot(ActorId actorId, InstitutionId institutionId, ActorType actorType) =>
+        FindSnapshot(actorId, institutionId);
 }
 
 /// <summary>
@@ -52,4 +59,11 @@ public interface IEffectivePermissionSource
 public interface IEntitlementVersionSource
 {
     long GetCurrentVersion(ActorId actorId, InstitutionId institutionId);
+
+    /// <summary>
+    /// Resolves the version for an explicit actor kind. Existing sources remain human-only unless
+    /// they deliberately override this method for service identities.
+    /// </summary>
+    long GetCurrentVersion(ActorId actorId, InstitutionId institutionId, ActorType actorType) =>
+        GetCurrentVersion(actorId, institutionId);
 }

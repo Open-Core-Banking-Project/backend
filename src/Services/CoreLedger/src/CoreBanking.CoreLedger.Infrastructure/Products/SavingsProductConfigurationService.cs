@@ -9,6 +9,7 @@ using CoreBanking.BuildingBlocks.Application.Messaging;
 using CoreBanking.BuildingBlocks.Application.Tenancy;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
+using CoreBanking.CoreLedger.Application.Accounts;
 using CoreBanking.CoreLedger.Application.Products;
 using CoreBanking.CoreLedger.Contracts;
 using CoreBanking.CoreLedger.Domain.Institutions;
@@ -34,17 +35,20 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
     private readonly IdempotencyService _idempotency;
     private readonly ITenantContext _tenantContext;
     private readonly TimeProvider _timeProvider;
+    private readonly IAccountOpeningPolicySource _openingPolicies;
 
     public SavingsProductConfigurationService(
         CoreLedgerDbContext context,
         IdempotencyService idempotency,
         ITenantContext tenantContext,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IAccountOpeningPolicySource? openingPolicies = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _idempotency = idempotency ?? throw new ArgumentNullException(nameof(idempotency));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _openingPolicies = openingPolicies ?? UnconfiguredAccountOpeningPolicySource.Instance;
     }
 
     public async Task<SavingsEligibilityDraftResult> CreateDraftAsync(
@@ -339,6 +343,7 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
         record.Status = "submitted";
         record.ApprovalReference = requestId;
         record.Version++;
+        AddAudit(record.InstitutionId, command.ActorId, "product.version.update", "product.savings.eligibility.approval.submit", record.VersionId, requestId, command.CorrelationId, now);
         await SaveAsync("product_approval_conflict", "The product version changed while approval was being submitted.", cancellationToken)
             .ConfigureAwait(false);
         return EncodeSubmission(record.InstitutionId, requestId, record.VersionId, record.ContentHash, eventId, "submitted", now);
@@ -370,7 +375,38 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
             throw Reject("product_content_integrity_failed", "The stored product content does not match its recorded hash.");
         try
         {
-            ProductEligibilityRules.FromConfigurationContent(storedContent);
+            ProductEligibilityRules rules = ProductEligibilityRules.FromConfigurationContent(storedContent);
+            // The platform cannot resolve residency, so a rule that needs it must never be published.
+            // Decision: P1-E04-D17.
+            if (!rules.ResidencyCountries.AllowsAny)
+            {
+                throw new SavingsProductConfigurationRejectedException(
+                    "eligibility_criterion_unavailable",
+                    "The approved rules require a residency fact the platform cannot resolve.");
+            }
+
+            // A product rule may tighten the institution ceiling and never loosen it, so a rule that
+            // allows more accounts than the effective ceiling is refused at publication.
+            // Decision: P1-E04-D07.
+            if (!rules.ExistingAccounts.AllowsAny)
+            {
+                AccountOpeningPolicyLookup ceiling = await _openingPolicies
+                    .GetAsync(command.InstitutionId, command.EffectiveFrom, cancellationToken)
+                    .ConfigureAwait(false);
+                if (ceiling.Policy is null)
+                {
+                    throw new SavingsProductConfigurationRejectedException(
+                        ceiling.RejectionCode ?? "account_opening_policy_unavailable",
+                        "The institution account-opening policy is unavailable, so no multiple-account rule can be published.");
+                }
+
+                if (rules.ExistingAccounts.MaximumAccounts > ceiling.Policy.MaximumOpenAccounts)
+                {
+                    throw new SavingsProductConfigurationRejectedException(
+                        "product_account_limit_exceeds_institution_ceiling",
+                        "The product allows more accounts than the institution ceiling.");
+                }
+            }
         }
         catch (ArgumentException exception)
         {
@@ -409,6 +445,7 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
         record.EffectiveTo = proposed.EffectiveTo;
         record.PublishedAt = now;
         record.Version++;
+        AddAudit(record.InstitutionId, command.ActorId, "product.version.publish", "product.savings.eligibility.publish", record.VersionId, publicationId, command.CorrelationId, now);
         _context.ConfigurationPublications.Add(new ConfigurationPublicationRecord
         {
             InstitutionId = record.InstitutionId,
@@ -532,6 +569,34 @@ public sealed class SavingsProductConfigurationService : ISavingsProductConfigur
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
         if (_tenantContext.CurrentInstitution != institutionId)
             throw Reject("cross_tenant_access_denied", "The authenticated institution does not match the product target.");
+    }
+
+    private void AddAudit(
+        string institutionId,
+        ActorId actorId,
+        string permission,
+        string action,
+        string resourceId,
+        string afterReference,
+        string correlationId,
+        DateTimeOffset occurredAt)
+    {
+        _context.InstitutionAuditEvents.Add(new InstitutionAuditRecord
+        {
+            InstitutionId = institutionId,
+            AuditEventId = Guid.NewGuid().ToString("N"),
+            ActorId = actorId.Value,
+            ActorType = "human",
+            Permission = permission,
+            Action = action,
+            ResourceType = "product.savings.eligibility.version",
+            ResourceId = resourceId,
+            Outcome = "succeeded",
+            Reason = string.Empty,
+            CorrelationId = correlationId,
+            AfterReference = afterReference,
+            OccurredAt = occurredAt,
+        });
     }
 
     private static string ValidateIdentifier(string value, string parameterName, int maximumLength)

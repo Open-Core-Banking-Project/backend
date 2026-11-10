@@ -89,6 +89,9 @@ public sealed class ServiceClientRecord : ITenantOwnedEntity
 
     public required string Audience { get; set; }
 
+    /// <summary>Explicit service-only grants. These never flow through human role assignments.</summary>
+    public string[] Permissions { get; set; } = [];
+
     /// <summary>Opaque provider reference only; the provider holds the secret. Never logged.</summary>
     public required string CredentialReference { get; set; }
 

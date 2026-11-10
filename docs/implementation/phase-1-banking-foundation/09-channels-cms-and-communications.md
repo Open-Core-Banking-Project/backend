@@ -11,7 +11,7 @@ modules:
   - Notifications
   - Human Handoff
   - Campaign Foundations
-status: Draft
+status: Approved
 requirements:
   - COM-001
   - COM-002

@@ -29,6 +29,9 @@ public static class MfaPolicy
     public static TimeSpan StepUpValidity { get; } = TimeSpan.FromMinutes(5);
 
     public static bool IsAvailable(MfaFactorKind kind) => kind == MfaFactorKind.Totp;
+
+    public static bool IsRevocationReason(string reasonCode) =>
+        reasonCode is "user_requested" or "device_lost" or "suspected_compromise";
 }
 
 /// <summary>
@@ -41,6 +44,7 @@ public static class StepUpEvidenceRules
         DateTimeOffset issuedAt,
         DateTimeOffset expiresAt,
         DateTimeOffset? consumedAt,
+        DateTimeOffset? invalidatedAt,
         string purpose,
         string requestedPurpose,
         string sessionId,
@@ -49,7 +53,7 @@ public static class StepUpEvidenceRules
         string? requestedDeviceId,
         DateTimeOffset now)
     {
-        if (consumedAt is not null || now >= expiresAt || now < issuedAt)
+        if (consumedAt is not null || invalidatedAt is not null || now >= expiresAt || now < issuedAt)
         {
             return false;
         }

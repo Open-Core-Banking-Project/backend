@@ -11,7 +11,7 @@ modules:
   - Capacity and Resilience
   - Security Operations
   - Incident and Runbook Management
-status: Draft
+status: Approved
 requirements:
   - NFR-PERF-001
   - NFR-PERF-002

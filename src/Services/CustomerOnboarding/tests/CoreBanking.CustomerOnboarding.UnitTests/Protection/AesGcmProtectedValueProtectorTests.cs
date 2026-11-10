@@ -84,8 +84,52 @@ public sealed class AesGcmProtectedValueProtectorTests
         Assert.Throws<InvalidOperationException>(() => ProtectedValueProtectionOptions.Create(key, key));
     }
 
-    private static AesGcmProtectedValueProtector CreateProtector(int lookupSeed = 2) =>
-        new(ProtectedValueProtectionOptions.Create(Base64(1), Base64(lookupSeed)));
+    [Fact]
+    public void A_protected_value_round_trips_only_with_the_same_key()
+    {
+        AesGcmProtectedValueProtector protector = CreateProtector();
+        ProtectedValue value = protector.Protect("2000-11-06");
+
+        Assert.Equal("2000-11-06", protector.Unprotect(value.ValueToken));
+    }
+
+    [Fact]
+    public void A_tampered_token_fails_integrity()
+    {
+        AesGcmProtectedValueProtector protector = CreateProtector();
+        ProtectedValue value = protector.Protect("2000-11-06");
+        byte[] bytes = Convert.FromBase64String(value.ValueToken["v1.".Length..]);
+        bytes[^1] ^= 0x01;
+        string tampered = "v1." + Convert.ToBase64String(bytes);
+
+        ProtectedValueException exception = Assert.Throws<ProtectedValueException>(() => protector.Unprotect(tampered));
+
+        Assert.Equal("protected_value_integrity_failed", exception.Code);
+    }
+
+    [Fact]
+    public void A_token_protected_with_another_key_fails_integrity()
+    {
+        ProtectedValue value = CreateProtector(encryptionSeed: 1).Protect("2000-11-06");
+        AesGcmProtectedValueProtector other = CreateProtector(encryptionSeed: 5);
+
+        ProtectedValueException exception = Assert.Throws<ProtectedValueException>(() => other.Unprotect(value.ValueToken));
+
+        Assert.Equal("protected_value_integrity_failed", exception.Code);
+    }
+
+    [Fact]
+    public void A_token_with_an_unknown_format_is_refused()
+    {
+        AesGcmProtectedValueProtector protector = CreateProtector();
+
+        ProtectedValueException exception = Assert.Throws<ProtectedValueException>(() => protector.Unprotect("plain-text"));
+
+        Assert.Equal("protected_value_invalid", exception.Code);
+    }
+
+    private static AesGcmProtectedValueProtector CreateProtector(int lookupSeed = 2, int encryptionSeed = 1) =>
+        new(ProtectedValueProtectionOptions.Create(Base64(encryptionSeed), Base64(lookupSeed)));
 
     private static string Base64(int seed) =>
         Convert.ToBase64String(Enumerable.Range(0, 32).Select(index => (byte)(seed * 32 + index)).ToArray());

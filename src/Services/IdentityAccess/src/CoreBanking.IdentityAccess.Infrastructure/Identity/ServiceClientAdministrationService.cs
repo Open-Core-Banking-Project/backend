@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,6 +39,25 @@ public sealed class ServiceClientAdministrationService : IServiceClientValidator
         string credentialReference,
         DateTimeOffset? credentialExpiresAt,
         CancellationToken cancellationToken)
+        => await RegisterAsync(
+            institutionId,
+            registeredBy,
+            clientName,
+            audience,
+            credentialReference,
+            credentialExpiresAt,
+            Array.Empty<string>(),
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task<ServiceClientResultV1> RegisterAsync(
+        InstitutionId institutionId,
+        ActorId registeredBy,
+        string clientName,
+        string audience,
+        string credentialReference,
+        DateTimeOffset? credentialExpiresAt,
+        IReadOnlyCollection<string> permissions,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(institutionId);
         ArgumentNullException.ThrowIfNull(registeredBy);
@@ -46,6 +66,7 @@ public sealed class ServiceClientAdministrationService : IServiceClientValidator
         string name = Normalise(() => ServiceClientRules.NormaliseName(clientName));
         string normalisedAudience = Normalise(() => ServiceClientRules.NormaliseAudience(audience));
         string reference = Normalise(() => ServiceClientRules.NormaliseReference(credentialReference));
+        string[] servicePermissions = Normalise(() => ServiceClientRules.NormalisePermissions(permissions).ToArray());
         Normalise(() =>
         {
             ServiceClientRules.ValidateExpiry(credentialExpiresAt, now);
@@ -58,6 +79,7 @@ public sealed class ServiceClientAdministrationService : IServiceClientValidator
             ServiceClientId = Guid.NewGuid().ToString("N"),
             ClientName = name,
             Audience = normalisedAudience,
+            Permissions = servicePermissions,
             CredentialReference = reference,
             CredentialExpiresAt = credentialExpiresAt,
             Status = RecordStatus.Active,
@@ -144,6 +166,8 @@ public sealed class ServiceClientAdministrationService : IServiceClientValidator
 
         return record is not null
             && record.InstitutionId == actor.InstitutionId.Value
+            && !string.IsNullOrWhiteSpace(actor.Audience)
+            && string.Equals(record.Audience, actor.Audience, StringComparison.Ordinal)
             && ServiceClientRules.IsUsable(record.Status.ToString(), record.CredentialExpiresAt, _timeProvider.GetUtcNow());
     }
 
@@ -192,6 +216,7 @@ public sealed class ServiceClientAdministrationService : IServiceClientValidator
         ServiceClientId = record.ServiceClientId,
         ClientName = record.ClientName,
         Audience = record.Audience,
+        Permissions = record.Permissions,
         Status = record.Status == RecordStatus.Active ? ServiceClientContractV1.StatusActive : ServiceClientContractV1.StatusRevoked,
         CredentialExpiresAt = record.CredentialExpiresAt,
         UpdatedAt = record.UpdatedAt,

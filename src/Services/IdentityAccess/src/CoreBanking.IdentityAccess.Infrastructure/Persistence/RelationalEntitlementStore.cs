@@ -40,12 +40,41 @@ public sealed class RelationalEntitlementStore : IEffectivePermissionSource, IEn
         return version ?? 0;
     }
 
-    public EntitlementSnapshot? FindSnapshot(ActorId actorId, InstitutionId institutionId)
+    public long GetCurrentVersion(ActorId actorId, InstitutionId institutionId, ActorType actorType)
     {
         ArgumentNullException.ThrowIfNull(actorId);
         ArgumentNullException.ThrowIfNull(institutionId);
 
-        long version = GetCurrentVersion(actorId, institutionId);
+        if (actorType == ActorType.Human)
+        {
+            return GetCurrentVersion(actorId, institutionId);
+        }
+
+        if (actorType != ActorType.Service)
+        {
+            return 0;
+        }
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        return _context.ServiceClients
+            .AsNoTracking()
+            .Any(client => client.InstitutionId == institutionId.Value
+                && client.ServiceClientId == actorId.Value
+                && client.Status == RecordStatus.Active
+                && (client.CredentialExpiresAt == null || client.CredentialExpiresAt > now))
+            ? 1L
+            : 0L;
+    }
+
+    public EntitlementSnapshot? FindSnapshot(ActorId actorId, InstitutionId institutionId)
+        => FindSnapshot(actorId, institutionId, ActorType.Human);
+
+    public EntitlementSnapshot? FindSnapshot(ActorId actorId, InstitutionId institutionId, ActorType actorType)
+    {
+        ArgumentNullException.ThrowIfNull(actorId);
+        ArgumentNullException.ThrowIfNull(institutionId);
+
+        long version = GetCurrentVersion(actorId, institutionId, actorType);
         if (version == 0L)
         {
             // No entitlement record means no grants, never an implicit set.
@@ -55,10 +84,51 @@ public sealed class RelationalEntitlementStore : IEffectivePermissionSource, IEn
         DateTimeOffset now = _timeProvider.GetUtcNow();
         HashSet<PermissionGrant> grants = new();
 
+        if (actorType == ActorType.Service)
+        {
+            string[]? servicePermissions = _context.ServiceClients
+                .AsNoTracking()
+                .Where(client => client.InstitutionId == institutionId.Value
+                    && client.ServiceClientId == actorId.Value
+                    && client.Status == RecordStatus.Active
+                    && (client.CredentialExpiresAt == null || client.CredentialExpiresAt > now))
+                .Select(client => client.Permissions)
+                .SingleOrDefault();
+
+            if (servicePermissions is null)
+            {
+                return null;
+            }
+
+            foreach (string permission in servicePermissions)
+            {
+                grants.Add(new PermissionGrant
+                {
+                    Permission = PermissionIdentifier.Parse(permission),
+                    Scope = GrantScope.ForInstitution(institutionId),
+                });
+            }
+
+            return new EntitlementSnapshot
+            {
+                ActorId = actorId,
+                InstitutionId = institutionId,
+                Version = version,
+                Grants = grants,
+                CapturedAt = now,
+            };
+        }
+
+        if (actorType != ActorType.Human)
+        {
+            return null;
+        }
+
         List<RoleGrantRow> roleGrants = (
             from assignment in _context.IdentityRoles.AsNoTracking()
-            join rolePermission in _context.RolePermissions.AsNoTracking()
-                on new { assignment.InstitutionId, assignment.RoleId } equals new { rolePermission.InstitutionId, rolePermission.RoleId }
+            join rolePermission in _context.RoleVersionPermissions.AsNoTracking()
+                on new { assignment.InstitutionId, assignment.RoleId, assignment.RoleVersion }
+                equals new { rolePermission.InstitutionId, rolePermission.RoleId, rolePermission.RoleVersion }
             where assignment.InstitutionId == institutionId.Value
                 && assignment.IdentityId == actorId.Value
                 && assignment.ValidFrom <= now

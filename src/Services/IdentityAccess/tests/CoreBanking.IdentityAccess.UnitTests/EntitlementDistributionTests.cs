@@ -124,6 +124,63 @@ public sealed class EntitlementDistributionTests
         Assert.Equal(AuthorisationCodes.MissingAuthentication, result.DenialCode);
     }
 
+    [Fact]
+    public void An_authorised_service_request_resolves_the_target_as_a_human_actor()
+    {
+        ActorType? resolvedActorType = null;
+        TypedSource source = new(actorType => resolvedActorType = actorType);
+        EntitlementDistributionService service = new(source, new FixedVersions(1), new FixedTime());
+
+        EntitlementDistributionResult result = service.GetSnapshotForService(
+            ServiceActor(Institution), OtherActor, Institution, 1);
+
+        Assert.True(result.IsAllowed);
+        Assert.Equal(ActorType.Human, resolvedActorType);
+        Assert.Equal(OtherActor.Value, result.Snapshot!.ActorId);
+    }
+
+    [Fact]
+    public void A_human_cannot_use_the_service_distribution_path()
+    {
+        TestSetup setup = new();
+
+        EntitlementDistributionResult result = setup.Service.GetSnapshotForService(
+            HumanActor(Institution), OtherActor, Institution, 0);
+
+        Assert.False(result.IsAllowed);
+        Assert.Equal(EntitlementDistributionV1.ActorMismatch, result.DenialCode);
+    }
+
+    [Fact]
+    public void A_service_cannot_request_another_institutions_snapshot()
+    {
+        TestSetup setup = new();
+
+        EntitlementDistributionResult result = setup.Service.GetSnapshotForService(
+            ServiceActor(Institution), OtherActor, OtherInstitution, 0);
+
+        Assert.False(result.IsAllowed);
+        Assert.Equal(EntitlementDistributionV1.InstitutionMismatch, result.DenialCode);
+    }
+
+    private static AuthenticatedActor HumanActor(InstitutionId institution) => new()
+    {
+        Id = Actor,
+        Type = ActorType.Human,
+        InstitutionId = institution,
+        EntitlementVersion = 1,
+        Strength = AuthenticationStrength.MultiFactor,
+    };
+
+    private static AuthenticatedActor ServiceActor(InstitutionId institution) => new()
+    {
+        Id = ActorId.From("service-client-1"),
+        Type = ActorType.Service,
+        InstitutionId = institution,
+        EntitlementVersion = 1,
+        Strength = AuthenticationStrength.SingleFactor,
+    };
+
     private sealed class TestSetup
     {
         private readonly InMemoryEntitlementStore _store;
@@ -186,5 +243,31 @@ public sealed class EntitlementDistributionTests
                 new() { Permission = View, Scope = GrantScope.ForInstitution(institutionId) },
             },
         };
+    }
+
+    private sealed class TypedSource : IEffectivePermissionSource
+    {
+        private readonly Action<ActorType> _capture;
+
+        public TypedSource(Action<ActorType> capture) => _capture = capture;
+
+        public EntitlementSnapshot? FindSnapshot(ActorId actorId, InstitutionId institutionId) =>
+            FindSnapshot(actorId, institutionId, ActorType.Human);
+
+        public EntitlementSnapshot? FindSnapshot(
+            ActorId actorId,
+            InstitutionId institutionId,
+            ActorType actorType)
+        {
+            _capture(actorType);
+            return new EntitlementSnapshot
+            {
+                ActorId = actorId,
+                InstitutionId = institutionId,
+                Version = 1,
+                CapturedAt = Now,
+                Grants = new HashSet<PermissionGrant>(),
+            };
+        }
     }
 }

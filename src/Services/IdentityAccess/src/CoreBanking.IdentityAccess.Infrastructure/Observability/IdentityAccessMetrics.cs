@@ -1,14 +1,15 @@
 using System.Diagnostics.Metrics;
+using CoreBanking.BuildingBlocks.Application.Diagnostics;
 
-namespace CoreBanking.IdentityAccess.Workers;
+namespace CoreBanking.IdentityAccess.Infrastructure.Observability;
 
 /// <summary>
 /// Bounded, identifier-free measures for identity state that needs attention. No tenant, actor or
 /// credential values are exported. Decision: ADR-0010; slice 14.
 /// </summary>
-internal static class IdentityAccessMetrics
+public static class IdentityAccessMetrics
 {
-    public static readonly Meter Meter = new("CoreBanking.IdentityAccess", "1.0.0");
+    public static readonly Meter Meter = new(CoreBankingMeterNames.IdentityAccess, "1.0.0");
 
     public static readonly Counter<long> GrantHoldersWithoutVersion = Meter.CreateCounter<long>(
         "identity.reconciliation.grant_holders_without_version",

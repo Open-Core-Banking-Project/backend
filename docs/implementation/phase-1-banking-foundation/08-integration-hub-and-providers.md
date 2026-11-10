@@ -10,7 +10,7 @@ modules:
   - Webhook Intake and Dispatch
   - Provider Health and Certification
   - Outbound Delivery
-status: Draft
+status: Approved
 requirements:
   - API-001
   - API-002

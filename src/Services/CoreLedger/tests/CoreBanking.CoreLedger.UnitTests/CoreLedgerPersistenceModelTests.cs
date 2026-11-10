@@ -184,6 +184,20 @@ public sealed class CoreLedgerPersistenceModelTests
         Assert.True(product.FindProperty(nameof(ProductRecord.Version))!.IsConcurrencyToken);
     }
 
+    [Fact]
+    public void Ledger_accounts_store_nullable_classification_without_storing_money()
+    {
+        using CoreLedgerDbContext context = CreateContext();
+        IEntityType ledgerAccount = context.Model.FindEntityType(typeof(LedgerAccountRecord))!;
+
+        Assert.Equal("legal_entity_code", ledgerAccount.FindProperty(nameof(LedgerAccountRecord.LegalEntityCode))!.GetColumnName());
+        Assert.Equal("chart_version_id", ledgerAccount.FindProperty(nameof(LedgerAccountRecord.ChartVersionId))!.GetColumnName());
+        Assert.Equal("gl_account_code", ledgerAccount.FindProperty(nameof(LedgerAccountRecord.GlAccountCode))!.GetColumnName());
+        Assert.DoesNotContain(ledgerAccount.GetProperties(), property =>
+            property.Name.Contains("Amount", StringComparison.OrdinalIgnoreCase)
+            || property.Name.Contains("Balance", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static CoreLedgerDbContext CreateContext()
     {
         DbContextOptions<CoreLedgerDbContext> options = new DbContextOptionsBuilder<CoreLedgerDbContext>()

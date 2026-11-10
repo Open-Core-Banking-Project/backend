@@ -22,6 +22,8 @@ public sealed class KeycloakActorContextResolver : IActorContextResolver
     public const string EntitlementVersionClaim = "entitlement_version";
     public const string AuthenticationStrengthClaim = "authentication_strength";
 
+    public const string AudienceClaim = "aud";
+
     public AuthenticatedActor? Resolve(
         ClaimsPrincipal authenticatedPrincipal,
         string? developmentAuthenticationMaterial)
@@ -35,6 +37,7 @@ public sealed class KeycloakActorContextResolver : IActorContextResolver
             || !TryReadRequiredClaim(authenticatedPrincipal, "sid", out string? sessionId)
             || !TryReadRequiredClaim(authenticatedPrincipal, EntitlementVersionClaim, out string? entitlementVersionValue)
             || !TryReadRequiredClaim(authenticatedPrincipal, AuthenticationStrengthClaim, out string? strengthValue)
+            || !TryReadRequiredClaim(authenticatedPrincipal, AudienceClaim, out string? audience)
             || !Enum.TryParse(actorTypeValue, ignoreCase: true, out ActorType actorType)
             || !Enum.IsDefined(actorType)
             || !long.TryParse(entitlementVersionValue, NumberStyles.None, CultureInfo.InvariantCulture, out long entitlementVersion)
@@ -54,6 +57,7 @@ public sealed class KeycloakActorContextResolver : IActorContextResolver
             InstitutionId = InstitutionId.From(institutionId!),
             SessionId = sessionId,
             DeviceId = deviceId,
+            Audience = audience,
             EntitlementVersion = entitlementVersion,
             Strength = strength,
         };

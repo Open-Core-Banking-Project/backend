@@ -11,7 +11,7 @@ modules:
   - Backup Catalogue
   - Restore Orchestration Evidence
   - Integrity Verification
-status: Draft
+status: Approved
 requirements:
   - AUD-001
   - AUD-002

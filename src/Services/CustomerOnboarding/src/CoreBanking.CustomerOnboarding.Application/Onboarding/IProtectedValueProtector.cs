@@ -16,4 +16,11 @@ public sealed record ProtectedValue(string ValueToken, string LookupToken, strin
 public interface IProtectedValueProtector
 {
     ProtectedValue Protect(string plaintext);
+
+    /// <summary>
+    /// Recovers a value this platform protected, for internal derivation only (for example the age a
+    /// product decision needs). Implementations must authenticate the token, fail closed on tampering
+    /// and never log or retain the plaintext. The result never crosses the service boundary.
+    /// </summary>
+    string Unprotect(string valueToken);
 }

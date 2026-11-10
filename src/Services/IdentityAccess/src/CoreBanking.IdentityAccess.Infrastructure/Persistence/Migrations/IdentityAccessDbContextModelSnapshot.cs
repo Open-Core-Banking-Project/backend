@@ -357,6 +357,10 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("region_id");
 
+                    b.Property<long>("RoleVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_version");
+
                     b.Property<DateTimeOffset>("ValidFrom")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("valid_from");
@@ -368,6 +372,8 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                     b.HasKey("InstitutionId", "IdentityId", "RoleId");
 
                     b.HasIndex("InstitutionId", "RoleId");
+
+                    b.HasIndex("InstitutionId", "RoleId", "RoleVersion");
 
                     b.ToTable("identity_roles", "access");
                 });
@@ -551,9 +557,42 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("role_id");
 
+                    b.Property<string>("ApprovalContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("approval_content_hash");
+
+                    b.Property<string>("ApprovalRequestId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("approval_request_id");
+
+                    b.Property<long>("ConcurrencyVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("concurrency_version");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("Decision")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("decision");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
 
                     b.Property<string>("RoleCode")
                         .IsRequired()
@@ -570,6 +609,15 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<string>("SubmittedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("submitted_by");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -578,12 +626,108 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("version");
 
+                    b.Property<string>("WorkflowDecisionReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("workflow_decision_reference");
+
                     b.HasKey("InstitutionId", "RoleId");
+
+                    b.HasIndex("InstitutionId", "ApprovalRequestId")
+                        .IsUnique()
+                        .HasFilter("approval_request_id IS NOT NULL");
 
                     b.HasIndex("InstitutionId", "RoleCode")
                         .IsUnique();
 
                     b.ToTable("roles", "access");
+                });
+
+            modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.RoleVersionPermissionRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasColumnType("text")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("RoleId")
+                        .HasColumnType("text")
+                        .HasColumnName("role_id");
+
+                    b.Property<long>("RoleVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_version");
+
+                    b.Property<string>("PermissionCode")
+                        .HasColumnType("text")
+                        .HasColumnName("permission_code");
+
+                    b.HasKey("InstitutionId", "RoleId", "RoleVersion", "PermissionCode");
+
+                    b.HasIndex("PermissionCode");
+
+                    b.ToTable("role_version_permissions", "access");
+                });
+
+            modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.RoleVersionRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasColumnType("text")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("RoleId")
+                        .HasColumnType("text")
+                        .HasColumnName("role_id");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.Property<string>("ApprovalRequestId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("approval_request_id");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("PublishedBy")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("published_by");
+
+                    b.Property<string>("RoleCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("role_code");
+
+                    b.Property<string>("RoleName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("role_name");
+
+                    b.Property<string>("WorkflowDecisionReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("workflow_decision_reference");
+
+                    b.HasKey("InstitutionId", "RoleId", "Version");
+
+                    b.HasIndex("InstitutionId", "WorkflowDecisionReference")
+                        .IsUnique();
+
+                    b.ToTable("role_versions", "access");
                 });
 
             modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.TemporaryGrantRecord", b =>
@@ -882,6 +1026,11 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("credential_reference");
+
+                    b.PrimitiveCollection<string[]>("Permissions")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("permissions");
 
                     b.Property<string>("PreviousCredentialReference")
                         .HasMaxLength(200)
@@ -1495,6 +1644,15 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("identity_id");
 
+                    b.Property<DateTimeOffset?>("InvalidatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("invalidated_at");
+
+                    b.Property<string>("InvalidationReasonCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("invalidation_reason_code");
+
                     b.Property<DateTimeOffset>("IssuedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("issued_at");
@@ -1519,6 +1677,10 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                     b.ToTable("step_up_evidence", "security", t =>
                         {
                             t.HasCheckConstraint("ck_step_up_expiry_after_issue", "expires_at > issued_at");
+
+                            t.HasCheckConstraint("ck_step_up_invalidation_after_issue", "invalidated_at IS NULL OR invalidated_at >= issued_at");
+
+                            t.HasCheckConstraint("ck_step_up_invalidation_reason", "(invalidated_at IS NULL AND invalidation_reason_code IS NULL) OR (invalidated_at IS NOT NULL AND invalidation_reason_code IN ('user_requested', 'device_lost', 'suspected_compromise'))");
                         });
                 });
 
@@ -1647,6 +1809,12 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .HasForeignKey("InstitutionId", "RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.RoleVersionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "RoleId", "RoleVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.PermissionConditionRecord", b =>
@@ -1685,6 +1853,30 @@ namespace CoreBanking.IdentityAccess.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("InstitutionId", "RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.RoleVersionPermissionRecord", b =>
+                {
+                    b.HasOne("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.PermissionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PermissionCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.RoleVersionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "RoleId", "RoleVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.RoleVersionRecord", b =>
+                {
+                    b.HasOne("CoreBanking.IdentityAccess.Infrastructure.Persistence.Access.RoleRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

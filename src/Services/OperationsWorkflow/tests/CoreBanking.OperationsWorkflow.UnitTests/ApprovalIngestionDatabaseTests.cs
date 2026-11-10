@@ -117,6 +117,7 @@ public sealed class ApprovalIngestionDatabaseTests : IDisposable
         ApprovalWorkflowService workflow = new(
             context,
             new FixedEntitlementVerifier(_approver, ApprovalProfiles.CustomerClassification.RequiredPermission, _time),
+            new FixedEligibilityVerifier(_approver, _maker),
             _tenant,
             _time);
 
@@ -184,6 +185,7 @@ public sealed class ApprovalIngestionDatabaseTests : IDisposable
         ApprovalWorkflowService workflow = new(
             context,
             new FixedEntitlementVerifier(_approver, ApprovalProfiles.CustomerMerge.RequiredPermission, _time),
+            new FixedEligibilityVerifier(_approver, _maker),
             _tenant,
             _time);
         await workflow.DecideAsync(
@@ -231,6 +233,7 @@ public sealed class ApprovalIngestionDatabaseTests : IDisposable
         ApprovalWorkflowService workflow = new(
             context,
             new FixedEntitlementVerifier(_approver, ApprovalProfiles.CustomerClassification.RequiredPermission, _time),
+            new FixedEligibilityVerifier(_approver, _maker),
             _tenant,
             _time);
         await workflow.DecideAsync(
@@ -361,6 +364,89 @@ public sealed class ApprovalIngestionDatabaseTests : IDisposable
                 now.AddMinutes(-1),
                 now.AddMinutes(4)));
         }
+    }
+
+    private sealed class FixedEligibilityVerifier : IApprovalEligibilityVerifier
+    {
+        private readonly ActorId _approver;
+        private readonly ActorId _maker;
+        private readonly long _version;
+
+        public FixedEligibilityVerifier(ActorId approver, ActorId maker, long version = 6)
+        {
+            _approver = approver;
+            _maker = maker;
+            _version = version;
+        }
+
+        public Task<ApprovalEligibilityVerification> VerifyAsync(
+            InstitutionId institutionId,
+            ActorId candidateActorId,
+            ActorId makerActorId,
+            string sourceRequestId,
+            string requiredPermission,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(candidateActorId == _approver && makerActorId == _maker
+                ? new ApprovalEligibilityVerification(true, "approval.eligible", _version)
+                : new ApprovalEligibilityVerification(false, "auth.segregation_of_duties", _version));
+    }
+
+    [Fact]
+    public async Task Identity_eligibility_refusal_blocks_self_approval_before_a_decision_is_stored()
+    {
+        string requestId = "self-approval-" + Guid.NewGuid().ToString("N");
+        const string subjectHash = "5555555555555555555555555555555555555555555555555555555555555555";
+
+        await using OperationsWorkflowDbContext context = CreateContext();
+        ApprovalRequestedConsumer requests = new(context, new InboxProcessor(context, _time), _tenant);
+        Assert.Equal(InboxResult.Processed, await requests.HandleAsync(
+            Envelope(requestId, ApprovalProfiles.CustomerClassification, subjectHash), CancellationToken.None));
+        _tenant.Establish(_institution);
+
+        ApprovalWorkflowService workflow = new(
+            context,
+            new FixedEntitlementVerifier(_maker, ApprovalProfiles.CustomerClassification.RequiredPermission, _time),
+            new FixedEligibilityVerifier(_approver, _maker),
+            _tenant,
+            _time);
+
+        ApprovalWorkflowRejectedException exception = await Assert.ThrowsAsync<ApprovalWorkflowRejectedException>(() =>
+            workflow.DecideAsync(
+                new DecideApprovalCommand(
+                    _institution, _maker, requestId, "self-decision", ApprovalDecisionType.Approve, null, "correlation-self"),
+                CancellationToken.None));
+
+        Assert.Equal("maker_cannot_approve_own_request", exception.Code);
+        Assert.Empty(await context.ApprovalDecisions.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Inconsistent_identity_versions_fail_closed_before_a_decision_is_stored()
+    {
+        string requestId = "version-mismatch-" + Guid.NewGuid().ToString("N");
+        const string subjectHash = "6666666666666666666666666666666666666666666666666666666666666666";
+
+        await using OperationsWorkflowDbContext context = CreateContext();
+        ApprovalRequestedConsumer requests = new(context, new InboxProcessor(context, _time), _tenant);
+        Assert.Equal(InboxResult.Processed, await requests.HandleAsync(
+            Envelope(requestId, ApprovalProfiles.CustomerClassification, subjectHash), CancellationToken.None));
+        _tenant.Establish(_institution);
+
+        ApprovalWorkflowService workflow = new(
+            context,
+            new FixedEntitlementVerifier(_approver, ApprovalProfiles.CustomerClassification.RequiredPermission, _time),
+            new FixedEligibilityVerifier(_approver, _maker, version: 5),
+            _tenant,
+            _time);
+
+        ApprovalWorkflowRejectedException exception = await Assert.ThrowsAsync<ApprovalWorkflowRejectedException>(() =>
+            workflow.DecideAsync(
+                new DecideApprovalCommand(
+                    _institution, _approver, requestId, "version-decision", ApprovalDecisionType.Approve, null, "correlation-version"),
+                CancellationToken.None));
+
+        Assert.Equal("approval_entitlement_stale", exception.Code);
+        Assert.Empty(await context.ApprovalDecisions.ToListAsync());
     }
 
     private sealed class TestTimeProvider : TimeProvider

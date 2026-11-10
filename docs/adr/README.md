@@ -33,7 +33,7 @@ Current gates:
 
 - Satisfied 2026-10-16: `ADR-0001`, `ADR-0002`, `ADR-0003` (Phase 0 repository and build), `ADR-0004` (database topology, principals and tenant isolation), `ADR-0007` (messaging, outbox, inbox and replay), `ADR-0008` and `ADR-0009` (authentication, authorisation and entitlement invalidation), `ADR-0010` (observability, audit and retention approach) and `ADR-0011` (secrets, keys and certificates).
 - Outstanding, decision drafted and awaiting approval: `ADR-0013` (deployment, migration execution, backup, restore, RTO and RPO) - required by Phase 1 operations and release readiness.
-- Outstanding, scope only: `ADR-0005` (any production financial posting in Phase 1), `ADR-0006` (API versioning and problem details), `ADR-0012` (channel security boundaries) and `ADR-0014` (reporting read models and regulatory lineage).
+- Outstanding, scope only: `ADR-0006` (API versioning and problem details), `ADR-0012` (channel security boundaries) and `ADR-0014` (reporting read models and regulatory lineage). `ADR-0005` was accepted on 2026-11-09.
 
 ## File naming
 
@@ -47,7 +47,7 @@ ADR-NNNN-kebab-case-title.md
 
 **Decision-complete, awaiting owner approval:** ADR-0013 (deployment, migration execution, backup, restore, RTO and RPO).
 
-**Scope only, awaiting an owner decision:** ADR-0005, ADR-0006, ADR-0012, ADR-0014.
+**Scope only, awaiting an owner decision:** ADR-0006, ADR-0012, ADR-0014.
 
 **Accepted 2026-10-20:** ADR-0015 (Phase 1 Savings eligibility and final-approval freshness).
 

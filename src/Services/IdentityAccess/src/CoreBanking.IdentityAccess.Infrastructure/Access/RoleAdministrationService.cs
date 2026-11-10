@@ -1,22 +1,28 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using CoreBanking.BuildingBlocks.Application.Messaging;
 using CoreBanking.BuildingBlocks.Application.Security;
 using CoreBanking.BuildingBlocks.Domain.Identity;
+using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.IdentityAccess.Contracts;
 using CoreBanking.IdentityAccess.Domain.Access;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence;
 using CoreBanking.IdentityAccess.Infrastructure.Persistence.Access;
+using CoreBanking.IdentityAccess.Infrastructure.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoreBanking.IdentityAccess.Infrastructure.Access;
 
 /// <summary>
 /// Role drafting and simulation over the approved catalogue. A draft stays inert: grants accept
-/// only active roles, so an unpublished draft can never grant access. Publication through the
-/// approval path is the remaining part of slice 7.
+/// only active roles, so an unpublished draft can never grant access. Submission freezes the
+/// exact version for Workflow; applying the returned decision and publishing remain separate.
 /// Decision: ADR-0009, P1-E02-D09 and P1-E02-D10.
 /// </summary>
 public sealed class RoleAdministrationService
@@ -64,6 +70,7 @@ public sealed class RoleAdministrationService
             Status = RecordStatus.Pending,
             CreatedAt = now,
             UpdatedAt = now,
+            ConcurrencyVersion = 1,
         };
         _context.Roles.Add(role);
         AddPermissions(institutionId, role.RoleId, normalised);
@@ -95,10 +102,21 @@ public sealed class RoleAdministrationService
 
         role.RoleName = name;
         role.Version += 1;
+        role.ConcurrencyVersion += 1;
         role.UpdatedAt = _timeProvider.GetUtcNow();
         AddPermissions(institutionId, role.RoleId, normalised);
 
-        await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new RoleAdministrationException(
+                RoleContractV1.RoleConcurrencyConflict,
+                "The role changed while the draft was being updated.",
+                exception);
+        }
 
         return ToResult(role, normalised);
     }
@@ -121,6 +139,143 @@ public sealed class RoleAdministrationService
             .ToArrayAsync(cancellationToken).ConfigureAwait(false);
 
         return ToResult(role, permissions);
+    }
+
+    /// <summary>
+    /// Freezes the exact draft content and durably requests a Workflow decision. Repeating the
+    /// command returns the original request; no second approval request is emitted.
+    /// </summary>
+    public async Task<RoleSubmissionResultV1> SubmitAsync(
+        InstitutionId institutionId,
+        ActorId submittedBy,
+        string roleId,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(institutionId);
+        ArgumentNullException.ThrowIfNull(submittedBy);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        RoleRecord role = await _context.Roles
+            .SingleOrDefaultAsync(record => record.RoleId == roleId, cancellationToken).ConfigureAwait(false)
+            ?? throw new RoleAdministrationException(RoleContractV1.RoleNotFound, "The role is not available.");
+
+        string[] permissions = await _context.RolePermissions
+            .Where(permission => permission.RoleId == roleId)
+            .Select(permission => permission.PermissionCode)
+            .OrderBy(permission => permission)
+            .ToArrayAsync(cancellationToken).ConfigureAwait(false);
+
+        if (role.ApprovalRequestId is not null)
+        {
+            return SubmissionResult(role);
+        }
+
+        if (role.Status != RecordStatus.Pending)
+        {
+            throw new RoleAdministrationException(RoleContractV1.RoleNotDraft, "Only a draft role can be submitted.");
+        }
+
+        await ValidatePermissionsAsync(permissions, cancellationToken).ConfigureAwait(false);
+        if (permissions.Length == 0)
+        {
+            throw new RoleAdministrationException(RoleContractV1.InvalidRole, "A role must contain at least one permission.");
+        }
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        string contentHash = ContentHash(role, permissions);
+        string requestId = Guid.NewGuid().ToString("N");
+        role.ApprovalRequestId = requestId;
+        role.ApprovalContentHash = contentHash;
+        role.SubmittedBy = submittedBy.Value;
+        role.SubmittedAt = now;
+        role.ConcurrencyVersion += 1;
+        role.UpdatedAt = now;
+
+        RoleApprovalRequestedV1 payload = new(
+            institutionId.Value,
+            requestId,
+            $"{role.RoleId}:{role.Version.ToString(CultureInfo.InvariantCulture)}",
+            RolePublicationApprovalV1.WorkflowKey,
+            RolePublicationApprovalV1.WorkflowVersionId,
+            RolePublicationApprovalV1.DefinitionHash,
+            RolePublicationApprovalV1.SourceService,
+            RolePublicationApprovalV1.SubjectType,
+            role.RoleId,
+            role.Version.ToString(CultureInfo.InvariantCulture),
+            contentHash,
+            submittedBy.Value,
+            RolePublicationApprovalV1.RequiredPermission,
+            correlationId,
+            now);
+
+        string eventId = Guid.NewGuid().ToString("N");
+        IntegrationEventEnvelope envelope = new()
+        {
+            EventId = eventId,
+            EventType = RolePublicationApprovalV1.RequestedEventType,
+            SchemaVersion = RoleContractV1.SchemaVersion,
+            OccurredAt = now,
+            InstitutionId = institutionId.Value,
+            CorrelationId = correlationId,
+            Producer = RolePublicationApprovalV1.SourceService,
+            BusinessReference = requestId,
+            Payload = EventContract.Serialize(payload),
+        };
+
+        _context.OutboxMessages.Add(new OutboxRecord
+        {
+            InstitutionId = institutionId.Value,
+            MessageId = Guid.NewGuid().ToString("N"),
+            EventId = eventId,
+            EventType = RolePublicationApprovalV1.RequestedEventType,
+            SchemaVersion = RoleContractV1.SchemaVersion,
+            Topic = EventContract.TopicFor(
+                RolePublicationApprovalV1.SourceService,
+                RolePublicationApprovalV1.EventFamily,
+                RoleContractV1.SchemaVersion),
+            BusinessReference = requestId,
+            CorrelationId = correlationId,
+            Producer = RolePublicationApprovalV1.SourceService,
+            Envelope = EventContract.Serialize(envelope),
+            Status = OutboxStatus.Pending,
+            Attempts = 0,
+            NextAttemptAt = now,
+            CreatedAt = now,
+        });
+        _context.OperatorActionAuditEvents.Add(new OperatorActionAuditRecord
+        {
+            InstitutionId = institutionId.Value,
+            AuditEventId = Guid.NewGuid().ToString("N"),
+            ActorId = submittedBy.Value,
+            Action = "role_submitted_for_approval",
+            ResourceType = "role",
+            ResourceId = role.RoleId,
+            Reason = "workflow_approval_requested",
+            CorrelationId = correlationId,
+            OccurredAt = now,
+        });
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return SubmissionResult(role);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            _context.ChangeTracker.Clear();
+            RoleRecord winner = await _context.Roles.AsNoTracking()
+                .SingleOrDefaultAsync(record => record.RoleId == roleId, cancellationToken).ConfigureAwait(false)
+                ?? throw new RoleAdministrationException(RoleContractV1.RoleNotFound, "The role is not available.");
+            if (winner.ApprovalRequestId is not null)
+            {
+                return SubmissionResult(winner);
+            }
+
+            throw new RoleAdministrationException(
+                RoleContractV1.RoleConcurrencyConflict,
+                "The role changed while it was being submitted.");
+        }
     }
 
     /// <summary>
@@ -161,7 +316,7 @@ public sealed class RoleAdministrationService
             throw new RoleAdministrationException(RoleContractV1.RoleNotFound, "The role is not available.");
         }
 
-        if (role.Status != RecordStatus.Pending)
+        if (role.Status != RecordStatus.Pending || role.ApprovalRequestId is not null)
         {
             throw new RoleAdministrationException(RoleContractV1.RoleNotDraft, "Only a draft role can be edited.");
         }
@@ -257,9 +412,32 @@ public sealed class RoleAdministrationService
         RoleCode = role.RoleCode,
         RoleName = role.RoleName,
         Version = role.Version,
-        Status = role.Status == RecordStatus.Pending ? RoleContractV1.StatusDraft : role.Status.ToString().ToLowerInvariant(),
+        Status = role.ApprovalRequestId is not null
+            ? RoleContractV1.StatusPendingApproval
+            : role.Status == RecordStatus.Pending ? RoleContractV1.StatusDraft : role.Status.ToString().ToLowerInvariant(),
         Permissions = permissions,
     };
+
+    private static RoleSubmissionResultV1 SubmissionResult(RoleRecord role) => new()
+    {
+        RoleId = role.RoleId,
+        Version = role.Version,
+        Status = RoleContractV1.StatusPendingApproval,
+        ApprovalRequestId = role.ApprovalRequestId
+            ?? throw new InvalidOperationException("A submitted role must retain its approval request identifier."),
+        ContentHash = role.ApprovalContentHash
+            ?? throw new InvalidOperationException("A submitted role must retain its content hash."),
+    };
+
+    private static string ContentHash(RoleRecord role, IReadOnlyList<string> permissions)
+    {
+        string canonical = string.Join('\n',
+            role.RoleCode,
+            role.RoleName,
+            role.Version.ToString(CultureInfo.InvariantCulture),
+            string.Join('\n', permissions));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+    }
 }
 
 /// <summary>Stable refusal with a contract code. It carries no role or permission detail.</summary>
@@ -267,6 +445,12 @@ public sealed class RoleAdministrationException : Exception
 {
     public RoleAdministrationException(string code, string message)
         : base(message)
+    {
+        Code = code;
+    }
+
+    public RoleAdministrationException(string code, string message, Exception innerException)
+        : base(message, innerException)
     {
         Code = code;
     }
