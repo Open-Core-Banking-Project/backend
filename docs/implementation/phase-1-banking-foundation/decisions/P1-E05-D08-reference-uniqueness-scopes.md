@@ -6,7 +6,9 @@ owners:
   - Domain owners
   - Finance
 required_by: P1-E05-S1
-status: Proposed
+status: Approved
+approved_on: 2026-11-09
+approved_by: Project owner
 brief_date: 2026-11-08
 related: [P1-E05-D01, P1-E05-D07, ADR-0007]
 decisions: [P1-E05-D08]
@@ -137,7 +139,7 @@ payment instruction from producing two postings for one real movement.
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
+| Project owner | User | Approved recommended position | 2026-11-09 |
 | Domain owners | | Pending: confirm source and external scopes | |
 | Finance | | Pending: confirm the duplicate-versus-conflict rule | |
 

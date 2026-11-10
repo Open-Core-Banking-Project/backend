@@ -7,7 +7,9 @@ owners:
   - Risk
   - Product
 required_by: P1-E05-S1
-status: Proposed
+status: Approved
+approved_on: 2026-11-09
+approved_by: Project owner
 brief_date: 2026-11-08
 related: [P1-E05-D01, P1-E05-D05, P1-E04-D10, P1-E04-D11]
 decisions: [P1-E05-D06]
@@ -144,7 +146,7 @@ Never evaluate availability before the locks are held, and never trust a caller-
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
+| Project owner | User | Approved recommended position | 2026-11-09 |
 | Finance | | Pending: confirm the formula and the zero floor | |
 | Risk | | Pending: confirm no Phase 1 overdraft | |
 | Product | | Pending: confirm the deficit reporting shape | |

@@ -6,7 +6,9 @@ owners:
   - Architecture
   - DBA
 required_by: P1-E05-S1
-status: Proposed
+status: Approved
+approved_on: 2026-11-09
+approved_by: Project owner
 brief_date: 2026-11-08
 related: [P1-E05-D01, P1-E05-D06, ADR-0004]
 decisions: [P1-E05-D07]
@@ -135,7 +137,7 @@ A constraint failure is a terminal outcome resolved by reading the existing row,
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
+| Project owner | User | Approved recommended position | 2026-11-09 |
 | Architecture | | Pending: confirm `READ COMMITTED`, deterministic locks and the retry ceiling | |
 | DBA | | Pending: confirm the timeout values and the lock ordering requirement | |
 

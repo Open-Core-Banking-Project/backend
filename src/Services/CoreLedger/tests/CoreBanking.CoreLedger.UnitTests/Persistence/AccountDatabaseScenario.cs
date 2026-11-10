@@ -47,7 +47,7 @@ internal static class AccountDatabaseScenario
             timeProvider,
             new FixedAccountNumberSchemeSource(),
             new AccountNumberAllocator(context, timeProvider),
-            new LedgerAccountInitialisationService(context, timeProvider));
+            new LedgerAccountInitialisationService(context, timeProvider, new FixedLedgerChartClassificationSource()));
 
     internal static async Task<long> CreateEligibleApplicationAsync(
         CoreLedgerDatabaseScope scope,

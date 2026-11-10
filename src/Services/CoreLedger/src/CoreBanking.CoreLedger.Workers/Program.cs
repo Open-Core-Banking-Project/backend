@@ -77,6 +77,7 @@ public static partial class Program
         builder.Services.AddScoped<IAccountOpeningService, AccountOpeningService>();
         builder.Services.AddScoped<IAccountNumberSchemeSource, AccountNumberSchemeSource>();
         builder.Services.AddScoped<IAccountNumberAllocator, AccountNumberAllocator>();
+        builder.Services.AddScoped<ILedgerChartClassificationSource, LedgerChartClassificationSource>();
         builder.Services.AddScoped<ILedgerAccountInitialisation, LedgerAccountInitialisationService>();
         builder.Services.AddScoped<IIntegrationEventConsumer, CoreLedgerIntegrationEventConsumer>();
         builder.Services.AddSingleton(new OutboxRelayOptions());

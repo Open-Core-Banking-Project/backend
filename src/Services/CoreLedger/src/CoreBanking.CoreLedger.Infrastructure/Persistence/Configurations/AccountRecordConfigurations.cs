@@ -106,6 +106,9 @@ internal sealed class LedgerAccountRecordConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.LedgerAccountId).HasColumnName("ledger_account_id").HasMaxLength(128);
         builder.Property(x => x.AccountId).HasColumnName("account_id").HasMaxLength(128);
         builder.Property(x => x.CurrencyCode).HasColumnName("currency_code").HasMaxLength(3);
+        builder.Property(x => x.LegalEntityCode).HasColumnName("legal_entity_code").HasMaxLength(64);
+        builder.Property(x => x.ChartVersionId).HasColumnName("chart_version_id").HasMaxLength(128);
+        builder.Property(x => x.GlAccountCode).HasColumnName("gl_account_code").HasMaxLength(64);
         builder.Property(x => x.Status).HasColumnName("status").HasMaxLength(32);
         builder.Property(x => x.Version).HasColumnName("version").IsConcurrencyToken();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");

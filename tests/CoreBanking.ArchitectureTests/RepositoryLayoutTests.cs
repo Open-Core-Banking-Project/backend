@@ -158,6 +158,34 @@ public sealed class RepositoryLayoutTests
     }
 
     [Fact]
+    public void Only_core_ledger_may_reference_ledger_persistence()
+    {
+        const string protectedNamespace = "CoreBanking.CoreLedger.Infrastructure.Persistence";
+        List<string> violations = new();
+
+        foreach (string file in SourceFiles(Path.Combine(RepositoryRoot, "src", "Services")))
+        {
+            string relative = Path.GetRelativePath(RepositoryRoot, file);
+            if (relative.StartsWith(
+                    Path.Combine("src", "Services", "CoreLedger") + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (File.ReadAllText(file).Contains(protectedNamespace, StringComparison.Ordinal))
+            {
+                violations.Add(relative);
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Only the protected Core Ledger context may reference ledger persistence (P1-E05-S2): "
+            + string.Join("; ", violations));
+    }
+
+    [Fact]
     public void Domain_application_and_contracts_projects_do_not_reference_forbidden_packages()
     {
         string[] guarded = { "Domain", "Application", "Contracts" };

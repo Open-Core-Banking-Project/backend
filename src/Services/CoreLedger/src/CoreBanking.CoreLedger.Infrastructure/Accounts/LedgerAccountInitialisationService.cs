@@ -19,17 +19,23 @@ public sealed class LedgerAccountInitialisationService : ILedgerAccountInitialis
 
     private readonly CoreLedgerDbContext _context;
     private readonly TimeProvider _timeProvider;
+    private readonly ILedgerChartClassificationSource _classifications;
 
-    public LedgerAccountInitialisationService(CoreLedgerDbContext context, TimeProvider timeProvider)
+    public LedgerAccountInitialisationService(
+        CoreLedgerDbContext context,
+        TimeProvider timeProvider,
+        ILedgerChartClassificationSource classifications)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _classifications = classifications ?? throw new ArgumentNullException(nameof(classifications));
     }
 
     public async Task<LedgerInitialisationResult> InitialiseAsync(
         InstitutionId institutionId,
         string accountId,
         string currencyCode,
+        DateTimeOffset asOf,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(institutionId);
@@ -44,12 +50,27 @@ public sealed class LedgerAccountInitialisationService : ILedgerAccountInitialis
             return new LedgerInitialisationResult(accountId, existing.LedgerAccountId, existing.Status);
         }
 
+        LedgerChartClassificationLookup classification = await _classifications
+            .ResolveAsync(institutionId, currencyCode, asOf, cancellationToken)
+            .ConfigureAwait(false);
+        if (classification.ChartVersionId is null
+            || classification.LegalEntityCode is null
+            || classification.GlAccountCode is null)
+        {
+            throw new AccountApplicationRejectedException(
+                classification.RejectionCode ?? "ledger_account_unclassified",
+                "An effective published chart could not classify the ledger account.");
+        }
+
         LedgerAccountRecord ledgerAccount = new()
         {
             InstitutionId = institutionId.Value,
             LedgerAccountId = Guid.NewGuid().ToString("N"),
             AccountId = accountId,
             CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            LegalEntityCode = classification.LegalEntityCode,
+            ChartVersionId = classification.ChartVersionId,
+            GlAccountCode = classification.GlAccountCode,
             Status = InitialisedStatus,
             Version = 1,
             CreatedAt = _timeProvider.GetUtcNow(),

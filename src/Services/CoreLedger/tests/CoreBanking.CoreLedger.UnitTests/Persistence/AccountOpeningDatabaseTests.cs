@@ -66,6 +66,9 @@ public sealed class AccountOpeningDatabaseTests : IDisposable
         LedgerAccountRecord ledgerAccount = await verification.LedgerAccounts.SingleAsync();
         Assert.Equal(account.AccountId, ledgerAccount.AccountId);
         Assert.Equal(account.LedgerAccountReference, ledgerAccount.LedgerAccountId);
+        Assert.Equal("legal-entity-1", ledgerAccount.LegalEntityCode);
+        Assert.Equal("chart-version-1", ledgerAccount.ChartVersionId);
+        Assert.Equal("2100", ledgerAccount.GlAccountCode);
 
         AccountStatusHistoryRecord history = await verification.AccountStatusHistory.SingleAsync();
         Assert.Equal("account_opened", history.ReasonCode);

@@ -6,7 +6,9 @@ owners:
   - Architecture
   - Finance
 required_by: P1-E05-S1
-status: Proposed
+status: Approved
+approved_on: 2026-11-09
+approved_by: Project owner
 brief_date: 2026-11-08
 related: [ADR-0005, ADR-0004, ADR-0007, P1-E05-D02, P1-E05-D05, P1-E05-D06, P1-E05-D07]
 decisions: [P1-E05-D01]
@@ -144,7 +146,7 @@ transaction opens, and revalidated from locked local state inside it.
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
+| Project owner | User | Approved recommended position | 2026-11-09 |
 | Finance | | Pending: confirm the movement-plus-accelerator model and the zero floor | |
 | Architecture | | Pending: confirm the transaction boundary, locking baseline and retry ceiling | |
 

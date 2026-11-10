@@ -27,6 +27,28 @@ public interface ILedgerAccountInitialisation
         InstitutionId institutionId,
         string accountId,
         string currencyCode,
+        DateTimeOffset asOf,
+        CancellationToken cancellationToken);
+}
+
+public sealed record LedgerChartClassificationLookup(
+    string? ChartVersionId,
+    string? LegalEntityCode,
+    string? GlAccountCode,
+    string? RejectionCode)
+{
+    public static LedgerChartClassificationLookup Found(string chartVersionId, string legalEntityCode, string glAccountCode) =>
+        new(chartVersionId, legalEntityCode, glAccountCode, null);
+
+    public static LedgerChartClassificationLookup Rejected(string code) => new(null, null, null, code);
+}
+
+public interface ILedgerChartClassificationSource
+{
+    Task<LedgerChartClassificationLookup> ResolveAsync(
+        InstitutionId institutionId,
+        string currencyCode,
+        DateTimeOffset asOf,
         CancellationToken cancellationToken);
 }
 

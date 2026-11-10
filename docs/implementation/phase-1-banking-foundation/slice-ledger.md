@@ -39,9 +39,9 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 ## Snapshot
 
 - Slices: **176** across **12** epics.
-- Implemented: **45** — **27** awaiting evidence review and **18** with a recorded human approval.
-- In progress: **22**. Not started: **99**. Blocked approvals: **10**.
-- Decisions: **189** total — 125 open, 4 partially approved, 19 with no recorded status, 41 resolved.
+- Implemented: **46** — **28** awaiting evidence review and **18** with a recorded human approval.
+- In progress: **23**. Not started: **97**. Blocked approvals: **10**.
+- Decisions: **189** total — 116 open, 4 partially approved, 19 with no recorded status, 50 resolved.
 - Slices the controller may start now without a new decision: **1** — `P1-E04-S15`, which is `in progress` with live
   PostgreSQL evidence for slices 7 to 9 and still cannot be claimed without the approved `P1-E04-D16` targets.
 
@@ -56,7 +56,7 @@ Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, and again on 202
 | P1-E02 Identity, Roles and Permissions | In Progress | 15 | 2 | 14 | 1 | 0 | 0 | 2 |
 | P1-E03 Customer and Onboarding | Implemented | 15 | 15 | 3 | 12 | 0 | 0 | 0 |
 | P1-E04 Products and Accounts | Approved | 15 | 0 | 13 | 0 | 1 | 1 | 5 |
-| P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
+| P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 1 | 1 | 1 | 12 | 8 |
 | P1-E06 Workflow and Maker-Checker | Approved | 13 | 0 | 4 | 0 | 1 | 8 | 12 |
 | P1-E07 Payments, Collections and VTU | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
 | P1-E08 Integration Hub and Providers | Approved | 15 | 0 | 0 | 3 | 1 | 11 | 16 |
@@ -81,10 +81,10 @@ It still cannot be claimed without the approved `P1-E04-D16` targets and the end
 `P1-E04-D14` (existing-account product migration) and
 `P1-E04-D16` (capacity, latency, RTO and RPO) remain open.
 
-Epic P1-E05 (Core Ledger and Financial Posting) is decision-gated rather than code-gated. Core Ledger currently holds
-only the institution, product and account modules, so no posting, journal, balance, hold, period or processing code
-exists. Briefs for `P1-E05-D01` to `P1-E05-D09` were drafted on 2026-11-08 and await approval; until the approving
-bodies sign them off, no slice of that epic can start.
+Epic P1-E05 (Core Ledger and Financial Posting) began on 2026-11-09 after the project owner approved the recommended
+positions in `P1-E05-D01` to `P1-E05-D09` and accepted ADR-0005. Slice 2 now supplies the typed financial primitives
+and protected-persistence architecture guard. No posting, journal, balance, hold, period or processing table exists yet;
+`P1-E05-D10` to `P1-E05-D17` remain open for their later slices and release gates.
 
 ## Human gates before the loop can advance
 
@@ -92,7 +92,7 @@ bodies sign them off, no slice of that epic can start.
 | --- | --- | --- | --- |
 | P1-E01 slice 1: approve decisions | P1-E01 | epic closure and production use | 9 decisions · Architecture/Security, Architecture/Operations, Finance/Product +6 more |
 | P1-E04 slice 1: approve decisions | P1-E04 | slices 2-15 | 10 decisions · Finance/Product, Finance/Tax/Compliance, Institution/Core operations +9 more |
-| P1-E05 slice 1: approve decisions | P1-E05 | slices 2-15 | 17 decisions · Architecture/Finance, Finance, Finance/Domain owners +12 more · briefs for D01 to D09 drafted 2026-11-08, awaiting approval |
+| P1-E05 slice 1: approve decisions | P1-E05 | later slices 9-15 | 8 decisions · Finance/Operations, Finance/Security, Finance/Compliance +5 more · briefs D10 to D17 await approval; D01 to D09 approved 2026-11-09 |
 | P1-E06 slice 1: approve decisions | P1-E06 | slices 2-13 | 12 decisions · Architecture/Operations, Risk/Compliance/Domain owners, Identity/Security +8 more |
 | P1-E07 slice 1: approve decisions | P1-E07 | slices 2-15 | 17 decisions · Product/Payments, Finance/Payments/Ledger, Integration/Payments/Provider owner +13 more |
 | P1-E08 slice 1: approve decisions | P1-E08 | slices 2-15 | 16 decisions · Product/Integration, Architecture/Domain owners, Security/Platform +13 more |
@@ -240,13 +240,13 @@ Owning service: Core Banking and Ledger · document status `Approved` · 13 impl
 
 ### P1-E05 — Core Ledger and Financial Posting
 
-Owning service: Core Banking and Ledger · document status `Draft` · 0 implemented, 0 in progress, 1 blocked, 14 not started.
+Owning service: Core Banking and Ledger · document status `Approved` · 2 implemented, 1 blocked, 12 not started.
 
 | Slice | Scope | Status | Approval | Unresolved decisions attached | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decision… | ⛔ blocked | — | P1-E05-D01, P1-E05-D02, P1-E05-D03, P1-E05-D04, P1-E05-D05, P1-E05-D06, P1-E05-D07, P1-E05-D08, P1-E05-D09, P1-E05-D10, P1-E05-D11, P1-E05-D12, P1-E05-D13, P1-E05-D14, P1-E05-D15, P1-E05-D16, P1-E05-D17 | 17 unresolved decisions in the epic document; briefs for P1-E05-D01 to P1-E05-D09 were drafted 2026-11-08 and await approval |
-| 2 | Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence ac… | · not started | — | P1-E05-D08 | Decision brief P1-E05-D08 drafted 2026-11-08 and awaiting approval; ledger and posting modules do not exist yet |
-| 3 | Implement ledger-account and approved mapping-version lifecycle with balanced simulation. | · not started | — | P1-E05-D02, P1-E05-D03, P1-E05-D04, P1-E05-D09 | Decision briefs P1-E05-D02 to P1-E05-D04 and P1-E05-D09 drafted 2026-11-08 and awaiting approval; ledger and posting modules do not exist yet |
+| 1 | Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decision… | ⛔ blocked | — | P1-E05-D10, P1-E05-D11, P1-E05-D12, P1-E05-D13, P1-E05-D14, P1-E05-D15, P1-E05-D16, P1-E05-D17 | D01 to D09 approved 2026-11-09; eight later-slice/release decisions remain open |
+| 2 | Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence ac… | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Typed financial primitives, reference/idempotency scopes and a protected-persistence architecture guard; Release builds passed with 0 warnings/errors, 343 Core Ledger non-database and 16 architecture tests passed 2026-11-09 |
+| 3 | Implement ledger-account and approved mapping-version lifecycle with balanced simulation. | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Balanced domain simulation, strict `ledger.chart`/`ledger.mapping` exact-hash lifecycle, nullable classification migration and fail-closed effective published-chart resolution at account opening; Release build and 12 focused tests pass, with 3 PostgreSQL classification tests added for the configured database harness |
 | 4 | Implement transaction/journal/line domain invariants and database append-only/balance guards. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
 | 5 | Implement scoped idempotency claim/outcome and canonical request hashing under concurrency. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
 | 6 | Implement atomic single-currency posting transaction with balance rows, movements, audit and outbox. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
@@ -497,23 +497,23 @@ Every decision the epic documents still require, with its owner and the slice it
 
 | ID | Decision | Owner | Required by | State | Brief |
 | --- | --- | --- | --- | --- | --- |
-| P1-E05-D01 | ADR-0005 consistency, balances and transaction boundary | Architecture/Finance | Slice 1 | drafted, awaiting approval | [brief](decisions/P1-E05-D01-ledger-consistency-balances-and-transaction-boundary.md) |
-| P1-E05-D02 | Chart of accounts and legal-entity balancing scopes | Finance | Slice 3 | drafted, awaiting approval | [brief](decisions/P1-E05-D02-chart-of-accounts-and-balancing-scopes.md) |
-| P1-E05-D03 | Phase 1 accounting event catalogue/mappings | Finance/Domain owners | Slice 3 | drafted, awaiting approval | [brief](decisions/P1-E05-D03-accounting-event-catalogue-and-mappings.md) |
-| P1-E05-D04 | Monetary precision, rate scale and rounding | Finance | Slice 3 | drafted, awaiting approval | [brief](decisions/P1-E05-D04-monetary-precision-and-rounding.md) |
-| P1-E05-D05 | Debit/credit sign and balance representation | Finance/Architecture | Slice 1 | drafted, awaiting approval | [brief](decisions/P1-E05-D05-debit-credit-sign-and-balance-representation.md) |
-| P1-E05-D06 | Available-funds, overdraft, hold, lien and pending formula | Finance/Risk/Product | Slice 1 | drafted, awaiting approval | [brief](decisions/P1-E05-D06-available-funds-and-control-formula.md) |
-| P1-E05-D07 | PostgreSQL isolation/locking/retry policy | Architecture/DBA | Slice 1 | drafted, awaiting approval | [brief](decisions/P1-E05-D07-postgresql-isolation-locking-and-retry.md) |
-| P1-E05-D08 | External/source reference uniqueness scopes | Domain owners/Finance | Slice 2 | drafted, awaiting approval | [brief](decisions/P1-E05-D08-reference-uniqueness-scopes.md) |
-| P1-E05-D09 | Fee/tax/commission/interest/waiver accounting treatment | Finance/Tax/Product | Slice 3 | drafted, awaiting approval | [brief](decisions/P1-E05-D09-fee-tax-and-waiver-treatment.md) |
-| P1-E05-D10 | Reversal/partial reversal and component policy | Finance/Operations | Slice 9 | open | — |
-| P1-E05-D11 | Manual journal/customer-account permissions | Finance/Security | Slice 10 | open | — |
-| P1-E05-D12 | Backdate/value-date windows and recalculation impact | Finance/Compliance | Slice 11 | open | — |
-| P1-E05-D13 | Period close/lock/reopen state and authority | Finance | Slice 11 | open | — |
-| P1-E05-D14 | EOD step graph, partitions and completion gates | Finance/Core operations | Slice 12 | open | — |
-| P1-E05-D15 | Statement running-balance/snapshot semantics | Finance/Product | Slice 13 | open | — |
-| P1-E05-D16 | Retention/partitioning/archival | Compliance/DBA | Before migration approval | open | — |
-| P1-E05-D17 | Load, latency, availability, RTO and RPO | Product/Platform | Before release testing | open | — |
+| P1-E05-D01 | ADR-0005 consistency, balances and transaction boundary | Architecture/Finance | Slice 1 | approved 2026-11-09 | [brief](decisions/P1-E05-D01-ledger-consistency-balances-and-transaction-boundary.md) |
+| P1-E05-D02 | Chart of accounts and legal-entity balancing scopes | Finance | Slice 3 | approved 2026-11-09 | [brief](decisions/P1-E05-D02-chart-of-accounts-and-balancing-scopes.md) |
+| P1-E05-D03 | Phase 1 accounting event catalogue/mappings | Finance/Domain owners | Slice 3 | approved 2026-11-09 | [brief](decisions/P1-E05-D03-accounting-event-catalogue-and-mappings.md) |
+| P1-E05-D04 | Monetary precision, rate scale and rounding | Finance | Slice 3 | approved 2026-11-09 | [brief](decisions/P1-E05-D04-monetary-precision-and-rounding.md) |
+| P1-E05-D05 | Debit/credit sign and balance representation | Finance/Architecture | Slice 1 | approved 2026-11-09 | [brief](decisions/P1-E05-D05-debit-credit-sign-and-balance-representation.md) |
+| P1-E05-D06 | Available-funds, overdraft, hold, lien and pending formula | Finance/Risk/Product | Slice 1 | approved 2026-11-09 | [brief](decisions/P1-E05-D06-available-funds-and-control-formula.md) |
+| P1-E05-D07 | PostgreSQL isolation/locking/retry policy | Architecture/DBA | Slice 1 | approved 2026-11-09 | [brief](decisions/P1-E05-D07-postgresql-isolation-locking-and-retry.md) |
+| P1-E05-D08 | External/source reference uniqueness scopes | Domain owners/Finance | Slice 2 | approved 2026-11-09 | [brief](decisions/P1-E05-D08-reference-uniqueness-scopes.md) |
+| P1-E05-D09 | Fee/tax/commission/interest/waiver accounting treatment | Finance/Tax/Product | Slice 3 | approved 2026-11-09 | [brief](decisions/P1-E05-D09-fee-tax-and-waiver-treatment.md) |
+| P1-E05-D10 | Reversal/partial reversal and component policy | Finance/Operations | Slice 9 | drafted, awaiting approval | [brief](decisions/P1-E05-D10-reversal-and-partial-reversal-policy.md) |
+| P1-E05-D11 | Manual journal/customer-account permissions | Finance/Security | Slice 10 | drafted, awaiting approval | [brief](decisions/P1-E05-D11-manual-journal-and-customer-account-permissions.md) |
+| P1-E05-D12 | Backdate/value-date windows and recalculation impact | Finance/Compliance | Slice 11 | drafted, awaiting approval | [brief](decisions/P1-E05-D12-backdate-value-date-and-recalculation-policy.md) |
+| P1-E05-D13 | Period close/lock/reopen state and authority | Finance | Slice 11 | drafted, awaiting approval | [brief](decisions/P1-E05-D13-accounting-period-state-and-authority.md) |
+| P1-E05-D14 | EOD step graph, partitions and completion gates | Finance/Core operations | Slice 12 | drafted, awaiting approval | [brief](decisions/P1-E05-D14-eod-step-graph-partitions-and-gates.md) |
+| P1-E05-D15 | Statement running-balance/snapshot semantics | Finance/Product | Slice 13 | drafted, awaiting approval | [brief](decisions/P1-E05-D15-statement-running-balance-and-snapshot-semantics.md) |
+| P1-E05-D16 | Retention/partitioning/archival | Compliance/DBA | Before migration approval | drafted, awaiting approval | [brief](decisions/P1-E05-D16-retention-partitioning-and-archival.md) |
+| P1-E05-D17 | Load, latency, availability, RTO and RPO | Product/Platform | Before release testing | drafted, awaiting approval | [brief](decisions/P1-E05-D17-capacity-latency-availability-and-recovery-targets.md) |
 
 ### P1-E06 decisions
 

@@ -6,7 +6,9 @@ owners:
   - Finance
   - Architecture
 required_by: P1-E05-S1
-status: Proposed
+status: Approved
+approved_on: 2026-11-09
+approved_by: Project owner
 brief_date: 2026-11-08
 related: [P1-E05-D01, P1-E05-D02, P1-E05-D04, P1-E05-D06]
 decisions: [P1-E05-D05]
@@ -126,7 +128,7 @@ it leaves open how direction is stored, how a net is signed, and what a customer
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
+| Project owner | User | Approved recommended position | 2026-11-09 |
 | Finance | | Pending: confirm debit-positive movements and the normal-side derivation | |
 | Architecture | | Pending: confirm the line direction column and the read shape | |
 

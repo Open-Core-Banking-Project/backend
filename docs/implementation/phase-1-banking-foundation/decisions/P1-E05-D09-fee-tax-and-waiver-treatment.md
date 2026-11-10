@@ -7,7 +7,9 @@ owners:
   - Tax
   - Product
 required_by: P1-E05-S1
-status: Proposed
+status: Approved
+approved_on: 2026-11-09
+approved_by: Project owner
 brief_date: 2026-11-08
 related: [P1-E05-D02, P1-E05-D03, P1-E05-D04]
 decisions: [P1-E05-D09]
@@ -138,7 +140,7 @@ Anything else is refused. A component carries its own amount, currency, directio
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
+| Project owner | User | Approved recommended position | 2026-11-09 |
 | Finance | | Pending: confirm component types and the waiver representation | |
 | Tax | | Pending: confirm the tax component and authority role | |
 | Product | | Pending: confirm commission split cardinality | |

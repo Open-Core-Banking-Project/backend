@@ -186,7 +186,7 @@ public sealed class AccountOpeningService : IAccountOpeningService
         try
         {
             initialisation = await _initialisation
-                .InitialiseAsync(command.InstitutionId, accountId, account.CurrencyCode, cancellationToken)
+                .InitialiseAsync(command.InstitutionId, accountId, account.CurrencyCode, now, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (AccountApplicationRejectedException)

@@ -2873,6 +2873,11 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("account_id");
 
+                    b.Property<string>("ChartVersionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("chart_version_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -2882,6 +2887,16 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency_code");
+
+                    b.Property<string>("GlAccountCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("gl_account_code");
+
+                    b.Property<string>("LegalEntityCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("legal_entity_code");
 
                     b.Property<string>("Status")
                         .IsRequired()

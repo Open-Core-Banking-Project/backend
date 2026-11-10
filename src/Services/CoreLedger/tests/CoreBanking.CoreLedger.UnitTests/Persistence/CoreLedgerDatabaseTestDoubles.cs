@@ -99,3 +99,13 @@ internal sealed class FixedAccountNumberSchemeSource : IAccountNumberSchemeSourc
         CancellationToken cancellationToken) =>
         Task.FromResult(AccountNumberSchemeLookup.Found(Scheme, SchemeVersionId));
 }
+
+internal sealed class FixedLedgerChartClassificationSource : ILedgerChartClassificationSource
+{
+    public Task<LedgerChartClassificationLookup> ResolveAsync(
+        InstitutionId institutionId,
+        string currencyCode,
+        DateTimeOffset asOf,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(LedgerChartClassificationLookup.Found("chart-version-1", "legal-entity-1", "2100"));
+}

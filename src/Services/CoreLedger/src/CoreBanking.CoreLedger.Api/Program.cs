@@ -167,10 +167,12 @@ if (useRelationalStore)
     builder.Services.AddScoped<AuthoritativeEligibilityFactsResolver>();
     builder.Services.AddScoped<ISavingsEligibilityEvaluationService, SavingsEligibilityEvaluationService>();
     builder.Services.AddScoped<IInstitutionConfigurationAreaLifecycle, InstitutionConfigurationAreaLifecycle>();
+    builder.Services.AddScoped<CoreBanking.CoreLedger.Application.Ledger.ILedgerConfigurationService, CoreBanking.CoreLedger.Infrastructure.Ledger.LedgerConfigurationService>();
     builder.Services.AddScoped<IAccountNumberingConfigurationService, AccountNumberingConfigurationService>();
     builder.Services.AddScoped<IAccountNumberSchemeSource, AccountNumberSchemeSource>();
     builder.Services.AddScoped<IAccountNumberAllocator, AccountNumberAllocator>();
     builder.Services.AddScoped<IAccountOpeningService, AccountOpeningService>();
+    builder.Services.AddScoped<ILedgerChartClassificationSource, LedgerChartClassificationSource>();
     builder.Services.AddScoped<ILedgerAccountInitialisation, LedgerAccountInitialisationService>();
     builder.Services.AddScoped<IAccountApprovalService, AccountApprovalService>();
     builder.Services.AddScoped<IAccountActivationService, AccountActivationService>();
