@@ -242,22 +242,35 @@ on conflict (institution_id, identity_id) do update
 set status = 'Active', updated_at = now();
 
 insert into access.roles
-    (institution_id, role_id, role_code, role_name, version, status, created_at, updated_at)
+    (institution_id, role_id, role_code, role_name, version, status, created_at, updated_at, concurrency_version)
 values
-    ('$institutionId', '$roleId', 'phase0-administrator', 'Phase 0 Administrator', 1, 'Active', now(), now())
+    ('$institutionId', '$roleId', 'phase0-administrator', 'Phase 0 Administrator', 1, 'Active', now(), now(), 1)
 on conflict (institution_id, role_id) do update
-set status = 'Active', updated_at = now();
+set status = 'Active', updated_at = now(), concurrency_version = access.roles.concurrency_version + 1;
 
 insert into access.role_permissions (institution_id, role_id, permission_code)
 values ('$institutionId', '$roleId', 'platform.foundation.execute')
 on conflict do nothing;
 
-insert into access.identity_roles
-    (institution_id, identity_id, role_id, region_id, branch_id, channel_id, valid_from, valid_to, assigned_by)
+insert into access.role_versions
+    (institution_id, role_id, version, role_code, role_name, content_hash,
+     approval_request_id, workflow_decision_reference, published_by, published_at)
 values
-    ('$institutionId', '$actorId', '$roleId', null, null, null, now() - interval '1 minute', null, '$actorId')
+    ('$institutionId', '$roleId', 1, 'phase0-administrator', 'Phase 0 Administrator',
+     repeat('0', 64), 'phase0-walking-skeleton', 'phase0-walking-skeleton', '$actorId', now())
+on conflict (institution_id, role_id, version) do nothing;
+
+insert into access.role_version_permissions
+    (institution_id, role_id, role_version, permission_code)
+values ('$institutionId', '$roleId', 1, 'platform.foundation.execute')
+on conflict do nothing;
+
+insert into access.identity_roles
+    (institution_id, identity_id, role_id, role_version, region_id, branch_id, channel_id, valid_from, valid_to, assigned_by)
+values
+    ('$institutionId', '$actorId', '$roleId', 1, null, null, null, now() - interval '1 minute', null, '$actorId')
 on conflict (institution_id, identity_id, role_id) do update
-set valid_from = excluded.valid_from, valid_to = null;
+set role_version = excluded.role_version, valid_from = excluded.valid_from, valid_to = null;
 
 insert into access.entitlement_versions (institution_id, identity_id, version, updated_at)
 values ('$institutionId', '$actorId', 1, now())
