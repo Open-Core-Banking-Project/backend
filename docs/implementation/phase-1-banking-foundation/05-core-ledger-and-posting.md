@@ -640,18 +640,38 @@ Financial configuration is immutable after effective use. Missing or stale criti
 
 ## 19. Implementation slices
 
-Implementation progress as of 2026-11-10: `P1-E05-D01` to `P1-E05-D09` are approved, ADR-0005 is accepted and slices 2
-and 3 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart and
-mapping schemas, balanced mapping simulation, an exact-hash publication lifecycle and fail-closed effective chart
-resolution that classifies new ledger accounts exactly once. Existing unclassified accounts remain nullable pending a
-separately approved backfill; no journal, balance, hold, period or processing table exists yet.
+Implementation progress as of 2026-11-22: `P1-E05-D01` to `P1-E05-D09` are approved, ADR-0005 is accepted and slices 2
+through 5 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
+and mapping schemas, balanced mapping simulation, an exact-hash publication lifecycle and fail-closed effective chart
+resolution. The posting foundation now models immutable financial transactions, journals and typed positive-amount
+lines; PostgreSQL enforces scoped reference uniqueness, at least one balanced two-line journal per Posted transaction,
+exact institution/legal-entity/currency scope, and application-principal append-only access. Financial commands now have
+deterministic canonical JSON hashes and a transaction-participating idempotency claim/outcome boundary: same-scope,
+same-hash retries replay the committed outcome while another hash conflicts, including under separate-connection
+contention. No posting endpoint, balance row, movement, hold, period or processing table is enabled yet.
 
 1. Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decisions.
    **D01 to D09 approved 2026-11-09; D10 to D17 remain proposed:** see [decisions/](decisions/).
 2. Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence access outside the module.
 3. Implement ledger-account and approved mapping-version lifecycle with balanced simulation.
-4. Implement transaction/journal/line domain invariants and database append-only/balance guards.
-5. Implement scoped idempotency claim/outcome and canonical request hashing under concurrency.
+4. Implement transaction/journal/line domain invariants and database append-only/balance guards. *Status: implemented
+   2026-11-21 — immutable domain construction requires positive typed lines, explicit debit/credit, contiguous unique
+   line identities, one accounting scope and exact debit/credit equality; a Posted transaction requires a bound
+   journal and cannot post twice. Migration `AddLedgerPostingFoundation` adds the protected tables, exact reference
+   scopes, numeric(19,4) amounts, allow-listed statuses/components, deferred commit-time journal/transaction guards,
+   PostgreSQL mutation triggers and restricted runtime grants. The Release solution builds with zero warnings/errors,
+   361 non-database Core Ledger tests, 38 PostgreSQL database/integration tests and 16 architecture tests pass,
+   formatting is clean and the Core Ledger migration snapshot is consistent.*
+5. Implement scoped idempotency claim/outcome and canonical request hashing under concurrency. *Status: implemented
+   2026-11-22 — object members are ordinally sorted, decimal values are normalised without scale drift, array order is
+   retained, duplicate members and numbers outside the approved decimal domain are rejected, and SHA-256 hashes use the
+   canonical UTF-8 bytes. The financial idempotency service requires a caller-owned PostgreSQL transaction, claims the
+   approved institution/operation/initiator/key scope with `INSERT ... ON CONFLICT DO NOTHING`, stages the bounded outcome
+   in that same transaction and classifies same-hash replay, changed-hash conflict and in-progress rows. A real
+   separate-connection contention test proves the second claimant waits for the first commit and then receives the
+   original outcome. The Release solution builds with zero warnings/errors; 365 non-database Core Ledger tests, 42
+   PostgreSQL database/integration tests and 16 architecture tests pass; formatting is clean and the Core Ledger migration
+   snapshot remains consistent with no schema change.*
 6. Implement atomic single-currency posting transaction with balance rows, movements, audit and outbox.
 7. Integrate account controls and prove concurrent debit/available-funds safety using real PostgreSQL contention tests.
 8. Implement hold lifecycle and capture-to-posting linkage.

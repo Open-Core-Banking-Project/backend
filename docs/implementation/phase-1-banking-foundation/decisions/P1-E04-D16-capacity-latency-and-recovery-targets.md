@@ -6,7 +6,7 @@ owners:
   - Product
   - Platform
 required_by: Before release testing
-status: Proposed
+status: Approved
 brief_date: 2026-11-08
 related: [P1-E04-D15, P1-E04-D13, P1-E05-D07]
 decisions: [P1-E04-D16]
@@ -104,6 +104,23 @@ renegotiated later.
 | Environment | An approved environment, identical for every run and identified in the report; workstation figures are labelled as such |
 | Isolation | One journey per run unless a mixed profile is explicitly approved |
 
+The approved initial-launch profile is:
+
+| Dimension | Approved target |
+| --- | --- |
+| Capacity dataset | 500,000 active accounts per institution, generated from synthetic data |
+| Concurrency profiles | 1, 8 and 32 concurrent callers for every synchronous journey |
+| Account summary reads | p95 at or below 300 ms; p99 at or below 750 ms |
+| Account, control, lien, statement-request, dormancy and closure writes | p95 at or below 750 ms; p99 at or below 1.5 seconds |
+| Automated account opening, end to end | p95 at or below 2 seconds; p99 at or below 5 seconds |
+| Technical error rate | At or below 0.1% per journey and concurrency profile |
+| Run shape | Five-minute warm-up followed by a 15-minute steady-state window, repeated three times |
+| Environment | A dedicated, repeatable acceptance environment identified in the evidence report; workstation runs remain observations only |
+
+Every report also records p50, sample count, dataset identity and the full environment identity. The 500,000-account
+dataset is the minimum approved capacity profile, not permission to infer a production maximum. Related synthetic
+application, control and lien counts must be recorded in the profile so subsequent runs use the same composition.
+
 ### D16-C Where the values live
 
 | Item | Recommendation |
@@ -122,6 +139,18 @@ renegotiated later.
 | Mechanisms required before any RPO claim | Continuous WAL archiving with retention, a retained base backup, an off-site copy, and a restore that is proven from a fresh cluster |
 | Mechanisms required before any RTO claim | A rehearsed restore into an environment that then serves traffic, with the elapsed time recorded per stage |
 | Prohibited | An RPO or RTO inferred from a workstation dump duration, or asserted from a configuration that does not exist |
+
+The approved initial-launch recovery objectives are:
+
+| Objective | Approved target |
+| --- | --- |
+| RTO | Four hours from detection through verified service restoration |
+| Financial RPO | Zero loss of committed journals, idempotency outcomes and audit records |
+
+The zero-loss objective is not satisfied by a periodic dump or asynchronous archive alone. It may be claimed only
+after the accepted design provides durable recovery of every acknowledged commit, the required base backup and
+off-site copy exist, and a fresh-cluster drill proves restoration and verification. Rebuildable projections may be
+reconstructed from authoritative facts, but must never be used to weaken the financial RPO.
 
 ### D16-E What may never be asserted from the current evidence
 
@@ -164,9 +193,9 @@ renegotiated later.
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
-| Product | | Pending: approve the measured journey set and the objective values | |
-| Platform | | Pending: approve the measurement contract, the environment and the recovery mechanisms | |
+| Project owner | Recorded in the implementation session | Approved Option 1: the 500,000-account profile, concurrency 1/8/32, the read/write/opening latency targets, 0.1% technical-error ceiling, four-hour RTO and zero loss of committed financial and audit evidence | 2026-11-21 |
+| Product | | Profile approved by the project owner; named Product confirmation remains a production-readiness check | |
+| Platform | | Profile approved by the project owner; named Platform confirmation of the environment and recovery design remains a production-readiness check | |
 
 ## 9. Implementation notes
 

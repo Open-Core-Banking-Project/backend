@@ -1,0 +1,82 @@
+{
+  "profileId": "p1-e04-initial-launch.v1",
+  "profileVersion": 1,
+  "decisionId": "P1-E04-D16",
+  "approvedOn": "2026-11-21",
+  "environment": {
+    "kind": "dedicated-acceptance",
+    "syntheticDataOnly": true,
+    "workstationClaimsAllowed": false
+  },
+  "dataset": {
+    "activeAccountsPerInstitution": 500000
+  },
+  "run": {
+    "warmupSeconds": 300,
+    "steadyStateSeconds": 900,
+    "repetitions": 3,
+    "concurrency": [1, 8, 32],
+    "modes": ["cold", "warm"]
+  },
+  "reporting": {
+    "p50Required": true,
+    "sampleCountRequired": true,
+    "environmentIdentityRequired": true,
+    "datasetIdentityRequired": true,
+    "maxTechnicalErrorRatePercent": 0.1
+  },
+  "journeys": [
+    {
+      "id": "account-opening-end-to-end",
+      "p95Milliseconds": 2000,
+      "p99Milliseconds": 5000
+    },
+    {
+      "id": "account-control-change",
+      "p95Milliseconds": 750,
+      "p99Milliseconds": 1500
+    },
+    {
+      "id": "account-lien-lifecycle",
+      "p95Milliseconds": 750,
+      "p99Milliseconds": 1500
+    },
+    {
+      "id": "account-summary-read",
+      "p95Milliseconds": 300,
+      "p99Milliseconds": 750
+    },
+    {
+      "id": "statement-request-handoff",
+      "p95Milliseconds": 750,
+      "p99Milliseconds": 1500
+    },
+    {
+      "id": "dormancy-closure-assessment",
+      "p95Milliseconds": 750,
+      "p99Milliseconds": 1500
+    },
+    {
+      "id": "concurrent-account-allocation-and-control-update",
+      "p95Milliseconds": 750,
+      "p99Milliseconds": 1500
+    }
+  ],
+  "recovery": {
+    "rtoSeconds": 14400,
+    "maxLostCommittedTransactions": 0,
+    "protectedEvidence": [
+      "journals",
+      "idempotency-outcomes",
+      "audit-records"
+    ],
+    "claimPrerequisites": [
+      "durable-acknowledged-commit-recovery",
+      "continuous-wal-archiving",
+      "retained-base-backup",
+      "off-site-copy",
+      "fresh-cluster-restore",
+      "service-start-and-verification"
+    ]
+  }
+}

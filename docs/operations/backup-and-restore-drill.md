@@ -1,8 +1,8 @@
 # Backup and restore drill
 
 `scripts/restore-drill.ps1` proves that each service database can be dumped and restored into a fresh
-database without losing rows. It is the recovery evidence the repository can produce without an
-approved RTO or RPO; it does not measure or claim either.
+database without losing rows. `P1-E04-D16` now defines a four-hour RTO and zero loss of committed
+financial and audit evidence, but this local drill does not measure or claim either objective.
 
 ## What the drill does
 
@@ -55,9 +55,9 @@ application.
 
 ## What the drill does not cover
 
-- **No RTO.** The restore duration covers `pg_restore` only. Detection, decision, environment
-  provisioning, service start-up and verification are excluded, and no target exists yet: `P1-E04-D16`
-  owns the recovery objectives.
+- **No RTO claim.** The restore duration covers `pg_restore` only. Detection, decision, environment
+  provisioning, service start-up and verification are excluded, so it cannot be compared with the approved four-hour
+  objective.
 - **No RPO.** The source is a live primary, not a retained backup, so nothing here says how much
   committed work a real recovery would lose.
 - **No point-in-time recovery.** WAL archiving, a retained base backup and a restore to an arbitrary
@@ -69,9 +69,10 @@ application.
 
 ## Before a recovery claim is published
 
-1. `P1-E04-D16` is approved with an RPO expressed in committed financial transactions and an RTO that
-   names every stage.
-2. Continuous WAL archiving and a retained base backup exist, with the retention window agreed.
-3. A restore into a fresh cluster serves the smoke journey, with the elapsed time recorded per stage.
+1. Continuous WAL archiving and a retained base backup exist, with the retention window agreed.
+2. Durable recovery of every acknowledged commit and a retained off-site copy are proven.
+3. A point-in-time restore into a fresh cluster serves the smoke journey, with the elapsed time recorded from detection
+   through verification.
 4. The restored database reconciles against the audit and outbox records, including exactly one
    idempotency outcome per financial request and no duplicate consumer effect.
+5. `scripts/recovery-evidence-gate.ps1` passes the captured result against the approved profile.

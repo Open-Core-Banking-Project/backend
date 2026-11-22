@@ -5,15 +5,14 @@ backup/restore and Phase 1 end-to-end evidence. It cannot be claimed from unit t
 containerised stack was available and `scripts/db-verify.ps1` was run for the first time against the account slices, so
 the PostgreSQL, concurrency and effective-privilege results below are observed rather than assumed.
 
-Two inputs are still missing, so the slice stays `in progress`:
+One decision and its executable evidence are still missing, so the slice stays `in progress`:
 
-- the capacity, latency, RTO and RPO figures need `P1-E04-D16`, which is still awaiting approval, and without them a
-  performance or recovery result has no pass condition;
+- `P1-E04-D16` was approved on 2026-11-21, but its 500,000-account performance profile and four-hour/zero-loss
+  recovery objectives have not yet been implemented or executed in the dedicated acceptance environment;
 - the end-to-end Phase 1 journey touches `P1-E04-D14` (existing-account product migration), which is also awaiting
   approval.
 
-Both now have decision briefs (`P1-E04-D14`, `P1-E04-D16`) that state what must be agreed and deliberately publish no
-numbers, so the remaining gap is human sign-off rather than an undesigned slice.
+Both have decision briefs. `P1-E04-D16` now supplies the pass conditions; `P1-E04-D14` still needs human sign-off.
 
 Nothing in this document changes a slice status beyond `in progress`, and no figure is quoted that was not observed.
 
@@ -29,6 +28,13 @@ Nothing in this document changes a slice status beyond `in progress`, and no fig
 | Per-service suites | `dotnet test <project> --filter Category!=Database&Category!=Integration` | one recorded Passed/Failed count per service instead of one solution-wide figure |
 | Permission grammar | literal scan of `PermissionIdentifier.Parse` | every capability is exactly `domain.resource.action`; the current report shows 59 capabilities and no exception |
 | Supply chain | `dotnet list package --vulnerable --include-transitive` | vulnerable direct and transitive packages, or an explicit `unknown` when the feed cannot be reached |
+| Approved performance profile | `scripts/performance-profile-gate.ps1 -SelfTest` | validates the versioned D16 profile and proves missing observations, target breaches, workstation results and dataset mismatches fail closed; it does not generate load |
+| Approved recovery objective | `scripts/recovery-evidence-gate.ps1 -SelfTest` | proves RTO breach, committed-transaction loss, missing prerequisites, workstation recovery and incomplete database evidence fail closed; it does not perform a restore |
+
+The per-service runner bounds VSTest's testhost connection window. When testhost cannot start, the report records an
+infrastructure failure, skips the remaining service projects and continues through permission, supply-chain,
+performance-profile and recovery-evidence checks. It never relabels that condition as a test assertion failure or a
+successful suite.
 
 ### Database evidence, 2026-11-08
 
@@ -112,7 +118,8 @@ afterwards, and the drill needs no application principal, so a recovery does not
 
 These durations are **observations on one workstation**, not targets: they exclude detection, decision, environment
 provisioning, service start-up and verification, and there is no WAL archiving, off-site copy or restore-to-timestamp
-path on the local stack. No RTO or RPO is claimed anywhere in this document, because `P1-E04-D16` has not set one.
+path on the local stack. `P1-E04-D16` now sets a four-hour RTO and zero loss of committed journals, idempotency outcomes
+and audit records, but no RTO or RPO is claimed here because the required architecture and drill do not yet exist.
 
 ### Defects this run found and fixed
 
@@ -187,15 +194,16 @@ system was observed.
 | ACC-028 | Blocked | the ledger posted-history query is `P1-E05`, so the request is refused with `statement_source_unavailable` (now asserted against a real request row) |
 | ACC-031 | Partial | contracts expose only masked numbers and control reasons are not returned, and the opening suite proves the outbox payload excludes the full number; log and live event inspection still needs a running host |
 | ACC-032 | Blocked | trace propagation needs a running API host |
-| ACC-033 | Partial | `scripts/restore-drill.ps1` proves every service database dumps and restores with matching row counts; point-in-time recovery, an off-site copy and an approved RTO/RPO (`P1-E04-D16`) are outstanding |
+| ACC-033 | Partial | `scripts/restore-drill.ps1` proves every service database dumps and restores with matching row counts; `P1-E04-D16` now defines the four-hour/zero-loss objectives, while point-in-time recovery, durable recovery of every acknowledged commit, an off-site copy and an objective-measured drill remain outstanding |
 | ACC-034 | Blocked | the end-to-end journey needs a running host and the `P1-E04-D14` migration policy |
 
 ## What must happen for slice 15 to be claimed
 
 1. ~~Start the stack and run `scripts/db-verify.ps1`.~~ Done on 2026-11-08; repeat it on the acceptance commit.
-2. Approve `P1-E04-D16`: account volume, contention profile, latency budget, RTO and RPO. Without those numbers a
-   performance or recovery result has no pass condition and must not be written down. The brief that asks for them is
-   `P1-E04-D16-capacity-latency-and-recovery-targets.md`.
+2. ~~Approve `P1-E04-D16`: account volume, contention profile, latency budget, RTO and RPO.~~ Done on 2026-11-21 for
+   the 500,000-account profile, concurrency 1/8/32, the versioned latency targets, four-hour RTO and zero committed-
+   transaction-loss RPO. The versioned profile and separate fail-closed gate are implemented; run it in the dedicated
+   acceptance environment before claiming performance or capacity.
 3. Resolve `P1-E04-D14` for the existing-account product migration, which the end-to-end journey touches. The brief that
    asks for it is `P1-E04-D14-existing-account-product-migration.md`.
 4. ~~Give the account controls, liens, dormancy and statement slices their own `Category=Database` evidence.~~ Every
@@ -206,5 +214,34 @@ system was observed.
    published.
 6. Re-run `scripts/phase1-evidence.ps1` on the final commit so the recorded counts belong to the acceptance commit, and
    record the database, performance and recovery results beside it.
+
+## 2026-11-21 profile-gate increment
+
+- `tests/performance/profiles/p1-e04-initial-launch.v1.json` is the single versioned source of the approved D16 values.
+- `scripts/performance-profile-gate.ps1` requires the complete journey × concurrency × cold/warm × repetition matrix,
+  rejects workstation or wrong-volume results and enforces the configured p95, p99 and technical-error ceilings.
+- The self-test passed for one complete synthetic result and four negative cases: missing observation, latency breach,
+  workstation evidence and dataset mismatch.
+- No performance, capacity, RTO or RPO result was measured or claimed by this increment.
+
+## 2026-11-21 recovery-gate increment
+
+- `scripts/recovery-evidence-gate.ps1` reads the same versioned D16 profile and requires a fresh-cluster point-in-time
+  recovery result with stable base-backup, WAL-archive and off-site-copy identities.
+- The gate measures RTO from detection through verification, requires equal acknowledged/recovered commit counts and
+  verifies journals, idempotency outcomes, audit records and all nine service databases.
+- The self-test passed one complete synthetic result and five negative cases: RTO breach, committed-transaction loss,
+  missing off-site copy, workstation recovery and incomplete database evidence.
+- No backup, PostgreSQL configuration, restore, RTO or RPO claim was produced by this increment.
+
+## 2026-11-22 evidence-harness resilience increment
+
+- `scripts/phase1-evidence.ps1` now applies a configurable 30–600 second testhost connection window (180 seconds by
+  default), preserves any caller-supplied `VSTEST_CONNECTION_TIMEOUT`, and records the native test exit code.
+- A testhost connection timeout fails the evidence run, records how many service projects were skipped and still runs
+  the permission, supply-chain, performance-profile and recovery-evidence sections before writing the report.
+- The focused 30-second verification reproduced the Audit Reconciliation testhost infrastructure timeout, wrote the
+  complete report, passed the 59-capability permission grammar scan and both evidence-gate self-tests, and exited 1.
+  No unit-test assertion result or supply-chain clean result is claimed from that run.
 
 Until the remaining steps are done, the slice stays `in progress` and the epic stays below `Implemented`.
