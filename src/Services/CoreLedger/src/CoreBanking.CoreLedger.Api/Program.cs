@@ -22,6 +22,7 @@ using CoreBanking.CoreLedger.Domain.Institutions;
 using CoreBanking.CoreLedger.Domain.Products;
 using CoreBanking.CoreLedger.Infrastructure.Accounts;
 using CoreBanking.CoreLedger.Infrastructure.Institutions;
+using CoreBanking.CoreLedger.Infrastructure.Ledger;
 using CoreBanking.CoreLedger.Infrastructure.Persistence;
 using CoreBanking.CoreLedger.Infrastructure.Products;
 using Microsoft.AspNetCore.Builder;
@@ -153,6 +154,7 @@ if (useRelationalStore)
     builder.Services.AddDbContext<CoreLedgerDbContext>(options => options.UseNpgsql(connectionString));
     builder.Services.AddScoped<IIntegrationStore>(provider => provider.GetRequiredService<CoreLedgerDbContext>());
     builder.Services.AddScoped<IdempotencyService>();
+    builder.Services.AddScoped<FinancialIdempotencyService>();
     builder.Services.AddScoped<IInstitutionCreationService, InstitutionCreationService>();
     builder.Services.AddScoped<IInstitutionActivationService, InstitutionActivationService>();
     builder.Services.AddScoped<IInstitutionSuspensionService, InstitutionSuspensionService>();

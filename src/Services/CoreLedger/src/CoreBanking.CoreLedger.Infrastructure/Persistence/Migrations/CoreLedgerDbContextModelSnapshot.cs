@@ -2640,6 +2640,187 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("FinancialTransactionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("financial_transaction_id");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EventCode")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("event_code");
+
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("external_reference")
+                        .UseCollation("C");
+
+                    b.Property<string>("ExternalReferenceProducer")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("external_reference_producer")
+                        .UseCollation("C");
+
+                    b.Property<string>("ExternalReferenceType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("external_reference_type");
+
+                    b.Property<DateTimeOffset?>("PostedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("posted_at");
+
+                    b.Property<DateOnly>("PostingDate")
+                        .HasColumnType("date")
+                        .HasColumnName("posting_date");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash")
+                        .UseCollation("C");
+
+                    b.Property<string>("SourceReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_reference")
+                        .UseCollation("C");
+
+                    b.Property<string>("SourceService")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_service")
+                        .UseCollation("C");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TransactionReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("transaction_reference")
+                        .UseCollation("C");
+
+                    b.Property<DateTimeOffset>("TransactionTimestamp")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("transaction_timestamp");
+
+                    b.Property<DateOnly>("ValueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("value_date");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "FinancialTransactionId");
+
+                    b.HasIndex("InstitutionId", "TransactionReference")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "SourceService", "SourceReference")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "ExternalReferenceProducer", "ExternalReferenceType", "ExternalReference")
+                        .IsUnique()
+                        .HasFilter("external_reference IS NOT NULL");
+
+                    b.ToTable("financial_transactions", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_financial_transactions_external_reference", "(external_reference_producer IS NULL AND external_reference_type IS NULL AND external_reference IS NULL) OR (external_reference_producer IS NOT NULL AND external_reference_type IS NOT NULL AND external_reference IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_financial_transactions_external_reference_type", "external_reference_type IS NULL OR external_reference_type IN ('provider_reference', 'channel_reference', 'settlement_reference', 'statement_reference', 'external_reference', 'internal_reference')");
+
+                            t.HasCheckConstraint("ck_financial_transactions_posted_at", "(status = 'posted' AND posted_at IS NOT NULL) OR (status <> 'posted' AND posted_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_financial_transactions_request_hash", "request_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_financial_transactions_status", "status IN ('received', 'pending_authorisation', 'ready_to_post', 'posted', 'rejected', 'failed_before_commit', 'disputed', 'reversed')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionStatusHistoryRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("HistoryId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("history_id");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("FinancialTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("financial_transaction_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("InstitutionId", "HistoryId");
+
+                    b.HasIndex("InstitutionId", "FinancialTransactionId", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("transaction_status_history", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_transaction_status_history_sequence", "sequence > 0");
+
+                            t.HasCheckConstraint("ck_transaction_status_history_status", "status IN ('received', 'pending_authorisation', 'ready_to_post', 'posted', 'rejected', 'failed_before_commit', 'disputed', 'reversed')");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.InstitutionAuditRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -2852,6 +3033,185 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_institutions_plan_version", "provisioning_plan_version IS NULL OR provisioning_plan_version > 0");
 
                             t.HasCheckConstraint("ck_institutions_status", "status IN ('draft', 'provisioning', 'provisioning_failed', 'pending_activation', 'active', 'suspended')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.JournalEntryRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("JournalEntryId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("journal_entry_id");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<string>("FinancialTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("financial_transaction_id");
+
+                    b.Property<string>("JournalReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("journal_reference")
+                        .UseCollation("C");
+
+                    b.Property<string>("LegalEntityCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("legal_entity_code");
+
+                    b.Property<string>("MappingVersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("mapping_version_id");
+
+                    b.Property<DateOnly>("PostingDate")
+                        .HasColumnType("date")
+                        .HasColumnName("posting_date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("TotalCredits")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("total_credits");
+
+                    b.Property<decimal>("TotalDebits")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("total_debits");
+
+                    b.Property<DateTimeOffset>("TransactionTimestamp")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("transaction_timestamp");
+
+                    b.Property<DateOnly>("ValueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("value_date");
+
+                    b.HasKey("InstitutionId", "JournalEntryId");
+
+                    b.HasIndex("InstitutionId", "FinancialTransactionId");
+
+                    b.HasIndex("InstitutionId", "JournalReference")
+                        .IsUnique();
+
+                    b.ToTable("journal_entries", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_journal_entries_balanced_totals", "total_debits > 0 AND total_debits = total_credits");
+
+                            t.HasCheckConstraint("ck_journal_entries_status", "status = 'posted'");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.JournalLineRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("JournalLineId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("journal_line_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("ComponentType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("component_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("JournalEntryId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("journal_entry_id");
+
+                    b.Property<string>("LedgerAccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ledger_account_id");
+
+                    b.Property<string>("LegalEntityCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("legal_entity_code");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.HasKey("InstitutionId", "JournalLineId");
+
+                    b.HasIndex("InstitutionId", "JournalEntryId", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("journal_lines", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_journal_lines_amount", "amount > 0");
+
+                            t.HasCheckConstraint("ck_journal_lines_component", "component_type IN ('principal', 'fee', 'tax', 'commission', 'penalty', 'interest', 'waiver', 'rounding')");
+
+                            t.HasCheckConstraint("ck_journal_lines_direction", "direction IN ('debit', 'credit')");
+
+                            t.HasCheckConstraint("ck_journal_lines_reason", "component_type = 'principal' OR reason_code IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_journal_lines_sequence", "sequence > 0");
                         });
                 });
 
@@ -3435,6 +3795,33 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("InstitutionId", "RollbackOfVersionId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionStatusHistoryRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "FinancialTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.JournalEntryRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "FinancialTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.JournalLineRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.JournalEntryRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "JournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerAccountRecord", b =>

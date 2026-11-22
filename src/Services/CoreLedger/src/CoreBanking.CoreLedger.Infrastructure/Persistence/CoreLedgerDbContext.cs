@@ -99,6 +99,15 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
     public DbSet<AccountStatementArtifactReferenceRecord> AccountStatementArtifactReferences =>
         Set<AccountStatementArtifactReferenceRecord>();
 
+    public DbSet<FinancialTransactionRecord> FinancialTransactions => Set<FinancialTransactionRecord>();
+
+    public DbSet<FinancialTransactionStatusHistoryRecord> FinancialTransactionStatusHistory =>
+        Set<FinancialTransactionStatusHistoryRecord>();
+
+    public DbSet<JournalEntryRecord> JournalEntries => Set<JournalEntryRecord>();
+
+    public DbSet<JournalLineRecord> JournalLines => Set<JournalLineRecord>();
+
     public DbSet<InstitutionAuditRecord> InstitutionAuditEvents => Set<InstitutionAuditRecord>();
 
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
@@ -164,6 +173,10 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<AccountClosureProposalRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AccountStatementRequestRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<AccountStatementArtifactReferenceRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<FinancialTransactionRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<FinancialTransactionStatusHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<JournalEntryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<JournalLineRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InstitutionAuditRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
@@ -180,7 +193,7 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        EnsureAuditEvidenceIsAppendOnly();
+        EnsureAppendOnlyEvidence();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
@@ -188,11 +201,11 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        EnsureAuditEvidenceIsAppendOnly();
+        EnsureAppendOnlyEvidence();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    private void EnsureAuditEvidenceIsAppendOnly()
+    private void EnsureAppendOnlyEvidence()
     {
         foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<InstitutionAuditRecord> entry
                  in ChangeTracker.Entries<InstitutionAuditRecord>())
@@ -200,6 +213,48 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
             if (entry.State is EntityState.Modified or EntityState.Deleted)
             {
                 throw new System.InvalidOperationException("Institution audit evidence is append-only.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<FinancialTransactionStatusHistoryRecord> entry
+                 in ChangeTracker.Entries<FinancialTransactionStatusHistoryRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Financial transaction status history is append-only.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<JournalEntryRecord> entry
+                 in ChangeTracker.Entries<JournalEntryRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Posted journal entries are immutable.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<JournalLineRecord> entry
+                 in ChangeTracker.Entries<JournalLineRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Posted journal lines are immutable.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<FinancialTransactionRecord> entry
+                 in ChangeTracker.Entries<FinancialTransactionRecord>())
+        {
+            if (entry.State is not (EntityState.Modified or EntityState.Deleted))
+            {
+                continue;
+            }
+
+            string? originalStatus = entry.OriginalValues.GetValue<string>(nameof(FinancialTransactionRecord.Status));
+            if (string.Equals(originalStatus, "posted", System.StringComparison.Ordinal))
+            {
+                throw new System.InvalidOperationException("Posted financial transactions are immutable.");
             }
         }
     }
