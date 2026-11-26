@@ -96,7 +96,10 @@ internal sealed class LedgerAccountRecordConfiguration : IEntityTypeConfiguratio
     public void Configure(EntityTypeBuilder<LedgerAccountRecord> builder)
     {
         builder.ToTable("ledger_accounts", "account", table =>
-            table.HasCheckConstraint("ck_ledger_accounts_status", "status IN ('initialised', 'closed')"));
+        {
+            table.HasCheckConstraint("ck_ledger_accounts_status", "status IN ('initialised', 'closed')");
+            table.HasCheckConstraint("ck_ledger_accounts_normal_side", "normal_side IS NULL OR normal_side IN ('debit', 'credit')");
+        });
         builder.HasKey(x => new { x.InstitutionId, x.LedgerAccountId });
         builder.HasIndex(x => new { x.InstitutionId, x.AccountId }).IsUnique();
         builder.HasOne<AccountRecord>().WithMany()
@@ -109,6 +112,7 @@ internal sealed class LedgerAccountRecordConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.LegalEntityCode).HasColumnName("legal_entity_code").HasMaxLength(64);
         builder.Property(x => x.ChartVersionId).HasColumnName("chart_version_id").HasMaxLength(128);
         builder.Property(x => x.GlAccountCode).HasColumnName("gl_account_code").HasMaxLength(64);
+        builder.Property(x => x.NormalSide).HasColumnName("normal_side").HasMaxLength(8);
         builder.Property(x => x.Status).HasColumnName("status").HasMaxLength(32);
         builder.Property(x => x.Version).HasColumnName("version").IsConcurrencyToken();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");

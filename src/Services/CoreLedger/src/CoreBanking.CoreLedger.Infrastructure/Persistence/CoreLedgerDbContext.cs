@@ -108,6 +108,16 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public DbSet<JournalLineRecord> JournalLines => Set<JournalLineRecord>();
 
+    public DbSet<FinancialReversalRecord> FinancialReversals => Set<FinancialReversalRecord>();
+
+    public DbSet<LedgerBalanceRecord> LedgerBalances => Set<LedgerBalanceRecord>();
+
+    public DbSet<LedgerMovementRecord> LedgerMovements => Set<LedgerMovementRecord>();
+
+    public DbSet<LedgerHoldRecord> LedgerHolds => Set<LedgerHoldRecord>();
+
+    public DbSet<LedgerHoldHistoryRecord> LedgerHoldHistory => Set<LedgerHoldHistoryRecord>();
+
     public DbSet<InstitutionAuditRecord> InstitutionAuditEvents => Set<InstitutionAuditRecord>();
 
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
@@ -177,6 +187,11 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<FinancialTransactionStatusHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<JournalEntryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<JournalLineRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<FinancialReversalRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<LedgerBalanceRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<LedgerMovementRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<LedgerHoldRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<LedgerHoldHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InstitutionAuditRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
@@ -207,6 +222,15 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     private void EnsureAppendOnlyEvidence()
     {
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<FinancialReversalRecord> entry
+                 in ChangeTracker.Entries<FinancialReversalRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Financial reversal evidence is append-only.");
+            }
+        }
+
         foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<InstitutionAuditRecord> entry
                  in ChangeTracker.Entries<InstitutionAuditRecord>())
         {
@@ -240,6 +264,24 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
             if (entry.State is EntityState.Modified or EntityState.Deleted)
             {
                 throw new System.InvalidOperationException("Posted journal lines are immutable.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<LedgerMovementRecord> entry
+                 in ChangeTracker.Entries<LedgerMovementRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Ledger movements are immutable.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<LedgerHoldHistoryRecord> entry
+                 in ChangeTracker.Entries<LedgerHoldHistoryRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Ledger hold history is append-only.");
             }
         }
 

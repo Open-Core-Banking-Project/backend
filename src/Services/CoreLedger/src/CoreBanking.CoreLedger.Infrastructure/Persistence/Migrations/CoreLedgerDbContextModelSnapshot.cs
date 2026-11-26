@@ -2640,6 +2640,121 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialReversalRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("FinancialReversalId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("financial_reversal_id");
+
+                    b.Property<string>("ApproverActorId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("approver_actor_id");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<string>("EvidenceReference")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("evidence_reference");
+
+                    b.Property<string>("MakerActorId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("maker_actor_id");
+
+                    b.Property<string>("MappingVersionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("mapping_version_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("OriginalFinancialTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("original_financial_transaction_id");
+
+                    b.Property<string>("OriginalJournalEntryId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("original_journal_entry_id");
+
+                    b.Property<DateOnly>("OriginalValueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("original_value_date");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<decimal>("RemainingAfter")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("remaining_after");
+
+                    b.Property<string>("ReversalFinancialTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("reversal_financial_transaction_id");
+
+                    b.Property<string>("ReversalJournalEntryId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("reversal_journal_entry_id");
+
+                    b.Property<DateOnly>("ReversalValueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("reversal_value_date");
+
+                    b.Property<decimal>("ReversedAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("reversed_amount");
+
+                    b.Property<string>("WorkflowDecisionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("workflow_decision_id");
+
+                    b.HasKey("InstitutionId", "FinancialReversalId");
+
+                    b.HasIndex("InstitutionId", "OriginalFinancialTransactionId")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "ReversalFinancialTransactionId")
+                        .IsUnique();
+
+                    b.ToTable("financial_reversals", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_financial_reversals_amounts", "reversed_amount > 0 AND remaining_after >= 0");
+
+                            t.HasCheckConstraint("ck_financial_reversals_distinct_transactions", "original_financial_transaction_id <> reversal_financial_transaction_id");
+
+                            t.HasCheckConstraint("ck_financial_reversals_workflow_evidence", "(workflow_decision_id IS NULL AND maker_actor_id IS NULL AND approver_actor_id IS NULL) OR (workflow_decision_id IS NOT NULL AND maker_actor_id IS NOT NULL AND approver_actor_id IS NOT NULL AND maker_actor_id <> approver_actor_id)");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -3258,6 +3373,11 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("legal_entity_code");
 
+                    b.Property<string>("NormalSide")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("normal_side");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -3276,7 +3396,354 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ledger_accounts", "account", t =>
                         {
+                            t.HasCheckConstraint("ck_ledger_accounts_normal_side", "normal_side IS NULL OR normal_side IN ('debit', 'credit')");
+
                             t.HasCheckConstraint("ck_ledger_accounts_status", "status IN ('initialised', 'closed')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerBalanceRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("LedgerAccountId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ledger_account_id");
+
+                    b.Property<DateTimeOffset>("AsOf")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("as_of");
+
+                    b.Property<decimal>("CreditLimit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("credit_limit");
+
+                    b.Property<decimal>("CreditTotal")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("credit_total");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<decimal>("DebitTotal")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("debit_total");
+
+                    b.Property<decimal>("HoldRemaining")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("hold_remaining");
+
+                    b.Property<decimal>("NetBalance")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("net_balance");
+
+                    b.Property<string>("NormalSide")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("normal_side");
+
+                    b.Property<decimal>("PendingAuthorised")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("pending_authorised");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "LedgerAccountId");
+
+                    b.ToTable("account_balances", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_balances_deductions", "credit_limit >= 0 AND hold_remaining >= 0 AND pending_authorised >= 0");
+
+                            t.HasCheckConstraint("ck_account_balances_net", "net_balance = debit_total - credit_total");
+
+                            t.HasCheckConstraint("ck_account_balances_normal_side", "normal_side IN ('debit', 'credit')");
+
+                            t.HasCheckConstraint("ck_account_balances_totals", "debit_total >= 0 AND credit_total >= 0");
+
+                            t.HasCheckConstraint("ck_account_balances_version", "version > 0");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerHoldHistoryRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("HistoryId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("history_id");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("FinancialTransactionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("financial_transaction_id");
+
+                    b.Property<string>("HoldId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("hold_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<decimal>("RemainingAfter")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("remaining_after");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<string>("Transition")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("transition");
+
+                    b.HasKey("InstitutionId", "HistoryId");
+
+                    b.HasIndex("InstitutionId", "HoldId", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("hold_status_history", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_hold_history_amounts", "amount >= 0 AND remaining_after >= 0");
+
+                            t.HasCheckConstraint("ck_hold_history_sequence", "sequence > 0");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerHoldRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("HoldId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("hold_id");
+
+                    b.Property<decimal>("CapturedAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("captured_amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("LedgerAccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ledger_account_id");
+
+                    b.Property<decimal>("OriginalAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("original_amount");
+
+                    b.Property<string>("PurposeCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("purpose_code");
+
+                    b.Property<decimal>("ReleasedAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("released_amount");
+
+                    b.Property<decimal>("RemainingAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("remaining_amount");
+
+                    b.Property<string>("SourceReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_reference");
+
+                    b.Property<string>("SourceService")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_service");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "HoldId");
+
+                    b.HasIndex("InstitutionId", "SourceService", "SourceReference")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "LedgerAccountId", "Status", "ExpiresAt");
+
+                    b.ToTable("holds", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_holds_amounts", "original_amount > 0 AND remaining_amount >= 0 AND captured_amount >= 0 AND released_amount >= 0 AND remaining_amount + captured_amount + released_amount = original_amount");
+
+                            t.HasCheckConstraint("ck_holds_expiry", "expires_at > created_at");
+
+                            t.HasCheckConstraint("ck_holds_status", "status IN ('active', 'partially_captured', 'captured', 'released', 'expired')");
+
+                            t.HasCheckConstraint("ck_holds_version", "version > 0");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerMovementRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("MovementId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("movement_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("BalanceVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("balance_version");
+
+                    b.Property<decimal>("CreditTotalAfter")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("credit_total_after");
+
+                    b.Property<decimal>("DebitTotalAfter")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("debit_total_after");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("JournalLineId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("journal_line_id");
+
+                    b.Property<string>("LedgerAccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ledger_account_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<decimal>("SignedAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("signed_amount");
+
+                    b.Property<decimal>("VisibleBalanceAfter")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("visible_balance_after");
+
+                    b.Property<decimal>("VisibleBalanceBefore")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("visible_balance_before");
+
+                    b.HasKey("InstitutionId", "MovementId");
+
+                    b.HasIndex("InstitutionId", "JournalLineId")
+                        .IsUnique();
+
+                    b.HasIndex("InstitutionId", "LedgerAccountId", "BalanceVersion")
+                        .IsUnique();
+
+                    b.ToTable("account_movements", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_movements_amount", "amount > 0");
+
+                            t.HasCheckConstraint("ck_account_movements_direction", "direction IN ('debit', 'credit')");
+
+                            t.HasCheckConstraint("ck_account_movements_signed_amount", "(direction = 'debit' AND signed_amount = amount) OR (direction = 'credit' AND signed_amount = -amount)");
+
+                            t.HasCheckConstraint("ck_account_movements_totals", "debit_total_after >= 0 AND credit_total_after >= 0");
+
+                            t.HasCheckConstraint("ck_account_movements_version", "balance_version > 1");
                         });
                 });
 
@@ -3797,6 +4264,21 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialReversalRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "OriginalFinancialTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "ReversalFinancialTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionStatusHistoryRecord", b =>
                 {
                     b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.FinancialTransactionRecord", null)
@@ -3829,6 +4311,48 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                     b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountRecord", null)
                         .WithMany()
                         .HasForeignKey("InstitutionId", "AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerBalanceRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerAccountRecord", null)
+                        .WithOne()
+                        .HasForeignKey("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerBalanceRecord", "InstitutionId", "LedgerAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerHoldHistoryRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerHoldRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "HoldId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerHoldRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerAccountRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "LedgerAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerMovementRecord", b =>
+                {
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.JournalLineRecord", null)
+                        .WithOne()
+                        .HasForeignKey("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerMovementRecord", "InstitutionId", "JournalLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CoreBanking.CoreLedger.Infrastructure.Persistence.LedgerBalanceRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId", "LedgerAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

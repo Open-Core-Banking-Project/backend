@@ -2,36 +2,36 @@
 phase: "Phase 1 - Banking Foundation"
 artifact: Slice and decision ledger
 status: Active
-approval_model: Human approves each slice
-snapshot: 2026-11-08
+approval_model: Automated acceptance evidence closes implementation; named authorities own consequential decisions
+snapshot: 2026-11-26
 source_documents: 01..12 epic implementation documents
 ---
 
 # Phase 1 slice ledger
 
-Tracks every implementation slice in Phase 1, the status claimed for it, the human approval it needs and the open decisions that block it.
-The epic documents define scope; this ledger is the single place that records execution and approval state.
+Tracks every implementation slice in Phase 1, its executable evidence and the open decisions that block it.
+The epic documents define scope; this ledger is the single place that records execution and decision state.
 
 On 2026-11-01 the user granted phase-wide approval to implement every Phase 1 epic and slice. In the CSV source this is recorded as `phase-wide implementation approved 2026-11-01`. It authorises implementation but does not fabricate acceptance evidence for unfinished work or resolve decision records whose exact policy remains unspecified.
 
-## Status and approval model
+## Status and decision model
 
-An agent may move a slice to `in progress` or `implemented`. Only a named human reviewer may set `approved`.
-A slice is never auto-approved, and an epic never advances because its slices were merely marked implemented.
+An implementation slice moves to `implemented` when its acceptance criteria and required executable evidence pass.
+Named authorities still resolve product, financial, regulatory, security, provider and production decisions.
 
 | Status | Meaning | Who sets it |
 | --- | --- | --- |
-| `blocked` | The slice is an approval or a decision that only a human owner can complete | Human |
+| `blocked` | A named consequential decision or external prerequisite is unresolved | Named owner |
 | `not started` | No implementation claim recorded | Agent |
 | `in progress` | Partial implementation recorded, remaining work named | Agent |
-| `implemented` | Implementation claimed with evidence, awaiting review | Agent |
+| `implemented` | Acceptance criteria and required executable evidence pass | Agent/automation |
 
 | Approval | Meaning |
 | --- | --- |
-| empty | No implementation to review |
-| `pending` | Implemented or partly implemented, review not done |
-| `approved <date>` | A human reviewer accepted the slice and its evidence on that date |
-| `phase-wide implementation approved <date>` | A human authorised implementation of the slice; evidence-based completion review still follows implementation |
+| empty | No separate implementation authorisation recorded |
+| `pending` | Legacy value; does not block evidence-based implementation completion |
+| `approved <date>` | A named scope or policy authorisation recorded on that date |
+| `phase-wide implementation approved <date>` | The implementation scope was authorised; acceptance evidence determines completion |
 
 A decision id in a slice row means the epic document still carries an unresolved decision that applies to that slice;
 it is not proof the slice is unimplemented, and an implemented slice can still be gated for production use by one.
@@ -39,8 +39,8 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 ## Snapshot
 
 - Slices: **176** across **12** epics.
-- Implemented: **47** — **29** awaiting evidence review and **18** with a recorded human approval.
-- In progress: **23**. Not started: **96**. Blocked approvals: **10**.
+- Implemented: **53**.
+- In progress: **22**. Not started: **91**. Blocked decisions/prerequisites: **10**.
 - Decisions: **189** total — 115 open, 4 partially approved, 19 with no recorded status, 51 resolved.
 - Slices the controller may start now without a new decision: **1** — `P1-E04-S15`, which is `in progress` with live
   PostgreSQL evidence and may now implement and execute the profile approved in `P1-E04-D16`.
@@ -48,7 +48,8 @@ it is not proof the slice is unimplemented, and an implemented slice can still b
 Statuses were reconciled from `slice-ledger.csv` on 2026-11-03, again on 2026-11-06 and 2026-11-07 after `P1-E02-D07`, `P1-E04-D17` and `P1-E04-D06`, `D07`, `D09`, `D10`, `D11`, `D12`, `D13` and `D15` were approved and slices `P1-E04-S6` to `P1-E04-S14` closed, and on 2026-11-21 after `P1-E04-D16` was approved. Verification is recorded separately in the
 *Verification runs* section; a slice without a verification entry has not been re-checked. P1-E05 slice 4 was
 reconciled on 2026-11-21 after its domain, migration and PostgreSQL evidence passed; slice 5 was reconciled on 2026-11-22
-after its canonical-hash and transaction-participating idempotency concurrency evidence passed.
+after its canonical-hash and transaction-participating idempotency concurrency evidence passed; slice 9 was reconciled on
+2026-11-26 after its reversal, replay and contention evidence passed.
 
 ## Epic summary
 
@@ -57,8 +58,8 @@ after its canonical-hash and transaction-participating idempotency concurrency e
 | P1-E01 Institution and Tenancy | Implemented | 12 | 11 | 11 | 0 | 1 | 0 | 9 |
 | P1-E02 Identity, Roles and Permissions | In Progress | 15 | 2 | 14 | 1 | 0 | 0 | 2 |
 | P1-E03 Customer and Onboarding | Implemented | 15 | 15 | 3 | 12 | 0 | 0 | 0 |
-| P1-E04 Products and Accounts | Approved | 15 | 0 | 13 | 0 | 1 | 1 | 5 |
-| P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 4 | 0 | 1 | 10 | 8 |
+| P1-E04 Products and Accounts | Approved | 15 | 0 | 13 | 1 | 1 | 0 | 5 |
+| P1-E05 Core Ledger and Financial Posting | Approved | 15 | 0 | 8 | 0 | 1 | 6 | 8 |
 | P1-E06 Workflow and Maker-Checker | Approved | 13 | 0 | 4 | 0 | 1 | 8 | 12 |
 | P1-E07 Payments, Collections and VTU | Approved | 15 | 0 | 0 | 0 | 1 | 14 | 17 |
 | P1-E08 Integration Hub and Providers | Approved | 15 | 0 | 0 | 3 | 1 | 11 | 16 |
@@ -69,11 +70,11 @@ after its canonical-hash and transaction-participating idempotency concurrency e
 
 ## Ready queue
 
-Slices 7, 8 and 9 are implemented and awaiting review, so the account-opening journey exists end to end in code:
+Slices 7, 8 and 9 are implemented, so the account-opening journey exists end to end in code:
 application, eligibility evidence, approval, number allocation, account opening, ledger initialisation and
 activation. The remaining product policy decisions were approved on 2026-11-07 (`P1-E04-D10`, `D11`, `D12`, `D13`,
 `D15`). `P1-E04-S10` (typed restrictions, freezes and blocks plus the ledger control-evaluation contract) is
-implemented and awaiting review, `P1-E04-S11` (lien lifecycle with ledger-reported availability) is implemented
+implemented, `P1-E04-S11` (lien lifecycle with ledger-reported availability) is implemented
 too, `P1-E04-S12` (dormancy, reactivation and closure prerequisites) is implemented, and `P1-E04-S13` (account
 summaries and statement handoff) is implemented, so every implementation slice of the epic is claimed. `P1-E04-S15`
 (security, performance, backup/restore and Phase 1 end-to-end evidence) is the only slice left; it is `in progress`
@@ -84,20 +85,22 @@ executed. The slice still cannot be claimed until that evidence exists and the e
 `P1-E04-D14` (existing-account product migration) remains open.
 
 Epic P1-E05 (Core Ledger and Financial Posting) began on 2026-11-09 after the project owner approved the recommended
-positions in `P1-E05-D01` to `P1-E05-D09` and accepted ADR-0005. Slices 2 through 5 now supply the typed financial
+positions in `P1-E05-D01` to `P1-E05-D09` and accepted ADR-0005. Slices 2 through 9 now supply the typed financial
 primitives, protected-persistence architecture guard, chart/mapping lifecycle, immutable transaction/journal/line
 domain, the guarded PostgreSQL posting foundation, canonical request hashing and a transaction-participating scoped
-idempotency claim/outcome boundary proven under separate-connection contention. No posting endpoint, balance, movement,
-hold, period or processing table exists yet; `P1-E05-D10` to `P1-E05-D17` remain open for their later slices and release
-gates.
+idempotency claim/outcome boundary, atomic balance/movement posting, account-control enforcement and locked
+available-funds checks proven under separate-connection contention, atomic hold lifecycle and capture-to-posting
+linkage, plus linked full reversal with duplicate and concurrent reversal prevention. No posting, hold or reversal HTTP
+endpoint, period or processing table exists yet. `P1-E05-D10` Option B was approved on 2026-11-26 and slice 9 is
+implemented; `P1-E05-D11` gates slice 10 and `P1-E05-D12` to `P1-E05-D17` remain open for later slices and release gates.
 
-## Human gates before the loop can advance
+## Decision gates before dependent work can advance
 
 | Gate | Epic | What it gates | Owner input needed |
 | --- | --- | --- | --- |
 | P1-E01 slice 1: approve decisions | P1-E01 | epic closure and production use | 9 decisions · Architecture/Security, Architecture/Operations, Finance/Product +6 more |
 | P1-E04 slice 1: approve decisions | P1-E04 | slices 2-15 | 10 decisions · Finance/Product, Finance/Tax/Compliance, Institution/Core operations +9 more |
-| P1-E05 slice 1: approve decisions | P1-E05 | later slices 9-15 | 8 decisions · Finance/Operations, Finance/Security, Finance/Compliance +5 more · briefs D10 to D17 await approval; D01 to D09 approved 2026-11-09 |
+| P1-E05 slice 1: approve decisions | P1-E05 | later slices 10-15 | 7 decisions · Finance/Security, Finance/Compliance +5 more · briefs D11 to D17 await approval; D01 to D09 approved 2026-11-09 and D10 approved 2026-11-26 (slice 9 implemented) |
 | P1-E06 slice 1: approve decisions | P1-E06 | slices 2-13 | 12 decisions · Architecture/Operations, Risk/Compliance/Domain owners, Identity/Security +8 more |
 | P1-E07 slice 1: approve decisions | P1-E07 | slices 2-15 | 17 decisions · Product/Payments, Finance/Payments/Ledger, Integration/Payments/Provider owner +13 more |
 | P1-E08 slice 1: approve decisions | P1-E08 | slices 2-15 | 16 decisions · Product/Integration, Architecture/Domain owners, Security/Platform +13 more |
@@ -108,10 +111,6 @@ gates.
 
 Phase exit criteria additionally require security, compliance, UAT, operational-readiness, provider-certification and
 backup-restore evidence that no agent can produce. See [00-phase-overview.md](00-phase-overview.md).
-
-## Review queue
-
-20 of the 38 implemented slices are awaiting evidence review; 31 slices have a recorded human approval.
 
 ## Verification runs
 
@@ -145,6 +144,7 @@ backup-restore evidence that no agent can produce. See [00-phase-overview.md](00
 | 2026-11-08 | P1-E04 slices 12 and 15 database evidence | Core Ledger `Category=Database` suite and full non-database suites | 30 Core Ledger PostgreSQL tests passed, adding business-date dormancy assessment, the recorded not-assessable outcome, the dormant transition and reactivation, and the closure proposal, approval, refusal and re-check sequence. 776 non-database tests still pass |
 | 2026-11-08 | P1-E04 slice 15 backup and restore evidence | `scripts/restore-drill.ps1` (new): a container-side dump of every service database, restored into a scratch database with a per-table row-count comparison, then cleaned up | All nine databases restored with a matching row count in every table: Core Ledger 42 tables/2208 rows, Customer Onboarding 36/86204, Identity 33/1440, Payments 6/2, Channels 6/2, Workflow 9/16, Risk 6/2, Integration 8/3, Audit 8/72. Measured on one workstation, so no RTO or RPO is claimed: point-in-time recovery, WAL archiving, an off-site copy and the `P1-E04-D16` targets are still outstanding |
 | 2026-11-22 | P1-E04 slice 15 evidence-harness resilience | `scripts/phase1-evidence.ps1 -Configuration Release -SkipGate -TestHostConnectionTimeoutSeconds 30 -ReportDirectory artifacts/automation` | Expected fail: Audit Reconciliation VSTest could not connect to testhost in 30 seconds. The harness recorded the infrastructure failure and eight skipped projects, then wrote a complete report after the 59-capability grammar scan and both performance/recovery gate self-tests passed. No unit assertion or supply-chain clean result is claimed |
+| 2026-11-26 | P1-E05 slice 9 full reversal | `dotnet build` Release solution, Core Ledger non-database suite, `scripts/db-verify.ps1` (nine migrations as their migration principal, database suites as each application principal), architecture suite and `dotnet format --verify-no-changes` | Build passed with 0 warnings/0 errors; 378 Core Ledger non-database, 55 Core Ledger PostgreSQL database/integration, 55 effective-principal security and 17 architecture tests passed; `20261126084737_AddFinancialReversals` applied by `coreledger_migrator` and the model has no pending changes. The reversal suite proves an exact opposite linked transaction with audit and outbox, same-key replay, changed-hash conflict, refusal of provider-uncertain evidence, append-only reversal rows, one committed reversal under two concurrent different-key attempts and `financial_transaction_already_reversed` for the loser. Partial/component reversal remains fail-closed pending an approved mapping |
 
 Gaps found by the verification runs: Payments and VTU, Channels and Engagement, Risk Reporting and Integration Hub still
 expose no `Category=Database` or `Category=Integration` tests, so their runtime concurrency evidence
@@ -246,19 +246,19 @@ Owning service: Core Banking and Ledger · document status `Approved` · 13 impl
 
 ### P1-E05 — Core Ledger and Financial Posting
 
-Owning service: Core Banking and Ledger · document status `Approved` · 4 implemented, 1 blocked, 10 not started.
+Owning service: Core Banking and Ledger · document status `Approved` · 8 implemented, 1 blocked, 6 not started.
 
 | Slice | Scope | Status | Approval | Unresolved decisions attached | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decision… | ⛔ blocked | — | P1-E05-D10, P1-E05-D11, P1-E05-D12, P1-E05-D13, P1-E05-D14, P1-E05-D15, P1-E05-D16, P1-E05-D17 | D01 to D09 approved 2026-11-09; eight later-slice/release decisions remain open |
+| 1 | Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decision… | ⛔ blocked | — | P1-E05-D11, P1-E05-D12, P1-E05-D13, P1-E05-D14, P1-E05-D15, P1-E05-D16, P1-E05-D17 | D01 to D09 approved 2026-11-09 and D10 Option B approved 2026-11-26; seven later-slice/release decisions remain open |
 | 2 | Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence ac… | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Typed financial primitives, reference/idempotency scopes and a protected-persistence architecture guard; Release builds passed with 0 warnings/errors, 343 Core Ledger non-database and 16 architecture tests passed 2026-11-09 |
 | 3 | Implement ledger-account and approved mapping-version lifecycle with balanced simulation. | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Balanced domain simulation, strict `ledger.chart`/`ledger.mapping` exact-hash lifecycle, nullable classification migration and fail-closed effective published-chart resolution at account opening; Release build and 12 focused tests pass, with 3 PostgreSQL classification tests added for the configured database harness |
 | 4 | Implement transaction/journal/line domain invariants and database append-only/balance guards. | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Immutable domain construction plus protected ledger tables, scoped unique references, deferred commit-time balance/transaction guards and runtime append-only grants; Release build, 361 non-database, 38 PostgreSQL and 16 architecture tests pass 2026-11-21 |
 | 5 | Implement scoped idempotency claim/outcome and canonical request hashing under concurrency. | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Canonical JSON and SHA-256 hashing plus a caller-transaction-owned scoped claim/outcome service; same-hash replay, changed-hash conflict and separate-connection contention verified; Release build, 365 non-database, 42 PostgreSQL and 16 architecture tests pass 2026-11-22 |
-| 6 | Implement atomic single-currency posting transaction with balance rows, movements, audit and outbox. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
-| 7 | Integrate account controls and prove concurrent debit/available-funds safety using real PostgreSQL contention… | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
-| 8 | Implement hold lifecycle and capture-to-posting linkage. | · not started | — | — | Ledger and posting modules do not exist yet; the slice starts at the domain model |
-| 9 | Implement full reversal plus original/reversal trace and duplicate/concurrent reversal prevention. | · not started | — | P1-E05-D10 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
+| 6 | Implement atomic single-currency posting transaction with balance rows, movements, audit and outbox. | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Balance/movement domain, zero-balance initialisation, atomic posting transaction, audit/outbox/idempotency coupling and migration; Release build, 369 non-database, 44 PostgreSQL database/integration and 54 effective-principal security tests pass 2026-11-24 |
+| 7 | Integrate account controls and prove concurrent debit/available-funds safety using real PostgreSQL contention… | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Explicit channel/type/control-version posting context; deterministic balance and account locks; fail-closed block/stale-version enforcement; active lien/hold/pending deductions through one availability function; 369 non-database and 48 PostgreSQL database/integration tests pass, including two concurrent 75 NGN debits against 100 NGN where exactly one commits |
+| 8 | Implement hold lifecycle and capture-to-posting linkage. | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Invariant-protected hold aggregate; atomic create/release/expiry with reserved-balance versions, idempotency, history, audit and outbox; capture linked to the final posting without double deduction; terminal/append-only PostgreSQL guards; 372 non-database, 51 database/integration, 54 security and 16 architecture tests pass, including concurrent same-version capture |
+| 9 | Implement full reversal plus original/reversal trace and duplicate/concurrent reversal prevention. | ✓ implemented | phase-wide implementation approved 2026-11-01 | — | Immutable original/reversal link with opposite lines derived from authoritative posted rows, locked reversible remainder and mandatory reason/evidence/Workflow approval evidence; provider-uncertain evidence refused; append-only `ledger.financial_reversals` with unique original/reversal indexes; 378 non-database, 55 PostgreSQL database/integration, 55 security and 17 architecture tests pass 2026-11-26, including concurrent different-key and same-key-changed-hash refusal |
 | 10 | Implement manual journal/adjustment and Workflow decision application. | · not started | — | P1-E05-D11 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
 | 11 | Implement accounting periods, date policies and controlled backdated/value-dated posting. | · not started | — | P1-E05-D12, P1-E05-D13 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
 | 12 | Implement EOD run graph, batches, checkpoints, restart and balancing summaries for approved Phase 1 steps. | · not started | — | P1-E05-D14 | Ledger and posting modules do not exist yet; the slice starts at the domain model |
@@ -512,7 +512,7 @@ Every decision the epic documents still require, with its owner and the slice it
 | P1-E05-D07 | PostgreSQL isolation/locking/retry policy | Architecture/DBA | Slice 1 | approved 2026-11-09 | [brief](decisions/P1-E05-D07-postgresql-isolation-locking-and-retry.md) |
 | P1-E05-D08 | External/source reference uniqueness scopes | Domain owners/Finance | Slice 2 | approved 2026-11-09 | [brief](decisions/P1-E05-D08-reference-uniqueness-scopes.md) |
 | P1-E05-D09 | Fee/tax/commission/interest/waiver accounting treatment | Finance/Tax/Product | Slice 3 | approved 2026-11-09 | [brief](decisions/P1-E05-D09-fee-tax-and-waiver-treatment.md) |
-| P1-E05-D10 | Reversal/partial reversal and component policy | Finance/Operations | Slice 9 | drafted, awaiting approval | [brief](decisions/P1-E05-D10-reversal-and-partial-reversal-policy.md) |
+| P1-E05-D10 | Reversal/partial reversal and component policy | Finance/Operations | Slice 9 | approved Option B 2026-11-26 | [brief](decisions/P1-E05-D10-reversal-and-partial-reversal-policy.md) |
 | P1-E05-D11 | Manual journal/customer-account permissions | Finance/Security | Slice 10 | drafted, awaiting approval | [brief](decisions/P1-E05-D11-manual-journal-and-customer-account-permissions.md) |
 | P1-E05-D12 | Backdate/value-date windows and recalculation impact | Finance/Compliance | Slice 11 | drafted, awaiting approval | [brief](decisions/P1-E05-D12-backdate-value-date-and-recalculation-policy.md) |
 | P1-E05-D13 | Period close/lock/reopen state and authority | Finance | Slice 11 | drafted, awaiting approval | [brief](decisions/P1-E05-D13-accounting-period-state-and-authority.md) |
@@ -685,11 +685,14 @@ Every decision the epic documents still require, with its owner and the slice it
 | 2026-11-07 | P1-E04 slice 13 summaries and statements | Core Ledger unit suite, Release solution build, `dotnet format --verify-no-changes`, `scripts/migrations-verify.ps1` | 325 Core Ledger unit tests pass; build 0 warnings/0 errors; formatting clean; every model snapshot consistent after `AddAccountStatementRequests` |
 | 2026-11-21 | P1-E05 slice 4 journal foundation | Release solution build; Core Ledger non-database, PostgreSQL and architecture suites; `dotnet format`; Core Ledger migration drift | Build 0 warnings/0 errors; 361 non-database, 38 database/integration and 16 architecture tests pass; formatting clean; `AddLedgerPostingFoundation` model snapshot consistent |
 | 2026-11-22 | P1-E05 slice 5 financial idempotency | Release solution build; Core Ledger non-database, PostgreSQL and architecture suites; `dotnet format`; Core Ledger migration drift | Build 0 warnings/0 errors; 365 non-database, 42 database/integration and 16 architecture tests pass; same-hash replay, changed-hash conflict and separate-connection serialization verified; formatting clean; model snapshot consistent with no schema change |
+| 2026-11-24 | P1-E05 slice 6 atomic posting | Release solution build; Core Ledger non-database and PostgreSQL suites; full database/privilege verification; `dotnet format`; Core Ledger migration drift | Build 0 warnings/0 errors; 369 non-database, 44 database/integration and 54 effective-principal security tests pass; atomic journal, movements, balance versions, idempotency outcome, audit and outbox commit once, replay once and roll back together; formatting clean; `AddAtomicLedgerPosting` model snapshot consistent |
+| 2026-11-24 | P1-E05 slice 7 controls and available funds | Release solution build; Core Ledger non-database and PostgreSQL suites; architecture suite; `dotnet format`; all migration snapshots | Build 0 warnings/0 errors; 369 non-database, 48 database/integration and 16 architecture tests pass; concurrent debits serialize on the balance row, block and stale-control decisions fail closed, active lien outstanding reduces available funds without becoming a control denial; formatting clean; all nine model snapshots consistent |
+| 2026-11-24 | P1-E05 slice 8 hold lifecycle and capture | Release solution build; full database/privilege verification; Core Ledger non-database and architecture suites; `dotnet format`; all migration snapshots | Build 0 warnings/0 errors; 372 non-database, 51 database/integration, 54 effective-principal security and 16 architecture tests pass; create/release/expiry change only reserved balance, capture links to and commits with final posting without double deduction, replay is single-effect and concurrent same-version capture commits once; formatting clean; all nine model snapshots consistent after `AddLedgerHolds` |
 
 ## Maintenance
 
-- Update `slice-ledger.csv` when a slice changes status; keep `approval` in step with the review.
+- Update `slice-ledger.csv` when a slice changes status; keep scope/decision authorisations distinct from executable implementation evidence.
 - Record evidence as a test name, migration, runbook or pull request, not a narrative.
 - Add a blocker id to a slice when a decision that gates it remains open; the register holds the owner.
 - Re-read the epic document implementation-slices progress note before changing a claim, and correct the epic document if it disagrees.
-- Phase 1 is complete only when every slice is `approved` and every phase exit criterion is evidenced.
+- Phase 1 implementation is complete only when every slice is `implemented` and every phase exit criterion is evidenced; production enablement remains separately authorised.

@@ -94,6 +94,21 @@ public sealed class ApplicationPrincipalPrivilegeTests
         Assert.True(inspected > 0, $"{service.Name} has no tables in its audit schema.");
     }
 
+    [Fact]
+    public async Task Core_ledger_principal_can_append_but_cannot_rewrite_financial_reversal_evidence()
+    {
+        ServiceDescriptor service = ServiceCatalogue.Get("CoreLedger");
+        await using NpgsqlConnection connection = await service.OpenAsync(CancellationToken.None);
+
+        TablePrivileges[] tables = await ReadTablePrivilegesAsync(connection, "ledger");
+        TablePrivileges reversal = Assert.Single(tables, table => table.Name == "financial_reversals");
+        Assert.True(reversal.Select);
+        Assert.True(reversal.Insert);
+        Assert.False(reversal.Update);
+        Assert.False(reversal.Delete);
+        Assert.False(reversal.Truncate);
+    }
+
     [Theory]
     [MemberData(nameof(Services))]
     public async Task The_principal_holds_no_ownership_membership_or_administrative_attribute(string serviceName)

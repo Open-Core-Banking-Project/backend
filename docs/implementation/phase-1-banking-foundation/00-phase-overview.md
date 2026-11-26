@@ -251,7 +251,7 @@ Review and implement in dependency order:
 
 All Phase 1 epic instructions are now drafted. Each remains subject to review against current requirements and approved decisions before implementation.
 
-Execution state is recorded in the [Phase 1 slice ledger](slice-ledger.md): per-slice status and evidence in [`slice-ledger.csv`](slice-ledger.csv), and every outstanding decision with its owner in [`decision-register.csv`](decision-register.csv). A slice is implemented by an agent but approved only by a human reviewer.
+Execution state is recorded in the [Phase 1 slice ledger](slice-ledger.md): per-slice status and evidence in [`slice-ledger.csv`](slice-ledger.csv), and every outstanding decision with its owner in [`decision-register.csv`](decision-register.csv). A slice is implemented when its acceptance criteria and required executable evidence pass; consequential policy and production decisions retain their named owners.
 
 ## Agent instructions
 

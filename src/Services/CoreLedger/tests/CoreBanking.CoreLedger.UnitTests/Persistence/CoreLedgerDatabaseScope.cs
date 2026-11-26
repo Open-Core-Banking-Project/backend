@@ -99,6 +99,7 @@ internal sealed class CoreLedgerDatabaseScope : IDisposable
         context.AccountClosureProposals.ExecuteDelete();
         context.AccountStatementArtifactReferences.ExecuteDelete();
         context.AccountStatementRequests.ExecuteDelete();
+        context.LedgerBalances.ExecuteDelete();
         context.LedgerAccounts.ExecuteDelete();
         context.AccountStatusHistory.ExecuteDelete();
         context.Accounts.ExecuteDelete();

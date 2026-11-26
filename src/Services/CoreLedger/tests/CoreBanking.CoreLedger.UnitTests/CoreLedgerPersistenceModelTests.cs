@@ -198,6 +198,26 @@ public sealed class CoreLedgerPersistenceModelTests
             || property.Name.Contains("Balance", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void Financial_reversal_links_are_tenant_scoped_unique_and_append_only_shaped()
+    {
+        using CoreLedgerDbContext context = CreateContext();
+        IEntityType reversal = context.Model.FindEntityType(typeof(FinancialReversalRecord))!;
+
+        Assert.Equal("ledger", reversal.GetSchema());
+        Assert.Equal("financial_reversals", reversal.GetTableName());
+        Assert.Equal(
+            ["InstitutionId", "FinancialReversalId"],
+            reversal.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Contains(reversal.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(property => property.Name)
+                .SequenceEqual(["InstitutionId", "OriginalFinancialTransactionId"]));
+        Assert.Contains(reversal.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(property => property.Name)
+                .SequenceEqual(["InstitutionId", "ReversalFinancialTransactionId"]));
+        Assert.Equal("numeric(19,4)", reversal.FindProperty(nameof(FinancialReversalRecord.ReversedAmount))!.GetColumnType());
+    }
+
     private static CoreLedgerDbContext CreateContext()
     {
         DbContextOptions<CoreLedgerDbContext> options = new DbContextOptionsBuilder<CoreLedgerDbContext>()

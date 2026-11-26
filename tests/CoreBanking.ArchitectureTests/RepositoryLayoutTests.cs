@@ -186,6 +186,23 @@ public sealed class RepositoryLayoutTests
     }
 
     [Fact]
+    public void Financial_reversal_boundary_is_not_exposed_as_an_http_or_public_contract_surface()
+    {
+        string coreLedger = Path.Combine(RepositoryRoot, "src", "Services", "CoreLedger", "src");
+        string contracts = Path.Combine(coreLedger, "CoreBanking.CoreLedger.Contracts");
+        string api = Path.Combine(coreLedger, "CoreBanking.CoreLedger.Api");
+        List<string> violations = SourceFiles(contracts)
+            .Concat(SourceFiles(api).Where(file => !file.EndsWith("Program.cs", StringComparison.OrdinalIgnoreCase)))
+            .Where(file => File.ReadAllText(file).Contains("LedgerReversal", StringComparison.Ordinal))
+            .Select(file => Path.GetRelativePath(RepositoryRoot, file))
+            .ToList();
+
+        Assert.True(
+            violations.Count == 0,
+            "P1-E05-S9 reversal remains a protected Core Ledger internal boundary: " + string.Join("; ", violations));
+    }
+
+    [Fact]
     public void Domain_application_and_contracts_projects_do_not_reference_forbidden_packages()
     {
         string[] guarded = { "Domain", "Application", "Contracts" };
