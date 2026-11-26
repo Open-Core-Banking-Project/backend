@@ -36,8 +36,12 @@ As of 2026-11-26:
   original/reversal link, audit and outbox fact atomically with the reversing posting. Duplicate, concurrent and
   same-key-changed-hash attempts are refused under real PostgreSQL contention. Partial/component reversal, periods and
   the reversal HTTP endpoint remain unimplemented.
-- Phase 1 Epic 5 slice 10 is the next Core Ledger implementation slice and is gated by `P1-E05-D11` (manual
-  journal/customer-account permissions), which is still a drafted brief awaiting approval.
+- Phase 1 Epic 5 slice 10 is eligible as of 2026-11-26: the project owner approved `P1-E05-D11` Option B with four
+  separated draft/submit/approve/post permissions, tiered approval at 100,000 and 1,000,000 in the institution
+  currency, a customer-account adjustment class that requires a named compensating account, per-class grants for
+  cash/settlement/tax/suspense/control/income-expense, bounded reason codes and dual-control auto-expiring break-glass.
+  Manual-journal commands, class grants and Workflow decision binding still need implementation; partial component
+  reversal, accounting periods and the reversal/manual-journal HTTP endpoints remain unimplemented.
 
 Slice 15 of P1-E04 is in progress: `scripts/phase1-evidence.ps1` collects the database-free evidence, `04-slice-15-evidence.md` maps every acceptance criterion, `scripts/performance-profile-gate.ps1` enforces the versioned `P1-E04-D16` load result, and `scripts/recovery-evidence-gate.ps1` enforces the fresh-cluster four-hour/zero-loss recovery result. A run must not mark the slice implemented from gate validation or unit tests: it still needs results from the dedicated acceptance environment, the actual recovery mechanisms and drill, the live-stack evidence on the acceptance commit and the end-to-end journey gated by `P1-E04-D14`. A run must still re-evaluate the ledger and repository before acting because the state may have changed.
 

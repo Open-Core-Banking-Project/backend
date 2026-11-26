@@ -131,7 +131,7 @@ Every epic defines permissions before endpoints or handlers are implemented. Ini
 | Account opening | `account.open`, `account.open.approve` | Operations Officer/Supervisor | Product/branch |
 | Account restriction | `account.restriction.apply`, `account.restriction.approve` | Authorised Operations | Account/branch/reason |
 | Financial posting | `ledger.transaction.post` | Internal service identity | Accounting event, not general user access |
-| Manual journal | `ledger.manual_journal.create`, `ledger.manual_journal.approve` | Finance Officer/Approver | Ledger entity/amount |
+| Manual journal | `ledger.manual_journal.draft`, `ledger.manual_journal.submit`, `ledger.manual_journal.approve`, `ledger.manual_journal.post` | Finance Officer/Approver | Ledger entity/account class/amount |
 | Payment initiation | `payment.transfer.initiate` | Customer/Operations Officer | Account/channel/limit |
 | Payment approval | `payment.transfer.approve` | Supervisor/Corporate Approver | Mandate/amount |
 | USSD administration | `channel.ussd.menu.manage`, `channel.ussd.menu.publish` | Channel Administrator | Institution/short code |

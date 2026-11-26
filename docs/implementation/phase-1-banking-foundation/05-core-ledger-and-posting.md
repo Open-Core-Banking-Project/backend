@@ -130,8 +130,12 @@ Human role names are illustrative. Normal posting permissions belong to narrowly
 | Customer/staff | `ledger.transaction_history.view` | Own or authorised account/period | Sensitive access policy | None |
 | Finance officer | `ledger.reversal.propose` | Institution/transaction/type/amount | Required | Maker-checker |
 | Finance approver | `ledger.reversal.approve` | Institution/transaction/type/amount | Required | Cannot approve own proposal |
-| Finance officer | `ledger.manual_journal.create` | Institution/legal entity/period/currency/accounts/amount | Required | Always approved |
-| Finance approver | `ledger.manual_journal.approve` | Same scope | Required | Cannot approve own journal |
+| Finance officer | `ledger.manual_journal.draft` | Institution/legal entity/period/currency/accounts/amount | Required | Draft only |
+| Finance officer | `ledger.manual_journal.submit` | Same scope | Required | Sends the exact draft hash to Workflow |
+| Finance approver | `ledger.manual_journal.approve` | Same scope, exact request hash | Required | Cannot approve own journal; tier count by amount |
+| Finance operations | `ledger.manual_journal.post` | Approved request hash | Required | Posts the approved content unchanged |
+| Named Security operations | `ledger.manual_journal.break_glass` | Institution/account class/reason | Required with MFA | Dual control, expires at the business-date end |
+| Finance security admin | `ledger.manual_journal.class.<class>` | Declared account class only | Required | Separate grant per cash/settlement/tax/suspense/control/income-expense/customer-account-adjustment class |
 | Finance operations | `ledger.period.manage` | Institution/legal entity/period | Required | Dual control by policy |
 | Finance operations | `ledger.processing.execute` | Institution/business date/run type | Required | Start/resume/override policy |
 | Finance supervisor | `ledger.processing.approve` | Run/checkpoint/exception | Required | Cannot approve own restricted override |
@@ -400,7 +404,7 @@ Financial mutation APIs are internal service contracts. They are never exposed d
 | POST | `/internal/v1/ledger/holds/{id}/captures` | `ledger.hold.capture` | `CaptureHoldRequest` | `HoldResponse` | Required |
 | POST | `/internal/v1/ledger/holds/{id}/releases` | `ledger.hold.release` | `ReleaseHoldRequest` | `HoldResponse` | Required |
 | POST | `/api/v1/ledger/reversal-requests` | `ledger.reversal.propose` | `CreateReversalRequest` | `ReversalRequestResponse` | By request ID |
-| POST | `/api/v1/ledger/manual-journals` | `ledger.manual_journal.create` | `CreateManualJournalRequest` | `ManualJournalResponse` | By request ID |
+| POST | `/api/v1/ledger/manual-journals` | `ledger.manual_journal.draft` | `CreateManualJournalRequest` | `ManualJournalResponse` | By request ID |
 | POST | `/api/v1/ledger/periods/{id}/transition-proposals` | `ledger.period.manage` | `PeriodTransitionRequest` | `PeriodResponse` | By request ID |
 | POST | `/api/v1/ledger/processing-runs` | `ledger.processing.execute` | `StartProcessingRunRequest` | `ProcessingRunResponse` | By institution/type/date |
 | POST | `/api/v1/ledger/processing-runs/{id}/resume` | `ledger.processing.execute` | Checkpoint/expected version | `ProcessingRunResponse` | Yes |
@@ -640,7 +644,7 @@ Financial configuration is immutable after effective use. Missing or stale criti
 
 ## 19. Implementation slices
 
-Implementation progress as of 2026-11-26: `P1-E05-D01` to `P1-E05-D10` are approved, ADR-0005 is accepted and slices 2
+Implementation progress as of 2026-11-26: `P1-E05-D01` to `P1-E05-D11` are approved, ADR-0005 is accepted and slices 2
 through 9 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
 and mapping schemas, balanced mapping simulation, an exact-hash publication lifecycle and fail-closed effective chart
 resolution. The posting foundation now models immutable financial transactions, journals and typed positive-amount
@@ -656,7 +660,7 @@ provider-uncertain evidence, and commits the immutable original/reversal link, a
 reversing posting. No posting, hold or reversal HTTP endpoint, accounting period or processing table is enabled yet.
 
 1. Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decisions.
-   **D01 to D10 approved 2026-11-09 and 2026-11-26; D11 to D17 remain proposed:** see [decisions/](decisions/).
+   **D01 to D11 approved 2026-11-09 and 2026-11-26; D12 to D17 remain proposed:** see [decisions/](decisions/).
 2. Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence access outside the module.
 3. Implement ledger-account and approved mapping-version lifecycle with balanced simulation.
 4. Implement transaction/journal/line domain invariants and database append-only/balance guards. *Status: implemented
@@ -826,7 +830,7 @@ proposed for their later slices and release gates.
 | External/source reference uniqueness scopes | Deduplication/traceability | Domain owners/Finance | Slice 2 | Approved 2026-11-09: [P1-E05-D08](decisions/P1-E05-D08-reference-uniqueness-scopes.md) |
 | Fee/tax/commission/interest/waiver accounting treatment | Explicit components/mappings | Finance/Tax/Product | Slice 3 | Approved 2026-11-09: [P1-E05-D09](decisions/P1-E05-D09-fee-tax-and-waiver-treatment.md) |
 | Reversal/partial reversal and component policy | Corrections and provider flows | Finance/Operations | Slice 9 | Approved Option B by project owner 2026-11-26: [P1-E05-D10](decisions/P1-E05-D10-reversal-and-partial-reversal-policy.md) |
-| Manual journal/customer-account permissions | Privileged financial risk | Finance/Security | Slice 10 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D11](decisions/P1-E05-D11-manual-journal-and-customer-account-permissions.md) |
+| Manual journal/customer-account permissions | Privileged financial risk | Finance/Security | Slice 10 | Approved Option B by project owner 2026-11-26: [P1-E05-D11](decisions/P1-E05-D11-manual-journal-and-customer-account-permissions.md) |
 | Backdate/value-date windows and recalculation impact | Period/accrual correctness | Finance/Compliance | Slice 11 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D12](decisions/P1-E05-D12-backdate-value-date-and-recalculation-policy.md) |
 | Period close/lock/reopen state and authority | Financial close | Finance | Slice 11 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D13](decisions/P1-E05-D13-accounting-period-state-and-authority.md) |
 | EOD step graph, partitions and completion gates | Restart/order/business date | Finance/Core operations | Slice 12 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D14](decisions/P1-E05-D14-eod-step-graph-partitions-and-gates.md) |
