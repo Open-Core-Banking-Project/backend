@@ -44,9 +44,15 @@ As of 2026-11-26:
   PostgreSQL refuses to rewrite or delete posted requests and append-only lines/approvals. No manual-journal HTTP
   endpoint is exposed; partial component reversal, accounting periods and the reversal/manual-journal endpoints remain
   unimplemented.
-- Phase 1 Epic 5 slice 11 (accounting periods, date policies and controlled backdated/value-dated posting) is the next
-  ledger slice and is gated by `P1-E05-D12` (date policy) and `P1-E05-D13` (period state and authority), both still
-  drafted briefs awaiting approval.
+- Phase 1 Epic 5 slice 11 (accounting periods, date policies and controlled backdated/value-dated posting) is eligible as
+  of 2026-11-26: `P1-E05-D12` approved a 90-day ordinary value-date window, a 91-365 day backdate authority with
+  step-up and exact approval, refusal beyond 365 days pending a reopen, current-open-period posting with a prior-period
+  classification, no future value dates and a mandatory recalculation handoff; `P1-E05-D13` approved four period states
+  with an empty soft-close allow-list by default, a one-approver Finance close with balanced/reconciliation/processing/
+  outbox evidence, a two-approver maker-checker reopen expiring after five business days with automatic reclose and a
+  post-reclose reconciliation, and locked periods reopened only by dual-control break-glass. No period table, state
+  machine or date-window enforcement exists yet.
+- Phase 1 Epic 5 slice 12 (EOD run graph) remains gated by `P1-E05-D14`.
 
 Slice 15 of P1-E04 is in progress: `scripts/phase1-evidence.ps1` collects the database-free evidence, `04-slice-15-evidence.md` maps every acceptance criterion, `scripts/performance-profile-gate.ps1` enforces the versioned `P1-E04-D16` load result, and `scripts/recovery-evidence-gate.ps1` enforces the fresh-cluster four-hour/zero-loss recovery result. A run must not mark the slice implemented from gate validation or unit tests: it still needs results from the dedicated acceptance environment, the actual recovery mechanisms and drill, the live-stack evidence on the acceptance commit and the end-to-end journey gated by `P1-E04-D14`. A run must still re-evaluate the ledger and repository before acting because the state may have changed.
 

@@ -4,8 +4,11 @@ title: Backdate, value-date windows and recalculation impact
 epic: P1-E05 Core Ledger and Financial Posting
 owners: [Finance, Compliance]
 required_by: P1-E05-S11
-status: Proposed
+status: Approved
 brief_date: 2026-11-09
+approved_on: 2026-11-26
+approved_by: Project owner
+selected_option: B - 90/365-day windows with classified historical posting
 related: [P1-E05-D04, P1-E05-D10, P1-E05-D13]
 decisions: [P1-E05-D12]
 ---
@@ -17,40 +20,69 @@ caller from using one date to disguise another or from silently changing a close
 
 ## 1. Decision requested
 
-Finance and Compliance must approve date windows by event type, the authority required outside a normal window, and the
-downstream recalculation/reconciliation work triggered by a historical value date.
+| Question | Required answer |
+| --- | --- |
+| Ordinary window | How far may a caller set a value date relative to the business date? |
+| Extended history | What authority does an older value date need? |
+| Posting date | Which period does a historical value date post into? |
+| Future dates | May Ledger hold or post a future-dated request? |
+| Recalculation | What follow-up work does a historical value date trigger? |
+| Evidence | Which calendar, cut-off and approval evidence is recorded? |
 
-## 2. Recommended position
+## 2. Approved position
 
-- The server records transaction timestamp. The institution calendar supplies business date. The open accounting
-  period supplies posting date. A caller may request value date only where its event mapping permits it.
-- Ordinary posting uses the current business/posting date and a value date inside the approved event window.
-- A posting date in a closed or locked period is refused; it is never moved silently to another period.
-- An exceptional historical posting uses the current open posting date with the approved historical value date and a
-  clear prior-period classification, unless Finance explicitly approves reopen under D13.
-- Backdate authority is scoped by institution, legal entity, event, account/product, maximum age and amount. It requires
-  reason, evidence, step-up and an exact approval reference.
-- Future value dates are scheduled instructions owned by the source domain; Ledger does not hold a request open or post
-  a journal with a future transaction timestamp.
-- Recalculation is explicit: affected accruals, fees, interest, limits, statements, reports and reconciliation ranges are
-  recorded as required follow-up work. Ledger never rewrites an earlier posted result.
-- Cut-off and timezone use the institution business calendar version recorded with the decision.
+Option B was approved on 2026-11-26.
 
-## 3. Required implementation evidence
+- The server records the transaction timestamp. The institution business calendar supplies the business date, and the
+  open accounting period supplies the posting date.
+- Ordinary posting uses the current business/posting date with a value date from 90 calendar days before the business
+  date up to and including the business date.
+- A value date between 91 and 365 calendar days before the business date is an exceptional historical posting. It
+  requires the `ledger.backdate.post` authority, step-up authentication, a bounded reason code, an evidence reference
+  and an exact approval reference scoped to institution, legal entity, event, account/product, maximum age and amount.
+- A value date older than 365 calendar days is refused. It needs a `P1-E05-D13` period reopen plus explicit Finance
+  approval; Ledger never backdates by default.
+- An exceptional historical posting keeps its historical value date but posts on the current open posting date and
+  carries an explicit prior-period classification. The earlier period is not silently reopened or rewritten.
+- A posting date that falls in a closed or locked period is refused. Ledger never moves it silently to another period.
+- Future value dates are refused. Scheduled instructions belong to the owning source domain; Ledger holds no request
+  open and posts no journal with a future transaction timestamp.
+- Cut-off and timezone come from the institution business calendar version recorded with the decision; a stale or
+  ambiguous calendar version is refused.
+- Every historical value date records a mandatory recalculation/reconciliation handoff naming the affected accruals,
+  fees, interest, limits, statements, reports and reconciliation ranges. Ledger never rewrites an earlier posted
+  result; the follow-up is explicit work owned by the named teams.
+- A refusal leaves no journal, balance or movement change and records a durable audit outcome.
 
-Boundary tests cover daylight-saving/offset handling, business-date rollover, maximum age, closed period, future date,
-stale calendar version, exact approval binding and the durable recalculation handoff. Every refusal leaves no journal.
+## 3. Options and impact
 
-## 4. Deferred for approval
+| Option | Position | Impact |
+| --- | --- | --- |
+| A — same business date only | No value date other than today; every correction needs a reopen. | Simplest control, but ordinary corrections and provider same-day value dating become impossible. |
+| B — 90/365-day windows with classified historical posting **(approved)** | Ordinary window 90 days; 91–365 days under backdate authority; older requires reopen. | Supports real backdating and corrections while keeping the posted period history intact. Needs a published backdate authority and a recalculation handoff. |
+| C — reopen required for any prior date | Any historical value date forces a period reopen. | Strongest period integrity, but every correction touches the close/reopen control and operations cannot correct same-month history without a full cycle. |
 
-Owners must publish the actual windows, cut-offs, eligible event types, approval thresholds and recalculation matrix.
-Product interest/accrual conventions remain outside this decision.
+## 4. Required implementation evidence
 
-## 5. Sign-off
+1. Boundary tests at 90 and 91 days, and at 365 and 366 days, including the refusal path.
+2. Daylight-saving/offset handling and business-date rollover using the recorded calendar version.
+3. Closed and locked period refusal, and refusal of a stale calendar version.
+4. Future value date refusal.
+5. Exact approval binding: a changed value date, posting date, amount or evidence invalidates the approval.
+6. The durable recalculation/reconciliation handoff record.
+7. Every refusal leaves no journal, balance or movement behind.
+
+## 5. Approved policy boundary
+
+- Windows, authority scopes, reason codes and the recalculation matrix are published configuration owned by Finance and
+  Compliance. Changing them is a configuration publication, not a code default.
+- Product interest/accrual conventions and provider value-date rules remain outside this decision.
+- Until this policy is implemented and proven, a value date outside the ordinary window is refused.
+
+## 6. Sign-off
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
-| Finance | | Pending: approve windows and accounting treatment | |
-| Compliance | | Pending: approve evidence and historical limits | |
-
+| Project owner | User | Approved Option B | 2026-11-26 |
+| Finance | Project-owner approval | Approved the 90/365-day windows and the current-open-period classified treatment | 2026-11-26 |
+| Compliance | Project-owner approval | Approved the evidence, approval-binding and recalculation-handoff requirements | 2026-11-26 |
