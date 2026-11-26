@@ -1899,6 +1899,180 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("account_status_history", "account");
                 });
 
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountingPeriodHistoryRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("LegalEntityCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("legal_entity_code");
+
+                    b.Property<string>("PeriodCode")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("period_code");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("AllowedEventCodesJson")
+                        .HasColumnType("text")
+                        .HasColumnName("allowed_event_codes_json");
+
+                    b.Property<string>("ApprovalReference")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("approval_reference");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("from_status");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("to_status");
+
+                    b.HasKey("InstitutionId", "LegalEntityCode", "PeriodCode", "Sequence");
+
+                    b.ToTable("accounting_period_history", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_accounting_period_history_sequence", "sequence > 0");
+
+                            t.HasCheckConstraint("ck_accounting_period_history_status", "from_status IN ('open', 'soft_closed', 'closed', 'locked', 'reopened') AND to_status IN ('open', 'soft_closed', 'closed', 'locked', 'reopened')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.AccountingPeriodRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("LegalEntityCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("legal_entity_code");
+
+                    b.Property<string>("PeriodCode")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("period_code");
+
+                    b.Property<string>("AllowedEventCodesJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("allowed_event_codes_json");
+
+                    b.Property<string>("CloseApprovalReference")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("close_approval_reference");
+
+                    b.Property<string>("CloseSummaryHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("close_summary_hash");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<decimal?>("ClosedCreditTotal")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("closed_credit_total");
+
+                    b.Property<decimal?>("ClosedDebitTotal")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("closed_debit_total");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("LockApprovalReference")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("lock_approval_reference");
+
+                    b.Property<DateTimeOffset?>("LockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_at");
+
+                    b.Property<string>("RecloseReconciliationReference")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("reclose_reconciliation_reference");
+
+                    b.Property<DateTimeOffset?>("ReclosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reclosed_at");
+
+                    b.Property<DateTimeOffset?>("ReopenExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reopen_expires_at");
+
+                    b.Property<string>("ReopenReasonCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reopen_reason_code");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("InstitutionId", "LegalEntityCode", "PeriodCode");
+
+                    b.ToTable("accounting_periods", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_accounting_periods_closed_evidence", "status NOT IN ('closed', 'locked') OR (closed_at IS NOT NULL AND close_summary_hash IS NOT NULL AND closed_debit_total IS NOT NULL AND closed_credit_total IS NOT NULL AND closed_debit_total = closed_credit_total)");
+
+                            t.HasCheckConstraint("ck_accounting_periods_locked_evidence", "status <> 'locked' OR locked_at IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_accounting_periods_reopen_evidence", "status <> 'reopened' OR (reopen_expires_at IS NOT NULL AND reopen_reason_code IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_accounting_periods_status", "status IN ('open', 'soft_closed', 'closed', 'locked', 'reopened')");
+
+                            t.HasCheckConstraint("ck_accounting_periods_version", "version > 0");
+                        });
+                });
+
             modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.BranchRecord", b =>
                 {
                     b.Property<string>("InstitutionId")
@@ -4270,6 +4444,77 @@ namespace CoreBanking.CoreLedger.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_provisioning_steps_failure_code", "(status = 'failed' AND failure_code IS NOT NULL) OR (status <> 'failed' AND failure_code IS NULL)");
 
                             t.HasCheckConstraint("ck_provisioning_steps_status", "status IN ('pending', 'initialised', 'failed')");
+                        });
+                });
+
+            modelBuilder.Entity("CoreBanking.CoreLedger.Infrastructure.Persistence.RecalculationHandoffRecord", b =>
+                {
+                    b.Property<string>("InstitutionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("institution_id");
+
+                    b.Property<string>("HandoffId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("handoff_id");
+
+                    b.Property<int>("AgeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("age_days");
+
+                    b.Property<string>("ApprovalReference")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("approval_reference");
+
+                    b.Property<string>("EvidenceReference")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("evidence_reference");
+
+                    b.Property<string>("FinancialTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("financial_transaction_id");
+
+                    b.Property<string>("LegalEntityCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("legal_entity_code");
+
+                    b.Property<string>("PeriodCode")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("period_code");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<DateOnly>("ValueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("value_date");
+
+                    b.HasKey("InstitutionId", "HandoffId");
+
+                    b.HasIndex("InstitutionId", "FinancialTransactionId")
+                        .IsUnique();
+
+                    b.ToTable("recalculation_handoffs", "ledger", t =>
+                        {
+                            t.HasCheckConstraint("ck_recalculation_handoffs_age", "age_days > 90");
                         });
                 });
 

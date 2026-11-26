@@ -163,6 +163,7 @@ if (useRelationalStore)
     builder.Services.AddScoped<IManualJournalPolicySource, ManualJournalPolicySource>();
     builder.Services.AddScoped<IManualJournalAccountResolver, ManualJournalAccountResolver>();
     builder.Services.AddScoped<ManualJournalService>();
+    builder.Services.AddScoped<IAccountingPeriodService, AccountingPeriodService>();
     builder.Services.AddScoped<IManualJournalService>(provider =>
         (IManualJournalService)provider.GetRequiredService<ManualJournalService>());
     builder.Services.AddScoped<IManualJournalApprovalApplier>(provider =>

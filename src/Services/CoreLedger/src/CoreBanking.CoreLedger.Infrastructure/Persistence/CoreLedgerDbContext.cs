@@ -116,6 +116,12 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public DbSet<ManualJournalApprovalRecord> ManualJournalApprovals => Set<ManualJournalApprovalRecord>();
 
+    public DbSet<AccountingPeriodRecord> AccountingPeriods => Set<AccountingPeriodRecord>();
+
+    public DbSet<AccountingPeriodHistoryRecord> AccountingPeriodHistory => Set<AccountingPeriodHistoryRecord>();
+
+    public DbSet<RecalculationHandoffRecord> RecalculationHandoffs => Set<RecalculationHandoffRecord>();
+
     public DbSet<LedgerBalanceRecord> LedgerBalances => Set<LedgerBalanceRecord>();
 
     public DbSet<LedgerMovementRecord> LedgerMovements => Set<LedgerMovementRecord>();
@@ -197,6 +203,9 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<ManualJournalRequestRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<ManualJournalLineRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<ManualJournalApprovalRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountingPeriodRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountingPeriodHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<RecalculationHandoffRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<LedgerBalanceRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<LedgerMovementRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<LedgerHoldRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
@@ -266,6 +275,24 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
             if (entry.State is EntityState.Modified or EntityState.Deleted)
             {
                 throw new System.InvalidOperationException("Manual journal approvals are append-only.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<AccountingPeriodHistoryRecord> entry
+                 in ChangeTracker.Entries<AccountingPeriodHistoryRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Accounting-period history is append-only.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<RecalculationHandoffRecord> entry
+                 in ChangeTracker.Entries<RecalculationHandoffRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Recalculation handoffs are append-only.");
             }
         }
 

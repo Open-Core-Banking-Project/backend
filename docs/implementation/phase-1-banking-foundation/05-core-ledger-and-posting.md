@@ -645,7 +645,7 @@ Financial configuration is immutable after effective use. Missing or stale criti
 ## 19. Implementation slices
 
 Implementation progress as of 2026-11-26: `P1-E05-D01` to `P1-E05-D13` are approved, ADR-0005 is accepted and slices 2
-through 10 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
+through 11 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
 and mapping schemas, balanced mapping simulation, an exact-hash publication lifecycle and fail-closed effective chart
 resolution. The posting foundation now models immutable financial transactions, journals and typed positive-amount
 lines; PostgreSQL enforces scoped reference uniqueness, at least one balanced two-line journal per Posted transaction,
@@ -659,8 +659,11 @@ consumes the reversible remainder, requires reason, evidence and applicable Work
 provider-uncertain evidence, and commits the immutable original/reversal link, audit and outbox fact atomically with the
 reversing posting. Manual journals resolve their accounts against the effective chart, enforce the published class
 grants, reason catalogue, compensating-account rule and amount tiers, and post only after the approved quorum of
-distinct non-maker approvers; dual-control break-glass posts with its own bounded security evidence. No posting, hold,
-reversal or manual-journal HTTP endpoint, accounting period or processing table is enabled yet.
+distinct non-maker approvers; dual-control break-glass posts with its own bounded security evidence. Accounting periods
+now enforce the approved state machine and date policy inside the posting transaction: monthly periods per legal entity,
+empty-by-default soft-close/reopen allow-lists, two-approver time-bounded reopen, close evidence and a durable
+recalculation handoff for historical value dates. No posting, hold, reversal, manual-journal or period HTTP endpoint,
+EOD processing table or statement query is enabled yet.
 
 1. Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decisions.
    **D01 to D13 approved 2026-11-09 and 2026-11-26; D14 to D17 remain proposed:** see [decisions/](decisions/).
@@ -745,7 +748,20 @@ reversal or manual-journal HTTP endpoint, accounting period or processing table 
     restricted grants. The Release solution builds with zero warnings/errors; 387 non-database, 62 PostgreSQL
     database/integration, 56 effective-principal security and 17 architecture tests pass. No manual-journal HTTP endpoint
     is exposed and closed-period posting remains with slices 11-13.*
-11. Implement accounting periods, date policies and controlled backdated/value-dated posting.
+11. Implement accounting periods, date policies and controlled backdated/value-dated posting. *Status: implemented
+    2026-11-26 — the approved `P1-E05-D12`/`D13` policy is enforced inside the posting transaction. Each legal entity
+    owns monthly accounting periods with an Open/SoftClosed/Closed/Locked/Reopened state machine, the soft-close and
+    reopen allow-lists default to empty, and a period is provisioned Open on first use while Finance controls every
+    later transition. Transitions run under the same advisory transaction lock posting uses, check optimistic version,
+    require balanced/reconciled/processing/outbox close evidence, and record append-only history plus audit. A reopen
+    needs two distinct non-maker Finance approvals, expires within five business days and refuses posting once expired.
+    The date policy treats a value date within 90 days as ordinary, requires a bound step-up backdate authority between
+    91 and 365 days, classifies those postings as prior-period on the current open posting date and records a durable
+    recalculation handoff, and refuses future dates, dates older than 365 days and a posting date that differs from the
+    business date. Migration `AddAccountingPeriods` adds the period, history and handoff tables with append-only guards
+    and restricted grants. The Release solution builds with zero warnings/errors; 411 non-database, 68 PostgreSQL
+    database/integration, 57 effective-principal security and 17 architecture tests pass. No period or recalculation
+    HTTP endpoint is exposed and EOD processing remains with slice 12.*
 12. Implement EOD run graph, batches, checkpoints, restart and balancing summaries for approved Phase 1 steps.
 13. Implement authoritative balance/history/statement-data queries and controlled document handoff.
 14. Implement balance rebuild, reconciliation feeds, dashboards, alerts and operational runbooks.

@@ -134,6 +134,31 @@ public sealed class ApplicationPrincipalPrivilegeTests
         }
     }
 
+    [Fact]
+    public async Task Core_ledger_principal_cannot_rewrite_accounting_period_evidence()
+    {
+        ServiceDescriptor service = ServiceCatalogue.Get("CoreLedger");
+        await using NpgsqlConnection connection = await service.OpenAsync(CancellationToken.None);
+
+        TablePrivileges[] tables = await ReadTablePrivilegesAsync(connection, "ledger");
+        TablePrivileges periods = Assert.Single(tables, table => table.Name == "accounting_periods");
+        Assert.True(periods.Select);
+        Assert.True(periods.Insert);
+        Assert.True(periods.Update);
+        Assert.False(periods.Delete);
+        Assert.False(periods.Truncate);
+
+        foreach (string appendOnly in new[] { "accounting_period_history", "recalculation_handoffs" })
+        {
+            TablePrivileges table = Assert.Single(tables, item => item.Name == appendOnly);
+            Assert.True(table.Select);
+            Assert.True(table.Insert);
+            Assert.False(table.Update);
+            Assert.False(table.Delete);
+            Assert.False(table.Truncate);
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Services))]
     public async Task The_principal_holds_no_ownership_membership_or_administrative_attribute(string serviceName)

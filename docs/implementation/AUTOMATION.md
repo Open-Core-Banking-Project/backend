@@ -44,15 +44,17 @@ As of 2026-11-26:
   PostgreSQL refuses to rewrite or delete posted requests and append-only lines/approvals. No manual-journal HTTP
   endpoint is exposed; partial component reversal, accounting periods and the reversal/manual-journal endpoints remain
   unimplemented.
-- Phase 1 Epic 5 slice 11 (accounting periods, date policies and controlled backdated/value-dated posting) is eligible as
-  of 2026-11-26: `P1-E05-D12` approved a 90-day ordinary value-date window, a 91-365 day backdate authority with
-  step-up and exact approval, refusal beyond 365 days pending a reopen, current-open-period posting with a prior-period
-  classification, no future value dates and a mandatory recalculation handoff; `P1-E05-D13` approved four period states
-  with an empty soft-close allow-list by default, a one-approver Finance close with balanced/reconciliation/processing/
-  outbox evidence, a two-approver maker-checker reopen expiring after five business days with automatic reclose and a
-  post-reclose reconciliation, and locked periods reopened only by dual-control break-glass. No period table, state
-  machine or date-window enforcement exists yet.
-- Phase 1 Epic 5 slice 12 (EOD run graph) remains gated by `P1-E05-D14`.
+- Phase 1 Epic 5 slice 11 is implemented as of 2026-11-26 under the project owner's `P1-E05-D12`/`D13` Option B
+  approvals: monthly legal-entity accounting periods enforce the approved state graph inside the posting transaction
+  under the same advisory lock, provision Open on first use, keep soft-close/reopen allow-lists empty by default, require
+  balanced/reconciled/processing/outbox close evidence, need two distinct non-maker Finance approvals for a reopen that
+  expires within five business days, and record append-only history plus audit. The date policy treats a value date
+  within 90 days as ordinary, requires a bound step-up backdate authority between 91 and 365 days, classifies those
+  postings prior-period on the current open posting date and records a durable recalculation handoff, and refuses future
+  dates, dates older than 365 days and a posting date that differs from the business date. No period or recalculation
+  HTTP endpoint is exposed.
+- Phase 1 Epic 5 slice 12 (EOD run graph, batches, checkpoints, restart and balancing summaries) is the next ledger slice
+  and is gated by `P1-E05-D14`, still a drafted brief awaiting approval. The only other startable item is `P1-E04-S15`.
 
 Slice 15 of P1-E04 is in progress: `scripts/phase1-evidence.ps1` collects the database-free evidence, `04-slice-15-evidence.md` maps every acceptance criterion, `scripts/performance-profile-gate.ps1` enforces the versioned `P1-E04-D16` load result, and `scripts/recovery-evidence-gate.ps1` enforces the fresh-cluster four-hour/zero-loss recovery result. A run must not mark the slice implemented from gate validation or unit tests: it still needs results from the dedicated acceptance environment, the actual recovery mechanisms and drill, the live-stack evidence on the acceptance commit and the end-to-end journey gated by `P1-E04-D14`. A run must still re-evaluate the ledger and repository before acting because the state may have changed.
 

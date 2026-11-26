@@ -27,7 +27,8 @@ public sealed record AtomicLedgerPostingCommand(
     string CorrelationId,
     string? CausationId = null,
     LedgerHoldCapture? HoldCapture = null,
-    LedgerReversalContext? Reversal = null);
+    LedgerReversalContext? Reversal = null,
+    DateAuthority? DateAuthority = null);
 
 public sealed record LedgerHoldCapture(string HoldId, decimal Amount, long ExpectedVersion);
 
@@ -121,6 +122,16 @@ public sealed class AtomicLedgerPostingService
 
         PreparedReversal? reversal = await PrepareReversalAsync(command, cancellationToken).ConfigureAwait(false);
 
+        PostingDateDecision dateDecision = await PostingDateGuard.EnsureAsync(
+            _context,
+            command.Transaction.InstitutionId,
+            command.Journal.Scope.LegalEntityCode,
+            command.Transaction.Dates,
+            command.Transaction.EventCode,
+            command.DateAuthority,
+            _timeProvider.GetUtcNow(),
+            cancellationToken).ConfigureAwait(false);
+
         string[] accountIds = command.Journal.Lines
             .Select(line => line.LedgerAccountId)
             .Distinct(StringComparer.Ordinal)
@@ -151,6 +162,10 @@ public sealed class AtomicLedgerPostingService
         }
 
         AddMovements(command, accounts.ToDictionary(pair => pair.Key, pair => pair.Value.Balance, StringComparer.Ordinal), postedAt);
+        if (dateDecision.RequiresRecalculationHandoff)
+        {
+            AddRecalculationHandoff(command, dateDecision, postedAt);
+        }
 
         LedgerPostingResult result = new(
             command.Transaction.Id,
@@ -660,6 +675,29 @@ public sealed class AtomicLedgerPostingService
             OriginalValueDate = prepared.OriginalJournal.ValueDate,
             ReversalValueDate = command.Journal.Dates.ValueDate,
             OccurredAt = postedAt,
+        });
+    }
+
+    private void AddRecalculationHandoff(
+        AtomicLedgerPostingCommand command,
+        PostingDateDecision decision,
+        DateTimeOffset postedAt)
+    {
+        DateAuthority authority = command.DateAuthority
+            ?? throw new LedgerPostingException("backdate_authority_required");
+        _context.RecalculationHandoffs.Add(new RecalculationHandoffRecord
+        {
+            InstitutionId = command.Transaction.InstitutionId,
+            HandoffId = Guid.NewGuid().ToString("N"),
+            LegalEntityCode = command.Journal.Scope.LegalEntityCode,
+            PeriodCode = command.Transaction.Dates.PostingDate.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture),
+            FinancialTransactionId = command.Transaction.Id,
+            ValueDate = command.Transaction.Dates.ValueDate,
+            AgeDays = decision.AgeDays,
+            ReasonCode = authority.ReasonCode.Trim(),
+            EvidenceReference = authority.EvidenceReference.Trim(),
+            ApprovalReference = authority.ApprovalReference.Trim(),
+            RecordedAt = postedAt,
         });
     }
 
