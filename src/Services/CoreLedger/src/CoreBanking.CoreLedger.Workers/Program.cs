@@ -6,9 +6,11 @@ using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.BuildingBlocks.Infrastructure.Messaging.Kafka;
 using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.CoreLedger.Application.Accounts;
+using CoreBanking.CoreLedger.Application.Ledger;
 using CoreBanking.CoreLedger.Infrastructure;
 using CoreBanking.CoreLedger.Infrastructure.Accounts;
 using CoreBanking.CoreLedger.Infrastructure.Institutions;
+using CoreBanking.CoreLedger.Infrastructure.Ledger;
 using CoreBanking.CoreLedger.Infrastructure.Persistence;
 using CoreBanking.CoreLedger.Infrastructure.Products;
 using Microsoft.EntityFrameworkCore;
@@ -70,6 +72,16 @@ public static partial class Program
         builder.Services.AddScoped<InstitutionConfigurationApprovalDecidedConsumer>();
         builder.Services.AddScoped<AccountApplicationApprovalDecidedConsumer>();
         builder.Services.AddScoped<AccountClosureApprovalDecidedConsumer>();
+        builder.Services.AddScoped<ManualJournalApprovalDecidedConsumer>();
+        builder.Services.AddScoped<IdempotencyService>();
+        builder.Services.AddScoped<FinancialIdempotencyService>();
+        builder.Services.AddScoped<IAccountControlService, AccountControlService>();
+        builder.Services.AddScoped<AtomicLedgerPostingService>();
+        builder.Services.AddScoped<IManualJournalPolicySource, ManualJournalPolicySource>();
+        builder.Services.AddScoped<IManualJournalAccountResolver, ManualJournalAccountResolver>();
+        builder.Services.AddScoped<ManualJournalService>();
+        builder.Services.AddScoped<IManualJournalApprovalApplier>(provider =>
+            (IManualJournalApprovalApplier)provider.GetRequiredService<ManualJournalService>());
         builder.Services.AddScoped<ILedgerClosureConditionSource, LedgerClosureConditionSource>();
         builder.Services.AddScoped<IAccountClosureService, AccountClosureService>();
         builder.Services.AddScoped<IAccountClosureApprovalApplier>(provider =>

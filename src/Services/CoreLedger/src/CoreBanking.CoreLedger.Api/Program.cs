@@ -159,6 +159,14 @@ if (useRelationalStore)
     builder.Services.AddScoped<AtomicLedgerPostingService>();
     builder.Services.AddScoped<LedgerReversalService>();
     builder.Services.AddScoped<ILedgerHoldService, LedgerHoldService>();
+    builder.Services.AddScoped<IManualJournalPolicyConfigurationService, ManualJournalPolicyConfigurationService>();
+    builder.Services.AddScoped<IManualJournalPolicySource, ManualJournalPolicySource>();
+    builder.Services.AddScoped<IManualJournalAccountResolver, ManualJournalAccountResolver>();
+    builder.Services.AddScoped<ManualJournalService>();
+    builder.Services.AddScoped<IManualJournalService>(provider =>
+        (IManualJournalService)provider.GetRequiredService<ManualJournalService>());
+    builder.Services.AddScoped<IManualJournalApprovalApplier>(provider =>
+        (IManualJournalApprovalApplier)provider.GetRequiredService<ManualJournalService>());
     builder.Services.AddScoped<IInstitutionCreationService, InstitutionCreationService>();
     builder.Services.AddScoped<IInstitutionActivationService, InstitutionActivationService>();
     builder.Services.AddScoped<IInstitutionSuspensionService, InstitutionSuspensionService>();

@@ -128,6 +128,21 @@ public static class LedgerConfigurationContent
         return ConfigurationContent.Create(json);
     }
 
+    /// <summary>Resolves the chart role of one approved chart account code. Decision: P1-E05-D11.</summary>
+    public static LedgerAccountRole ResolveAccountRole(string json, string chartAccountCode)
+    {
+        ChartPayload payload = Deserialize<ChartPayload>(json);
+        ArgumentException.ThrowIfNullOrWhiteSpace(chartAccountCode);
+        string code = chartAccountCode.Trim();
+        ChartAccountPayload account = payload.Accounts.SingleOrDefault(item =>
+            string.Equals(item.Code?.Trim(), code, StringComparison.Ordinal))
+            ?? throw new LedgerMappingException("ledger_account_code_unknown");
+        return ParseEnum<LedgerAccountRole>(account.Role, "role");
+    }
+
+    public static string ResolveLegalEntityCode(string json) =>
+        Deserialize<ChartPayload>(json).LegalEntityCode.Trim();
+
     private static T Deserialize<T>(string json)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);

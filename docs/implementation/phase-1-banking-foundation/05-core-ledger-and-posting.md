@@ -645,7 +645,7 @@ Financial configuration is immutable after effective use. Missing or stale criti
 ## 19. Implementation slices
 
 Implementation progress as of 2026-11-26: `P1-E05-D01` to `P1-E05-D11` are approved, ADR-0005 is accepted and slices 2
-through 9 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
+through 10 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
 and mapping schemas, balanced mapping simulation, an exact-hash publication lifecycle and fail-closed effective chart
 resolution. The posting foundation now models immutable financial transactions, journals and typed positive-amount
 lines; PostgreSQL enforces scoped reference uniqueness, at least one balanced two-line journal per Posted transaction,
@@ -657,7 +657,10 @@ audit and outbox evidence under the same financial idempotency boundary; capture
 Full reversal derives exact opposite lines from the authoritative posted rows, locks the original while it validates and
 consumes the reversible remainder, requires reason, evidence and applicable Workflow approval separation, refuses
 provider-uncertain evidence, and commits the immutable original/reversal link, audit and outbox fact atomically with the
-reversing posting. No posting, hold or reversal HTTP endpoint, accounting period or processing table is enabled yet.
+reversing posting. Manual journals resolve their accounts against the effective chart, enforce the published class
+grants, reason catalogue, compensating-account rule and amount tiers, and post only after the approved quorum of
+distinct non-maker approvers; dual-control break-glass posts with its own bounded security evidence. No posting, hold,
+reversal or manual-journal HTTP endpoint, accounting period or processing table is enabled yet.
 
 1. Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decisions.
    **D01 to D11 approved 2026-11-09 and 2026-11-26; D12 to D17 remain proposed:** see [decisions/](decisions/).
@@ -728,7 +731,20 @@ reversing posting. No posting, hold or reversal HTTP endpoint, accounting period
    55 effective-principal security and 17 architecture tests pass. Partial/component reversal remains fail-closed until
    an approved event mapping publishes its eligibility, component treatment and limits. No reversal HTTP endpoint is
    exposed.*
-10. Implement manual journal/adjustment and Workflow decision application.
+10. Implement manual journal/adjustment and Workflow decision application. *Status: implemented 2026-11-26 — the
+    institution's `ledger.manual_journal_policy` is authored through the shared configuration lifecycle and resolved
+    fail-closed: a missing, ambiguous, superseded or corrupt policy refuses every manual journal. A draft resolves each
+    ledger account against the effective published chart, maps its role to an approved class grant, refuses unauthorised
+    reason codes, requires a compensating-class line for a `customer_account_adjustment`, and fixes an exact content hash
+    together with the amount-tier and class quorum. Submitting emits one `approval_requested` fact bound to the exact
+    version and hash. The Workflow `approval_decided` consumer records append-only decisions, excludes the maker, applies
+    the tier's Finance-head permission and posts through the protected posting boundary only when the quorum is met. A
+    Break-glass post requires a distinct dual-control actor, a bounded security evidence reference and an expiry, and
+    cannot bypass balancing, immutability, period, currency or idempotency checks. Migration `AddManualJournals` adds the
+    request, line and approval tables with content-immutability and posted-request triggers, append-only child guards and
+    restricted grants. The Release solution builds with zero warnings/errors; 387 non-database, 62 PostgreSQL
+    database/integration, 56 effective-principal security and 17 architecture tests pass. No manual-journal HTTP endpoint
+    is exposed and closed-period posting remains with slices 11-13.*
 11. Implement accounting periods, date policies and controlled backdated/value-dated posting.
 12. Implement EOD run graph, batches, checkpoints, restart and balancing summaries for approved Phase 1 steps.
 13. Implement authoritative balance/history/statement-data queries and controlled document handoff.

@@ -109,6 +109,31 @@ public sealed class ApplicationPrincipalPrivilegeTests
         Assert.False(reversal.Truncate);
     }
 
+    [Fact]
+    public async Task Core_ledger_principal_cannot_rewrite_manual_journal_evidence()
+    {
+        ServiceDescriptor service = ServiceCatalogue.Get("CoreLedger");
+        await using NpgsqlConnection connection = await service.OpenAsync(CancellationToken.None);
+
+        TablePrivileges[] tables = await ReadTablePrivilegesAsync(connection, "ledger");
+        TablePrivileges requests = Assert.Single(tables, table => table.Name == "manual_journal_requests");
+        Assert.True(requests.Select);
+        Assert.True(requests.Insert);
+        Assert.True(requests.Update);
+        Assert.False(requests.Delete);
+        Assert.False(requests.Truncate);
+
+        foreach (string appendOnly in new[] { "manual_journal_lines", "manual_journal_approvals" })
+        {
+            TablePrivileges table = Assert.Single(tables, item => item.Name == appendOnly);
+            Assert.True(table.Select);
+            Assert.True(table.Insert);
+            Assert.False(table.Update);
+            Assert.False(table.Delete);
+            Assert.False(table.Truncate);
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Services))]
     public async Task The_principal_holds_no_ownership_membership_or_administrative_attribute(string serviceName)
