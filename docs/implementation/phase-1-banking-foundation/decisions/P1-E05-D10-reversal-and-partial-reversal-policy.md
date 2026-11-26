@@ -5,7 +5,7 @@ epic: P1-E05 Core Ledger and Financial Posting
 owners: [Finance, Operations]
 required_by: P1-E05-S9
 status: Proposed
-brief_date: 2026-11-09
+brief_date: 2026-11-26
 related: [P1-E05-D03, P1-E05-D09, P1-E07-D14]
 decisions: [P1-E05-D10]
 ---
@@ -40,7 +40,19 @@ provider timeout, duplicate request or concurrent operator action from producing
   its value-date relationship to the original is recorded, not inferred.
 - Reversal refusal is a durable, queryable outcome and never edits the original transaction state to `Failed`.
 
-## 3. Required implementation evidence
+## 3. Options and impact
+
+| Option | Position | Impact |
+| --- | --- | --- |
+| A — full-only reversals | Every eligible posting is reversed in full, including every component selected by its approved mapping. | Smallest and safest Phase 1 implementation, but operations cannot correct a settled partial amount without a separate approved adjustment flow. |
+| B — mapping-gated partial reversals **(recommended)** | Full reversal remains the default. An approved event mapping may opt specific principal/fee/tax/commission components into partial reversal and define their limits. | Supports legitimate partial corrections while keeping accounting treatment explicit. Requires Finance to publish an event-by-event eligibility/component matrix and Operations to publish reason/evidence/approval rules before implementation. |
+| C — caller-selected partial reversals | The caller chooses any amount or component up to the remaining original amount. | Most flexible, but it permits callers to invent accounting treatment and can strand fees, taxes or commissions. This conflicts with the protected posting boundary and is rejected. |
+
+Approving Option B authorises only the reversal mechanics described here. It does not approve provider finality,
+backdating, closed-period posting, arbitrary journal lines or a production accounting mapping. Without the Finance and
+Operations matrices named below, P1-E05-S9 remains blocked and no reversal API or posting path may be exposed.
+
+## 4. Required implementation evidence
 
 1. Full reversal produces balanced opposite lines and an immutable original/reversal link.
 2. Two concurrent reversals produce at most the approved reversible total.
@@ -49,12 +61,14 @@ provider timeout, duplicate request or concurrent operator action from producing
 5. Component-only reversal is refused unless the exact mapping permits it.
 6. Maker self-approval, stale approval and closed-period attempts are denied and audited.
 
-## 4. Deferred for approval
+## 5. Approval inputs required
 
-Finance and Operations must publish the event-by-event eligibility matrix, partial limits, component treatment, reason
-catalogue and approval thresholds. Provider-specific finality remains owned by Payments/Integration decisions.
+Finance must select an option and, for Option B, publish the event-by-event eligibility matrix, partial limits and
+principal/fee/tax/commission treatment. Operations must approve the reason catalogue, evidence requirements and
+approval thresholds. Provider-specific finality remains owned by Payments/Integration decisions and cannot be inferred
+from this approval.
 
-## 5. Sign-off
+## 6. Sign-off
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
