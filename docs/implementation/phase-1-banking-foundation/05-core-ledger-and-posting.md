@@ -644,7 +644,7 @@ Financial configuration is immutable after effective use. Missing or stale criti
 
 ## 19. Implementation slices
 
-Implementation progress as of 2026-11-26: `P1-E05-D01` to `P1-E05-D13` are approved, ADR-0005 is accepted and slices 2
+Implementation progress as of 2026-11-26: `P1-E05-D01` to `P1-E05-D14` are approved, ADR-0005 is accepted and slices 2
 through 11 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
 and mapping schemas, balanced mapping simulation, an exact-hash publication lifecycle and fail-closed effective chart
 resolution. The posting foundation now models immutable financial transactions, journals and typed positive-amount
@@ -666,7 +666,7 @@ recalculation handoff for historical value dates. No posting, hold, reversal, ma
 EOD processing table or statement query is enabled yet.
 
 1. Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decisions.
-   **D01 to D13 approved 2026-11-09 and 2026-11-26; D14 to D17 remain proposed:** see [decisions/](decisions/).
+   **D01 to D14 approved 2026-11-09 and 2026-11-26; D15 to D17 remain proposed:** see [decisions/](decisions/).
 2. Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence access outside the module.
 3. Implement ledger-account and approved mapping-version lifecycle with balanced simulation.
 4. Implement transaction/journal/line domain invariants and database append-only/balance guards. *Status: implemented
@@ -865,7 +865,7 @@ proposed for their later slices and release gates.
 | Manual journal/customer-account permissions | Privileged financial risk | Finance/Security | Slice 10 | Approved Option B by project owner 2026-11-26: [P1-E05-D11](decisions/P1-E05-D11-manual-journal-and-customer-account-permissions.md) |
 | Backdate/value-date windows and recalculation impact | Period/accrual correctness | Finance/Compliance | Slice 11 | Approved Option B by project owner 2026-11-26: [P1-E05-D12](decisions/P1-E05-D12-backdate-value-date-and-recalculation-policy.md) |
 | Period close/lock/reopen state and authority | Financial close | Finance | Slice 11 | Approved Option B by project owner 2026-11-26: [P1-E05-D13](decisions/P1-E05-D13-accounting-period-state-and-authority.md) |
-| EOD step graph, partitions and completion gates | Restart/order/business date | Finance/Core operations | Slice 12 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D14](decisions/P1-E05-D14-eod-step-graph-partitions-and-gates.md) |
+| EOD step graph, partitions and completion gates | Restart/order/business date | Finance/Core operations | Slice 12 | Approved Option A by project owner 2026-11-26: [P1-E05-D14](decisions/P1-E05-D14-eod-step-graph-partitions-and-gates.md) |
 | Statement running-balance/snapshot semantics | US-023 accuracy | Finance/Product | Slice 13 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D15](decisions/P1-E05-D15-statement-running-balance-and-snapshot-semantics.md) |
 | Retention/partitioning/archival | Scale, audit and restore | Compliance/DBA | Before migration approval | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D16](decisions/P1-E05-D16-retention-partitioning-and-archival.md) |
 | Load, latency, availability, RTO and RPO | Release/performance/recovery | Product/Platform | Before release testing | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D17](decisions/P1-E05-D17-capacity-latency-availability-and-recovery-targets.md) |

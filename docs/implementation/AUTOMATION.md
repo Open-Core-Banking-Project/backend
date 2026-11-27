@@ -53,8 +53,16 @@ As of 2026-11-26:
   postings prior-period on the current open posting date and records a durable recalculation handoff, and refuses future
   dates, dates older than 365 days and a posting date that differs from the business date. No period or recalculation
   HTTP endpoint is exposed.
-- Phase 1 Epic 5 slice 12 (EOD run graph, batches, checkpoints, restart and balancing summaries) is the next ledger slice
-  and is gated by `P1-E05-D14`, still a drafted brief awaiting approval. The only other startable item is `P1-E04-S15`.
+- Phase 1 Epic 5 slice 12 (EOD run graph, batches, checkpoints, restart and balancing summaries) is eligible as of
+  2026-11-26: `P1-E05-D14` approved seven blocking steps (prerequisite validation, scheduled financial inputs, approved
+  accrual/fee steps, balance and event reconciliation, period checks, completion summary, business-date advancement)
+  with dormancy/statement/payment/provider steps as named non-blocking handoffs, immutable run snapshots, deterministic
+  run/step/partition identities, 60-second expiring leases with database checkpoints as the only truth, three attempts
+  then a blocking exception, ledger-account-hash partitions reconciled at merge, one Core Operations sign-off, and a
+  dual-control `ledger.processing.override` for non-financial retry/skip that can never manufacture a checkpoint or
+  bypass an invariant. No run, step, checkpoint or partition table exists yet.
+- Phase 1 Epic 5 slice 13 (authoritative balance/history/statement-data queries) is gated by `P1-E05-D15`; slices 14-15
+  remain gated by `P1-E05-D16` and `P1-E05-D17`. The only other startable item is `P1-E04-S15`.
 
 Slice 15 of P1-E04 is in progress: `scripts/phase1-evidence.ps1` collects the database-free evidence, `04-slice-15-evidence.md` maps every acceptance criterion, `scripts/performance-profile-gate.ps1` enforces the versioned `P1-E04-D16` load result, and `scripts/recovery-evidence-gate.ps1` enforces the fresh-cluster four-hour/zero-loss recovery result. A run must not mark the slice implemented from gate validation or unit tests: it still needs results from the dedicated acceptance environment, the actual recovery mechanisms and drill, the live-stack evidence on the acceptance commit and the end-to-end journey gated by `P1-E04-D14`. A run must still re-evaluate the ledger and repository before acting because the state may have changed.
 
