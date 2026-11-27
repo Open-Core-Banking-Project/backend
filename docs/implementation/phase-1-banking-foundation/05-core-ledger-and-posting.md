@@ -130,8 +130,12 @@ Human role names are illustrative. Normal posting permissions belong to narrowly
 | Customer/staff | `ledger.transaction_history.view` | Own or authorised account/period | Sensitive access policy | None |
 | Finance officer | `ledger.reversal.propose` | Institution/transaction/type/amount | Required | Maker-checker |
 | Finance approver | `ledger.reversal.approve` | Institution/transaction/type/amount | Required | Cannot approve own proposal |
-| Finance officer | `ledger.manual_journal.create` | Institution/legal entity/period/currency/accounts/amount | Required | Always approved |
-| Finance approver | `ledger.manual_journal.approve` | Same scope | Required | Cannot approve own journal |
+| Finance officer | `ledger.manual_journal.draft` | Institution/legal entity/period/currency/accounts/amount | Required | Draft only |
+| Finance officer | `ledger.manual_journal.submit` | Same scope | Required | Sends the exact draft hash to Workflow |
+| Finance approver | `ledger.manual_journal.approve` | Same scope, exact request hash | Required | Cannot approve own journal; tier count by amount |
+| Finance operations | `ledger.manual_journal.post` | Approved request hash | Required | Posts the approved content unchanged |
+| Named Security operations | `ledger.manual_journal.break_glass` | Institution/account class/reason | Required with MFA | Dual control, expires at the business-date end |
+| Finance security admin | `ledger.manual_journal.class.<class>` | Declared account class only | Required | Separate grant per cash/settlement/tax/suspense/control/income-expense/customer-account-adjustment class |
 | Finance operations | `ledger.period.manage` | Institution/legal entity/period | Required | Dual control by policy |
 | Finance operations | `ledger.processing.execute` | Institution/business date/run type | Required | Start/resume/override policy |
 | Finance supervisor | `ledger.processing.approve` | Run/checkpoint/exception | Required | Cannot approve own restricted override |
@@ -400,7 +404,7 @@ Financial mutation APIs are internal service contracts. They are never exposed d
 | POST | `/internal/v1/ledger/holds/{id}/captures` | `ledger.hold.capture` | `CaptureHoldRequest` | `HoldResponse` | Required |
 | POST | `/internal/v1/ledger/holds/{id}/releases` | `ledger.hold.release` | `ReleaseHoldRequest` | `HoldResponse` | Required |
 | POST | `/api/v1/ledger/reversal-requests` | `ledger.reversal.propose` | `CreateReversalRequest` | `ReversalRequestResponse` | By request ID |
-| POST | `/api/v1/ledger/manual-journals` | `ledger.manual_journal.create` | `CreateManualJournalRequest` | `ManualJournalResponse` | By request ID |
+| POST | `/api/v1/ledger/manual-journals` | `ledger.manual_journal.draft` | `CreateManualJournalRequest` | `ManualJournalResponse` | By request ID |
 | POST | `/api/v1/ledger/periods/{id}/transition-proposals` | `ledger.period.manage` | `PeriodTransitionRequest` | `PeriodResponse` | By request ID |
 | POST | `/api/v1/ledger/processing-runs` | `ledger.processing.execute` | `StartProcessingRunRequest` | `ProcessingRunResponse` | By institution/type/date |
 | POST | `/api/v1/ledger/processing-runs/{id}/resume` | `ledger.processing.execute` | Checkpoint/expected version | `ProcessingRunResponse` | Yes |
@@ -640,18 +644,29 @@ Financial configuration is immutable after effective use. Missing or stale criti
 
 ## 19. Implementation slices
 
-Implementation progress as of 2026-11-22: `P1-E05-D01` to `P1-E05-D09` are approved, ADR-0005 is accepted and slices 2
-through 5 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
+Implementation progress as of 2026-11-26: `P1-E05-D01` to `P1-E05-D14` are approved, ADR-0005 is accepted and slices 2
+through 11 are implemented. Typed financial primitives and the protected-persistence guard are followed by strict chart
 and mapping schemas, balanced mapping simulation, an exact-hash publication lifecycle and fail-closed effective chart
 resolution. The posting foundation now models immutable financial transactions, journals and typed positive-amount
 lines; PostgreSQL enforces scoped reference uniqueness, at least one balanced two-line journal per Posted transaction,
 exact institution/legal-entity/currency scope, and application-principal append-only access. Financial commands now have
 deterministic canonical JSON hashes and a transaction-participating idempotency claim/outcome boundary: same-scope,
 same-hash retries replay the committed outcome while another hash conflicts, including under separate-connection
-contention. No posting endpoint, balance row, movement, hold, period or processing table is enabled yet.
+contention. Atomic hold create, release, expiry and capture now update the reserved balance component, lifecycle history,
+audit and outbox evidence under the same financial idempotency boundary; capture is committed with its final posting.
+Full reversal derives exact opposite lines from the authoritative posted rows, locks the original while it validates and
+consumes the reversible remainder, requires reason, evidence and applicable Workflow approval separation, refuses
+provider-uncertain evidence, and commits the immutable original/reversal link, audit and outbox fact atomically with the
+reversing posting. Manual journals resolve their accounts against the effective chart, enforce the published class
+grants, reason catalogue, compensating-account rule and amount tiers, and post only after the approved quorum of
+distinct non-maker approvers; dual-control break-glass posts with its own bounded security evidence. Accounting periods
+now enforce the approved state machine and date policy inside the posting transaction: monthly periods per legal entity,
+empty-by-default soft-close/reopen allow-lists, two-approver time-bounded reopen, close evidence and a durable
+recalculation handoff for historical value dates. No posting, hold, reversal, manual-journal or period HTTP endpoint,
+EOD processing table or statement query is enabled yet.
 
 1. Approve ADR-0005 plus chart, mapping, precision, rounding, available-funds, reversal, period and EOD decisions.
-   **D01 to D09 approved 2026-11-09; D10 to D17 remain proposed:** see [decisions/](decisions/).
+   **D01 to D14 approved 2026-11-09 and 2026-11-26; D15 to D17 remain proposed:** see [decisions/](decisions/).
 2. Define Money/date/reference/idempotency contracts and architecture guards that prohibit Ledger persistence access outside the module.
 3. Implement ledger-account and approved mapping-version lifecycle with balanced simulation.
 4. Implement transaction/journal/line domain invariants and database append-only/balance guards. *Status: implemented
@@ -672,12 +687,81 @@ contention. No posting endpoint, balance row, movement, hold, period or processi
    original outcome. The Release solution builds with zero warnings/errors; 365 non-database Core Ledger tests, 42
    PostgreSQL database/integration tests and 16 architecture tests pass; formatting is clean and the Core Ledger migration
    snapshot remains consistent with no schema change.*
-6. Implement atomic single-currency posting transaction with balance rows, movements, audit and outbox.
+6. Implement atomic single-currency posting transaction with balance rows, movements, audit and outbox. *Status:
+   implemented 2026-11-24 — the ledger now owns accumulated debit/credit totals, normal-side visible balances and the
+   approved available-funds breakdown. Ledger-account initialisation creates an exact zero balance, and the protected
+   posting service takes deterministic account/balance row locks before staging the financial transaction, balanced
+   journal and lines, immutable movements, authoritative balance versions, idempotency outcome, audit evidence and
+   outbox fact in one `READ COMMITTED` PostgreSQL transaction. Migration `AddAtomicLedgerPosting` supplies numeric(19,4)
+   balance/movement tables, signed-movement and net-total checks, append-only movement and used-balance deletion guards,
+   restricted runtime grants and a zero-balance backfill for the existing customer-deposit accounts. No HTTP posting
+   endpoint is exposed. The Release solution builds with zero warnings/errors; 369 non-database Core Ledger tests, 44
+   PostgreSQL database/integration tests and 54 effective-principal security tests pass. The migration applied using the
+   migrator principal, while atomic commit, replay, rollback and runtime grants were exercised using the restricted
+   application principal. Formatting and migration drift are clean.*
 7. Integrate account controls and prove concurrent debit/available-funds safety using real PostgreSQL contention tests.
-8. Implement hold lifecycle and capture-to-posting linkage.
-9. Implement full reversal plus original/reversal trace and duplicate/concurrent reversal prevention.
-10. Implement manual journal/adjustment and Workflow decision application.
-11. Implement accounting periods, date policies and controlled backdated/value-dated posting.
+   *Status: implemented 2026-11-24 — every posting supplies an explicit channel, transaction type and known control
+   version per affected ledger account. After deterministic balance locks, the service takes shared account locks,
+   re-evaluates restrictions/freezes/blocks, refuses missing or stale versions, and calculates reductions from the one
+   domain availability function using visible balance, approved credit limit, active holds, active lien outstanding and
+   pending authorisations. A PostgreSQL contention test submits two distinct 75 NGN debits against one 100 NGN deposit
+   balance through separate connections: exactly one commits and the other returns `insufficient_available_funds`.
+   Focused tests also prove an applicable legal block, stale control version and 40 NGN lien all fail closed before any
+   financial evidence is committed. The Release build has zero warnings/errors; 369 non-database and 48 PostgreSQL
+   database/integration tests pass. No posting HTTP endpoint is exposed.*
+8. Implement hold lifecycle and capture-to-posting linkage. *Status: implemented 2026-11-24 — the ledger owns an
+   invariant-protected hold aggregate with original, remaining, captured and released amounts, explicit expiry and
+   optimistic versioning. Create, partial/full release and expiry serialize on the authoritative balance and hold rows,
+   update only `hold_remaining` and the balance version, and commit lifecycle history, scoped idempotency outcome, audit
+   and outbox evidence atomically. Capture is part of the protected posting transaction, links its history row to the
+   financial transaction and consumes reserved funds without deducting them twice from available funds. PostgreSQL
+   guards make terminal holds immutable and lifecycle history append-only. Separate-connection contention proves only
+   one capture of the same version can commit. The Release solution builds with zero warnings/errors; 372 non-database,
+   51 PostgreSQL database/integration, 54 effective-principal security and 16 architecture tests pass. No posting or hold
+   HTTP endpoint is exposed.*
+9. Implement full reversal plus original/reversal trace and duplicate/concurrent reversal prevention. *Status:
+   implemented 2026-11-26 — `LedgerReversalService` loads the original posted transaction, journal and ordered lines,
+   asks the domain `FinancialReversalPolicy` for exact-opposite, same-scope, same-mapping and same-component equality,
+   and then delegates to the atomic posting boundary with a reversal context. The posting service re-reads the original
+   with `FOR UPDATE`, refuses a non-`Posted` original, refuses reversing a reversal, refuses a second reversal of the
+   same original, and commits the reversing transaction, opposite journal, `ledger.financial_reversals` link, audit and
+   `financial_transaction_reversed` outbox fact in one transaction. Reason code, evidence reference and current-period
+   posting date are mandatory; provider-uncertain evidence, maker self-approval, stale or differently bound approval
+   and component/amount changes are denied. Migration `AddFinancialReversals` adds the append-only link table with unique
+   original/reversal indexes, a workflow-evidence check, a rejection trigger and restricted grants. Separate-connection
+   contention proves two distinct keys produce one committed reversal and one `financial_transaction_already_reversed`
+   refusal. The Release solution builds with zero warnings/errors; 378 non-database, 55 PostgreSQL database/integration,
+   55 effective-principal security and 17 architecture tests pass. Partial/component reversal remains fail-closed until
+   an approved event mapping publishes its eligibility, component treatment and limits. No reversal HTTP endpoint is
+   exposed.*
+10. Implement manual journal/adjustment and Workflow decision application. *Status: implemented 2026-11-26 — the
+    institution's `ledger.manual_journal_policy` is authored through the shared configuration lifecycle and resolved
+    fail-closed: a missing, ambiguous, superseded or corrupt policy refuses every manual journal. A draft resolves each
+    ledger account against the effective published chart, maps its role to an approved class grant, refuses unauthorised
+    reason codes, requires a compensating-class line for a `customer_account_adjustment`, and fixes an exact content hash
+    together with the amount-tier and class quorum. Submitting emits one `approval_requested` fact bound to the exact
+    version and hash. The Workflow `approval_decided` consumer records append-only decisions, excludes the maker, applies
+    the tier's Finance-head permission and posts through the protected posting boundary only when the quorum is met. A
+    Break-glass post requires a distinct dual-control actor, a bounded security evidence reference and an expiry, and
+    cannot bypass balancing, immutability, period, currency or idempotency checks. Migration `AddManualJournals` adds the
+    request, line and approval tables with content-immutability and posted-request triggers, append-only child guards and
+    restricted grants. The Release solution builds with zero warnings/errors; 387 non-database, 62 PostgreSQL
+    database/integration, 56 effective-principal security and 17 architecture tests pass. No manual-journal HTTP endpoint
+    is exposed and closed-period posting remains with slices 11-13.*
+11. Implement accounting periods, date policies and controlled backdated/value-dated posting. *Status: implemented
+    2026-11-26 — the approved `P1-E05-D12`/`D13` policy is enforced inside the posting transaction. Each legal entity
+    owns monthly accounting periods with an Open/SoftClosed/Closed/Locked/Reopened state machine, the soft-close and
+    reopen allow-lists default to empty, and a period is provisioned Open on first use while Finance controls every
+    later transition. Transitions run under the same advisory transaction lock posting uses, check optimistic version,
+    require balanced/reconciled/processing/outbox close evidence, and record append-only history plus audit. A reopen
+    needs two distinct non-maker Finance approvals, expires within five business days and refuses posting once expired.
+    The date policy treats a value date within 90 days as ordinary, requires a bound step-up backdate authority between
+    91 and 365 days, classifies those postings as prior-period on the current open posting date and records a durable
+    recalculation handoff, and refuses future dates, dates older than 365 days and a posting date that differs from the
+    business date. Migration `AddAccountingPeriods` adds the period, history and handoff tables with append-only guards
+    and restricted grants. The Release solution builds with zero warnings/errors; 411 non-database, 68 PostgreSQL
+    database/integration, 57 effective-principal security and 17 architecture tests pass. No period or recalculation
+    HTTP endpoint is exposed and EOD processing remains with slice 12.*
 12. Implement EOD run graph, batches, checkpoints, restart and balancing summaries for approved Phase 1 steps.
 13. Implement authoritative balance/history/statement-data queries and controlled document handoff.
 14. Implement balance rebuild, reconciliation feeds, dashboards, alerts and operational runbooks.
@@ -740,7 +824,7 @@ Property-based tests generate balanced/unbalanced journals, component combinatio
 - [ ] Atomic posting includes transaction, journal, lines, movements, balances, idempotency, audit and outbox.
 - [ ] Balance by scope/currency is enforced in domain and database at commit.
 - [ ] Idempotency survives concurrency, restart, timeout and event replay.
-- [ ] Concurrent debit/hold/control tests prove the available-funds policy cannot be bypassed.
+- [x] Concurrent debit/hold/control tests prove the available-funds policy cannot be bypassed.
 - [ ] Components, currencies, dates, mapping and rule versions are explicit.
 - [ ] Reversals/adjustments preserve originals and enforce remaining eligibility under concurrency.
 - [ ] Manual journals, backdates and period exceptions require authority, reason, approval and audit.
@@ -763,8 +847,8 @@ Property-based tests generate balanced/unbalanced journals, component combinatio
 ## 23. Open decisions
 
 Decision briefs exist for all 17 decisions in [decisions/](decisions/). The project owner approved the recommended
-positions in D01 to D09 on 2026-11-09 and ADR-0005 is accepted. D10 to D17 remain proposed for their later slices and
-release gates.
+positions in D01 to D09 on 2026-11-09 and Option B in D10 on 2026-11-26; ADR-0005 is accepted. D11 to D17 remain
+proposed for their later slices and release gates.
 
 | Decision | Impact | Owner | Required by | Status |
 | --- | --- | --- | --- | --- |
@@ -777,11 +861,11 @@ release gates.
 | PostgreSQL isolation/locking/retry policy | Contention and correctness | Architecture/DBA | Slice 1 | Approved 2026-11-09: [P1-E05-D07](decisions/P1-E05-D07-postgresql-isolation-locking-and-retry.md) |
 | External/source reference uniqueness scopes | Deduplication/traceability | Domain owners/Finance | Slice 2 | Approved 2026-11-09: [P1-E05-D08](decisions/P1-E05-D08-reference-uniqueness-scopes.md) |
 | Fee/tax/commission/interest/waiver accounting treatment | Explicit components/mappings | Finance/Tax/Product | Slice 3 | Approved 2026-11-09: [P1-E05-D09](decisions/P1-E05-D09-fee-tax-and-waiver-treatment.md) |
-| Reversal/partial reversal and component policy | Corrections and provider flows | Finance/Operations | Slice 9 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D10](decisions/P1-E05-D10-reversal-and-partial-reversal-policy.md) |
-| Manual journal/customer-account permissions | Privileged financial risk | Finance/Security | Slice 10 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D11](decisions/P1-E05-D11-manual-journal-and-customer-account-permissions.md) |
-| Backdate/value-date windows and recalculation impact | Period/accrual correctness | Finance/Compliance | Slice 11 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D12](decisions/P1-E05-D12-backdate-value-date-and-recalculation-policy.md) |
-| Period close/lock/reopen state and authority | Financial close | Finance | Slice 11 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D13](decisions/P1-E05-D13-accounting-period-state-and-authority.md) |
-| EOD step graph, partitions and completion gates | Restart/order/business date | Finance/Core operations | Slice 12 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D14](decisions/P1-E05-D14-eod-step-graph-partitions-and-gates.md) |
+| Reversal/partial reversal and component policy | Corrections and provider flows | Finance/Operations | Slice 9 | Approved Option B by project owner 2026-11-26: [P1-E05-D10](decisions/P1-E05-D10-reversal-and-partial-reversal-policy.md) |
+| Manual journal/customer-account permissions | Privileged financial risk | Finance/Security | Slice 10 | Approved Option B by project owner 2026-11-26: [P1-E05-D11](decisions/P1-E05-D11-manual-journal-and-customer-account-permissions.md) |
+| Backdate/value-date windows and recalculation impact | Period/accrual correctness | Finance/Compliance | Slice 11 | Approved Option B by project owner 2026-11-26: [P1-E05-D12](decisions/P1-E05-D12-backdate-value-date-and-recalculation-policy.md) |
+| Period close/lock/reopen state and authority | Financial close | Finance | Slice 11 | Approved Option B by project owner 2026-11-26: [P1-E05-D13](decisions/P1-E05-D13-accounting-period-state-and-authority.md) |
+| EOD step graph, partitions and completion gates | Restart/order/business date | Finance/Core operations | Slice 12 | Approved Option A by project owner 2026-11-26: [P1-E05-D14](decisions/P1-E05-D14-eod-step-graph-partitions-and-gates.md) |
 | Statement running-balance/snapshot semantics | US-023 accuracy | Finance/Product | Slice 13 | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D15](decisions/P1-E05-D15-statement-running-balance-and-snapshot-semantics.md) |
 | Retention/partitioning/archival | Scale, audit and restore | Compliance/DBA | Before migration approval | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D16](decisions/P1-E05-D16-retention-partitioning-and-archival.md) |
 | Load, latency, availability, RTO and RPO | Release/performance/recovery | Product/Platform | Before release testing | Brief drafted 2026-11-09, awaiting approval: [P1-E05-D17](decisions/P1-E05-D17-capacity-latency-availability-and-recovery-targets.md) |

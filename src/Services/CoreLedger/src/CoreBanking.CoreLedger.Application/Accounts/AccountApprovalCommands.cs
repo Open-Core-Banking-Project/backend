@@ -35,12 +35,17 @@ public sealed record LedgerChartClassificationLookup(
     string? ChartVersionId,
     string? LegalEntityCode,
     string? GlAccountCode,
+    string? NormalSide,
     string? RejectionCode)
 {
-    public static LedgerChartClassificationLookup Found(string chartVersionId, string legalEntityCode, string glAccountCode) =>
-        new(chartVersionId, legalEntityCode, glAccountCode, null);
+    public static LedgerChartClassificationLookup Found(
+        string chartVersionId,
+        string legalEntityCode,
+        string glAccountCode,
+        string normalSide) =>
+        new(chartVersionId, legalEntityCode, glAccountCode, normalSide, null);
 
-    public static LedgerChartClassificationLookup Rejected(string code) => new(null, null, null, code);
+    public static LedgerChartClassificationLookup Rejected(string code) => new(null, null, null, null, code);
 }
 
 public interface ILedgerChartClassificationSource

@@ -108,6 +108,28 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     public DbSet<JournalLineRecord> JournalLines => Set<JournalLineRecord>();
 
+    public DbSet<FinancialReversalRecord> FinancialReversals => Set<FinancialReversalRecord>();
+
+    public DbSet<ManualJournalRequestRecord> ManualJournalRequests => Set<ManualJournalRequestRecord>();
+
+    public DbSet<ManualJournalLineRecord> ManualJournalLines => Set<ManualJournalLineRecord>();
+
+    public DbSet<ManualJournalApprovalRecord> ManualJournalApprovals => Set<ManualJournalApprovalRecord>();
+
+    public DbSet<AccountingPeriodRecord> AccountingPeriods => Set<AccountingPeriodRecord>();
+
+    public DbSet<AccountingPeriodHistoryRecord> AccountingPeriodHistory => Set<AccountingPeriodHistoryRecord>();
+
+    public DbSet<RecalculationHandoffRecord> RecalculationHandoffs => Set<RecalculationHandoffRecord>();
+
+    public DbSet<LedgerBalanceRecord> LedgerBalances => Set<LedgerBalanceRecord>();
+
+    public DbSet<LedgerMovementRecord> LedgerMovements => Set<LedgerMovementRecord>();
+
+    public DbSet<LedgerHoldRecord> LedgerHolds => Set<LedgerHoldRecord>();
+
+    public DbSet<LedgerHoldHistoryRecord> LedgerHoldHistory => Set<LedgerHoldHistoryRecord>();
+
     public DbSet<InstitutionAuditRecord> InstitutionAuditEvents => Set<InstitutionAuditRecord>();
 
     public DbSet<OutboxRecord> OutboxMessages => Set<OutboxRecord>();
@@ -177,6 +199,17 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
         modelBuilder.Entity<FinancialTransactionStatusHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<JournalEntryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<JournalLineRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<FinancialReversalRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ManualJournalRequestRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ManualJournalLineRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<ManualJournalApprovalRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountingPeriodRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<AccountingPeriodHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<RecalculationHandoffRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<LedgerBalanceRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<LedgerMovementRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<LedgerHoldRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
+        modelBuilder.Entity<LedgerHoldHistoryRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<InstitutionAuditRecord>().HasQueryFilter(record => CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
         modelBuilder.Entity<OutboxRecord>().HasQueryFilter(record =>
             CurrentInstitutionId != null && record.InstitutionId == CurrentInstitutionId);
@@ -207,6 +240,62 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
 
     private void EnsureAppendOnlyEvidence()
     {
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<FinancialReversalRecord> entry
+                 in ChangeTracker.Entries<FinancialReversalRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Financial reversal evidence is append-only.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<ManualJournalRequestRecord> entry
+                 in ChangeTracker.Entries<ManualJournalRequestRecord>())
+        {
+            if (entry.State == EntityState.Deleted
+                || (entry.State == EntityState.Modified
+                    && string.Equals(entry.OriginalValues["Status"] as string, "posted", System.StringComparison.Ordinal)))
+            {
+                throw new System.InvalidOperationException("A posted manual journal is immutable.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<ManualJournalLineRecord> entry
+                 in ChangeTracker.Entries<ManualJournalLineRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Manual journal lines are append-only.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<ManualJournalApprovalRecord> entry
+                 in ChangeTracker.Entries<ManualJournalApprovalRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Manual journal approvals are append-only.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<AccountingPeriodHistoryRecord> entry
+                 in ChangeTracker.Entries<AccountingPeriodHistoryRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Accounting-period history is append-only.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<RecalculationHandoffRecord> entry
+                 in ChangeTracker.Entries<RecalculationHandoffRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Recalculation handoffs are append-only.");
+            }
+        }
+
         foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<InstitutionAuditRecord> entry
                  in ChangeTracker.Entries<InstitutionAuditRecord>())
         {
@@ -240,6 +329,24 @@ public sealed class CoreLedgerDbContext : DbContext, IIntegrationStore
             if (entry.State is EntityState.Modified or EntityState.Deleted)
             {
                 throw new System.InvalidOperationException("Posted journal lines are immutable.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<LedgerMovementRecord> entry
+                 in ChangeTracker.Entries<LedgerMovementRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Ledger movements are immutable.");
+            }
+        }
+
+        foreach (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<LedgerHoldHistoryRecord> entry
+                 in ChangeTracker.Entries<LedgerHoldHistoryRecord>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new System.InvalidOperationException("Ledger hold history is append-only.");
             }
         }
 

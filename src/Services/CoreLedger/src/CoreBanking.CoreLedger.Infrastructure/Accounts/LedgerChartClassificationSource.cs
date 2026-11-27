@@ -80,7 +80,8 @@ public sealed class LedgerChartClassificationSource : ILedgerChartClassification
             return LedgerChartClassificationLookup.Found(
                 candidate.VersionId,
                 classification.LegalEntityCode,
-                classification.GlAccountCode);
+                classification.GlAccountCode,
+                classification.NormalSide.ToString().ToLowerInvariant());
         }
         catch (LedgerMappingException exception)
         {

@@ -175,9 +175,10 @@ public sealed class AccountControlService : IAccountControlService
 
         IReadOnlyList<AccountControlDescriptor> controls = await LoadControlsAsync(accountId, cancellationToken)
             .ConfigureAwait(false);
-        long currentVersion = controls.Count == 0
-            ? 0
-            : await CurrentControlVersionAsync(accountId, cancellationToken).ConfigureAwait(false);
+        // The version is the account's full control history boundary, not the count of currently active rows.
+        // A released/expired control still advances the version so a caller holding the pre-release snapshot
+        // cannot pass a posting decision after the control set changed.
+        long currentVersion = await CurrentControlVersionAsync(accountId, cancellationToken).ConfigureAwait(false);
 
         AccountControlDecision decision = AccountControlPrecedencePolicy.Evaluate(
             controls,

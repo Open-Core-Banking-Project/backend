@@ -14,6 +14,7 @@ using CoreBanking.BuildingBlocks.Infrastructure.Tenancy;
 using CoreBanking.CoreLedger.Api.Authorisation;
 using CoreBanking.CoreLedger.Application.Accounts;
 using CoreBanking.CoreLedger.Application.Institutions;
+using CoreBanking.CoreLedger.Application.Ledger;
 using CoreBanking.CoreLedger.Application.Products;
 using CoreBanking.CoreLedger.Application.Provisioning;
 using CoreBanking.CoreLedger.Contracts;
@@ -155,6 +156,18 @@ if (useRelationalStore)
     builder.Services.AddScoped<IIntegrationStore>(provider => provider.GetRequiredService<CoreLedgerDbContext>());
     builder.Services.AddScoped<IdempotencyService>();
     builder.Services.AddScoped<FinancialIdempotencyService>();
+    builder.Services.AddScoped<AtomicLedgerPostingService>();
+    builder.Services.AddScoped<LedgerReversalService>();
+    builder.Services.AddScoped<ILedgerHoldService, LedgerHoldService>();
+    builder.Services.AddScoped<IManualJournalPolicyConfigurationService, ManualJournalPolicyConfigurationService>();
+    builder.Services.AddScoped<IManualJournalPolicySource, ManualJournalPolicySource>();
+    builder.Services.AddScoped<IManualJournalAccountResolver, ManualJournalAccountResolver>();
+    builder.Services.AddScoped<ManualJournalService>();
+    builder.Services.AddScoped<IAccountingPeriodService, AccountingPeriodService>();
+    builder.Services.AddScoped<IManualJournalService>(provider =>
+        (IManualJournalService)provider.GetRequiredService<ManualJournalService>());
+    builder.Services.AddScoped<IManualJournalApprovalApplier>(provider =>
+        (IManualJournalApprovalApplier)provider.GetRequiredService<ManualJournalService>());
     builder.Services.AddScoped<IInstitutionCreationService, InstitutionCreationService>();
     builder.Services.AddScoped<IInstitutionActivationService, InstitutionActivationService>();
     builder.Services.AddScoped<IInstitutionSuspensionService, InstitutionSuspensionService>();

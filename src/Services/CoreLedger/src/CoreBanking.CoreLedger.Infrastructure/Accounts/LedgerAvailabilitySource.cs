@@ -1,18 +1,19 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CoreBanking.BuildingBlocks.Domain.Identity;
 using CoreBanking.CoreLedger.Application.Accounts;
 using CoreBanking.CoreLedger.Domain.Accounts;
+using CoreBanking.CoreLedger.Domain.Ledger;
 using CoreBanking.CoreLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoreBanking.CoreLedger.Infrastructure.Accounts;
 
 /// <summary>
-/// The in-process ledger availability answer for Phase 1. No posting exists yet, so the ledger reports a zero
-/// balance and zero holds with its own source version; the account module reports that answer and never
-/// derives an available balance itself. Decision: P1-E04-D11.
+/// Reads the authoritative ledger balance and applies the approved availability formula. The account
+/// module reports this answer and never derives a balance itself. Decisions: P1-E04-D11, P1-E05-D06.
 /// </summary>
 public sealed class LedgerAvailabilitySource : ILedgerAvailabilitySource
 {
@@ -42,12 +43,49 @@ public sealed class LedgerAvailabilitySource : ILedgerAvailabilitySource
                 "ledger_initialisation_unproven",
                 "The account has no ledger account, so its availability is unknown.");
 
+        LedgerBalanceRecord balance = await _context.LedgerBalances
+            .AsNoTracking()
+            .SingleOrDefaultAsync(record => record.LedgerAccountId == ledgerAccount.LedgerAccountId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new AccountApplicationRejectedException(
+                "ledger_balance_unproven",
+                "The account has no authoritative ledger balance, so its availability is unknown.");
+
         DateTimeOffset now = _timeProvider.GetUtcNow();
+        decimal outstandingLiens = await _context.AccountLiens
+            .AsNoTracking()
+            .Where(record => record.AccountId == accountId
+                && record.Status == "active"
+                && record.EffectiveFrom <= now
+                && (record.EffectiveTo == null || now < record.EffectiveTo))
+            .SumAsync(record => (decimal?)record.OutstandingAmount, cancellationToken)
+            .ConfigureAwait(false) ?? 0m;
+        LedgerBalance ledgerBalance = LedgerBalance.Restore(
+            balance.LedgerAccountId,
+            balance.CurrencyCode,
+            ParseNormalSide(balance.NormalSide),
+            balance.DebitTotal,
+            balance.CreditTotal,
+            balance.CreditLimit,
+            balance.HoldRemaining,
+            balance.PendingAuthorised,
+            balance.Version);
+        AvailableFundsPosition position = ledgerBalance.Available(outstandingLiens);
+
         return new LedgerAvailabilitySnapshot(
-            LedgerBalance: 0m,
-            Holds: 0m,
-            Available: 0m,
-            SourceVersion: $"ledger:{ledgerAccount.LedgerAccountId}:v{ledgerAccount.Version}",
-            AsOf: now);
+            LedgerBalance: position.VisibleLedgerBalance,
+            Holds: balance.HoldRemaining,
+            Available: position.Available,
+            SourceVersion: $"ledger:{ledgerAccount.LedgerAccountId}:v{balance.Version}",
+            AsOf: balance.AsOf <= now ? balance.AsOf : now);
     }
+
+    private static DebitCreditIndicator ParseNormalSide(string value) => value switch
+    {
+        "debit" => DebitCreditIndicator.Debit,
+        "credit" => DebitCreditIndicator.Credit,
+        _ => throw new AccountApplicationRejectedException(
+            "ledger_balance_normal_side_invalid",
+            "The authoritative ledger balance has an invalid normal side."),
+    };
 }

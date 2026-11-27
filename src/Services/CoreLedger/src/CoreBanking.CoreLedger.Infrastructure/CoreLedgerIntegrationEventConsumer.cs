@@ -7,6 +7,7 @@ using CoreBanking.BuildingBlocks.Infrastructure.Messaging;
 using CoreBanking.CoreLedger.Contracts;
 using CoreBanking.CoreLedger.Infrastructure.Accounts;
 using CoreBanking.CoreLedger.Infrastructure.Institutions;
+using CoreBanking.CoreLedger.Infrastructure.Ledger;
 using CoreBanking.CoreLedger.Infrastructure.Products;
 
 namespace CoreBanking.CoreLedger.Infrastructure;
@@ -23,19 +24,22 @@ public sealed class CoreLedgerIntegrationEventConsumer : IIntegrationEventConsum
     private readonly InstitutionConfigurationApprovalDecidedConsumer _configurationApprovals;
     private readonly AccountApplicationApprovalDecidedConsumer _accountApprovals;
     private readonly AccountClosureApprovalDecidedConsumer _closureApprovals;
+    private readonly ManualJournalApprovalDecidedConsumer _manualJournalApprovals;
 
     public CoreLedgerIntegrationEventConsumer(
         InstitutionBoundaryAcknowledgementConsumer institutions,
         SavingsEligibilityApprovalDecidedConsumer savingsApprovals,
         InstitutionConfigurationApprovalDecidedConsumer configurationApprovals,
         AccountApplicationApprovalDecidedConsumer accountApprovals,
-        AccountClosureApprovalDecidedConsumer closureApprovals)
+        AccountClosureApprovalDecidedConsumer closureApprovals,
+        ManualJournalApprovalDecidedConsumer manualJournalApprovals)
     {
         _institutions = institutions ?? throw new ArgumentNullException(nameof(institutions));
         _savingsApprovals = savingsApprovals ?? throw new ArgumentNullException(nameof(savingsApprovals));
         _configurationApprovals = configurationApprovals ?? throw new ArgumentNullException(nameof(configurationApprovals));
         _accountApprovals = accountApprovals ?? throw new ArgumentNullException(nameof(accountApprovals));
         _closureApprovals = closureApprovals ?? throw new ArgumentNullException(nameof(closureApprovals));
+        _manualJournalApprovals = manualJournalApprovals ?? throw new ArgumentNullException(nameof(manualJournalApprovals));
     }
 
     public string Topic => throw new NotSupportedException("The routing consumer subscribes to multiple configured topics.");
@@ -52,6 +56,7 @@ public sealed class CoreLedgerIntegrationEventConsumer : IIntegrationEventConsum
         {
             AccountOpeningApprovalV1.SubjectType => _accountApprovals.HandleAsync(envelope, cancellationToken),
             AccountClosureApprovalV1.SubjectType => _closureApprovals.HandleAsync(envelope, cancellationToken),
+            ManualJournalApprovalV1.SubjectType => _manualJournalApprovals.HandleAsync(envelope, cancellationToken),
             InstitutionConfigurationApprovalV1.SubjectType => _configurationApprovals.HandleAsync(envelope, cancellationToken),
             SavingsEligibilityApprovalV1.SubjectType => _savingsApprovals.HandleAsync(envelope, cancellationToken),
             _ => _institutions.HandleAsync(envelope, cancellationToken),

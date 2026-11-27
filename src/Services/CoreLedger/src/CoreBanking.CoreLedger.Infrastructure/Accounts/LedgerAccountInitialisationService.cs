@@ -9,9 +9,9 @@ using Microsoft.EntityFrameworkCore;
 namespace CoreBanking.CoreLedger.Infrastructure.Accounts;
 
 /// <summary>
-/// The in-process ledger contract for Phase 1. It opens exactly one ledger account per bank account and
-/// holds no amount, balance or posting column, so opening and activation can never create money.
-/// Decision: P1-E04-D09.
+/// Opens exactly one ledger account and its zero authoritative balance. Initialisation never creates a
+/// movement or non-zero amount, so opening and activation cannot create money. Decisions: P1-E04-D09,
+/// P1-E05-D05.
 /// </summary>
 public sealed class LedgerAccountInitialisationService : ILedgerAccountInitialisation
 {
@@ -55,7 +55,8 @@ public sealed class LedgerAccountInitialisationService : ILedgerAccountInitialis
             .ConfigureAwait(false);
         if (classification.ChartVersionId is null
             || classification.LegalEntityCode is null
-            || classification.GlAccountCode is null)
+            || classification.GlAccountCode is null
+            || classification.NormalSide is null)
         {
             throw new AccountApplicationRejectedException(
                 classification.RejectionCode ?? "ledger_account_unclassified",
@@ -71,11 +72,27 @@ public sealed class LedgerAccountInitialisationService : ILedgerAccountInitialis
             LegalEntityCode = classification.LegalEntityCode,
             ChartVersionId = classification.ChartVersionId,
             GlAccountCode = classification.GlAccountCode,
+            NormalSide = classification.NormalSide,
             Status = InitialisedStatus,
             Version = 1,
             CreatedAt = _timeProvider.GetUtcNow(),
         };
         _context.LedgerAccounts.Add(ledgerAccount);
+        _context.LedgerBalances.Add(new LedgerBalanceRecord
+        {
+            InstitutionId = institutionId.Value,
+            LedgerAccountId = ledgerAccount.LedgerAccountId,
+            CurrencyCode = ledgerAccount.CurrencyCode,
+            NormalSide = classification.NormalSide,
+            DebitTotal = 0m,
+            CreditTotal = 0m,
+            NetBalance = 0m,
+            CreditLimit = 0m,
+            HoldRemaining = 0m,
+            PendingAuthorised = 0m,
+            Version = 1,
+            AsOf = _timeProvider.GetUtcNow(),
+        });
         return new LedgerInitialisationResult(accountId, ledgerAccount.LedgerAccountId, ledgerAccount.Status);
     }
 }

@@ -79,6 +79,7 @@ public sealed class LedgerAccountRecord : ITenantOwnedEntity
     public string? LegalEntityCode { get; set; }
     public string? ChartVersionId { get; set; }
     public string? GlAccountCode { get; set; }
+    public string? NormalSide { get; set; }
     public required string Status { get; set; }
     public long Version { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

@@ -59,7 +59,9 @@ Before completion:
 - Run the narrowest relevant tests, then the broader affected suite.
 - Run formatting and static analysis configured by the repository.
 - Inspect the diff for secrets, sensitive data, accidental generated files, and unrelated edits.
-- Update the applicable phase slice ledger with the slice status and recorded evidence; never mark a slice approved yourself.
+- Update the applicable phase slice ledger with the slice status and recorded evidence. An implementation slice is
+  complete when its acceptance criteria and automated evidence pass; do not add a separate human evidence-review gate.
+  Product, regulatory, security, provider, production, and other consequential decisions still require their named authority.
 - Report commands run, results, assumptions, and any remaining risk.
 
 Never claim a build, test, migration, or provider flow passed unless it was actually run successfully.

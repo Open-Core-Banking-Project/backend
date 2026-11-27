@@ -4,8 +4,11 @@ title: Reversal, partial-reversal and component policy
 epic: P1-E05 Core Ledger and Financial Posting
 owners: [Finance, Operations]
 required_by: P1-E05-S9
-status: Proposed
-brief_date: 2026-11-09
+status: Approved
+brief_date: 2026-11-26
+approved_on: 2026-11-26
+approved_by: Project owner
+selected_option: B - mapping-gated partial reversals
 related: [P1-E05-D03, P1-E05-D09, P1-E07-D14]
 decisions: [P1-E05-D10]
 ---
@@ -40,7 +43,21 @@ provider timeout, duplicate request or concurrent operator action from producing
   its value-date relationship to the original is recorded, not inferred.
 - Reversal refusal is a durable, queryable outcome and never edits the original transaction state to `Failed`.
 
-## 3. Required implementation evidence
+## 3. Options and impact
+
+| Option | Position | Impact |
+| --- | --- | --- |
+| A — full-only reversals | Every eligible posting is reversed in full, including every component selected by its approved mapping. | Smallest and safest Phase 1 implementation, but operations cannot correct a settled partial amount without a separate approved adjustment flow. |
+| B — mapping-gated partial reversals **(recommended)** | Full reversal remains the default. An approved event mapping may opt specific principal/fee/tax/commission components into partial reversal and define their limits. | Supports legitimate partial corrections while keeping accounting treatment explicit. Requires Finance to publish an event-by-event eligibility/component matrix and Operations to publish reason/evidence/approval rules before implementation. |
+| C — caller-selected partial reversals | The caller chooses any amount or component up to the remaining original amount. | Most flexible, but it permits callers to invent accounting treatment and can strand fees, taxes or commissions. This conflicts with the protected posting boundary and is rejected. |
+
+The project owner approved Option B on 2026-11-26. This authorises only the reversal mechanics described here. It does
+not approve provider finality, backdating, closed-period posting, arbitrary journal lines or a production accounting
+mapping. Full reversal is the default; partial/component reversal remains fail-closed unless an approved event mapping
+explicitly supplies its eligibility, component treatment and limit. Reason/evidence and Workflow requirements remain
+mandatory as described below.
+
+## 4. Required implementation evidence
 
 1. Full reversal produces balanced opposite lines and an immutable original/reversal link.
 2. Two concurrent reversals produce at most the approved reversible total.
@@ -49,16 +66,21 @@ provider timeout, duplicate request or concurrent operator action from producing
 5. Component-only reversal is refused unless the exact mapping permits it.
 6. Maker self-approval, stale approval and closed-period attempts are denied and audited.
 
-## 4. Deferred for approval
+## 5. Approved policy boundary
 
-Finance and Operations must publish the event-by-event eligibility matrix, partial limits, component treatment, reason
-catalogue and approval thresholds. Provider-specific finality remains owned by Payments/Integration decisions.
+- Full reversal is permitted only for an eligible `Posted` transaction under its exact approved event mapping.
+- Partial/component reversal is denied unless that mapping explicitly names the eligible components and limits.
+- Every reversal requires a stable reason code and evidence reference. A reversal classified as restricted by the
+  applicable approved policy requires an exact, current Workflow decision and maker separation.
+- Provider-specific finality remains owned by Payments/Integration decisions and cannot be inferred from this approval.
+- Adding or changing eligibility, components, limits, reason codes or approval thresholds is configuration publication,
+  not an implicit code default.
 
-## 5. Sign-off
+## 6. Sign-off
 
 | Role | Name | Decision | Date |
 | --- | --- | --- | --- |
-| Project owner | | Pending | |
-| Finance | | Pending: approve eligibility and component rules | |
-| Operations | | Pending: approve reasons and evidence | |
+| Project owner | User | Approved Option B | 2026-11-26 |
+| Finance | Project-owner approval | Approved mapping-gated eligibility and component boundary | 2026-11-26 |
+| Operations | Project-owner approval | Approved reason, evidence and Workflow boundary | 2026-11-26 |
 

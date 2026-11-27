@@ -107,5 +107,5 @@ internal sealed class FixedLedgerChartClassificationSource : ILedgerChartClassif
         string currencyCode,
         DateTimeOffset asOf,
         CancellationToken cancellationToken) =>
-        Task.FromResult(LedgerChartClassificationLookup.Found("chart-version-1", "legal-entity-1", "2100"));
+        Task.FromResult(LedgerChartClassificationLookup.Found("chart-version-1", "legal-entity-1", "2100", "credit"));
 }
